@@ -71,6 +71,10 @@
 
 <div align="center">
 
+<img src="./src/assets/github_cover/cover1.jpg" width="100%" alt="Touhou Isekai Izakaya Cover" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);" />
+
+<br/><br/>
+
 <!-- 项目核心亮点卡片 -->
 <table>
 <tr>
