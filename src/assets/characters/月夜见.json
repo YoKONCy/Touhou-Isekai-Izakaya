@@ -1,0 +1,23 @@
+{
+  "uuid": "Tsukuyomi",
+  "name": "月夜见",
+  "type": "character",
+  "gender": "male",
+  "category": "月之都",
+  "initialPower": "US",
+  "initialMaxHp": 4000,
+  "initialResidence": "",
+  "description": {
+    "角色名": "月夜见",
+    "性别": "男",
+    "设定": "月夜见是月都贤者，月之都的开山鼻祖之一，夜与月之都之王。",
+    "性格": [
+      "温和",
+      "威严",
+      "睿智"
+    ]
+  },
+  "tags": [
+    "月夜见"
+  ]
+}

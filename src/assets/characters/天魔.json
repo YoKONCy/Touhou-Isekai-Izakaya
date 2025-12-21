@@ -1,0 +1,29 @@
+{
+  "uuid": "tenma",
+  "name": "天魔",
+  "type": "character",
+  "gender": "female",
+  "category": "妖怪之山",
+  "initialPower": "S",
+  "initialMaxHp": 2000,
+  "initialResidence": "",
+  "description": {
+    "角色名": "天魔",
+    "性别": "女",
+    "设定": "天魔是妖怪之山上天狗们的首脑和头领",
+    "外貌": [
+      "黑发",
+      "黑瞳",
+      "带有羽翼型翅膀",
+      "与人类外貌相似"
+    ],
+    "性格": [
+      "威严",
+      "睿智",
+      "难以捉摸"
+    ]
+  },
+  "tags": [
+    "天魔"
+  ]
+}

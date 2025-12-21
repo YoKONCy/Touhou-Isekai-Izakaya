@@ -1,0 +1,207 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/* 
+  强制 Dark Mode 使用 class 策略，而非系统偏好 (media strategy)。
+  这样只要 html 标签不添加 'dark' 类，所有 dark: 修饰符就不会生效。
+  从而实现强制浅色模式。
+*/
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* 东方配色方案 */
+  --color-touhou-red: #D32F2F; /* 灵梦红 - 沉稳版 */
+  --color-touhou-red-light: #FFCDD2;
+  --color-touhou-red-dark: #B71C1C;
+  
+  --color-marisa-gold: #FBC02D; /* 魔理沙金 */
+  --color-marisa-gold-light: #FFF9C4;
+  
+  --color-izakaya-bg: #FDFBF7; /* 居酒屋米色背景 */
+  --color-izakaya-paper: #FFFDF5; /* 纸张色 */
+  --color-izakaya-wood: #5D4037; /* 深木纹 */
+  --color-izakaya-wood-light: #8D6E63;
+  
+  --color-ink: #212121; /* 墨色 */
+  --color-ink-light: #757575;
+  
+  --font-display: "Ma Shan Zheng", "Noto Serif SC", serif;
+  --font-serif-display: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --font-sans-body: "Noto Sans SC", system-ui, sans-serif;
+  
+  --shadow-paper: 0 2px 8px rgba(93, 64, 55, 0.1);
+  --shadow-floating: 0 8px 24px rgba(93, 64, 55, 0.15);
+
+  /* 动画 */
+  --animate-fade-in: fade-in 0.3s ease-out;
+  --animate-pop: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes pop {
+    0% { transform: scale(0.9) translateY(5px); opacity: 0; }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
+  }
+}
+
+/* Theme Overrides */
+
+/* Dark Theme (深色主题) */
+html.theme-dark {
+  --color-izakaya-bg: #121212;
+  --color-izakaya-paper: #1E1E1E;
+  --color-izakaya-wood: #8D6E63; /* Lighter wood for contrast on dark */
+  --color-izakaya-wood-light: #A1887F;
+  
+  --color-ink: #E0E0E0; /* Light text */
+  --color-ink-light: #9E9E9E;
+  
+  --shadow-paper: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow-floating: 0 8px 24px rgba(0, 0, 0, 0.7);
+
+  /* Adjust pattern opacity for dark mode */
+  --bg-pattern-asanoha: 
+    repeating-linear-gradient(60deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(-60deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 18px);
+}
+
+/* Eye Protection Theme (护眼主题) - Warmer, lower contrast */
+html.theme-eye-protection {
+  --color-izakaya-bg: #E3DCC3; /* Greenish-beige (C3) or warmer */
+  --color-izakaya-paper: #F0EAD6; /* Eggshell */
+  
+  /* Softer ink */
+  --color-ink: #3E3B35;
+  --color-ink-light: #6D6860;
+  
+  /* Softer Red */
+  --color-touhou-red: #A64444;
+  --color-touhou-red-dark: #8A3333;
+  
+  --bg-pattern-asanoha: 
+    repeating-linear-gradient(60deg, rgba(93, 64, 55, 0.03) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(-60deg, rgba(93, 64, 55, 0.03) 0 1px, transparent 1px 18px);
+}
+
+/* Typing Effect Cursor */
+.typing-effect > *:last-child::after {
+  content: '🖊️';
+  display: inline-block;
+  animation: writing 1s infinite alternate;
+  font-size: 0.8em;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+@keyframes writing {
+  0% { transform: rotate(0deg) translateX(0); opacity: 0.7; }
+  100% { transform: rotate(-10deg) translateX(-2px); opacity: 1; }
+}
+
+/* 
+  全局样式重置与基础设定 
+  Global Reset & Base Settings
+*/
+
+:root {
+  /* 麻叶纹 (Asanoha) 背景图案 - 使用 CSS 渐变模拟 */
+  --bg-pattern-asanoha: 
+    repeating-linear-gradient(60deg, rgba(141, 110, 99, 0.05) 0 1px, transparent 1px 18px),
+    repeating-linear-gradient(-60deg, rgba(141, 110, 99, 0.05) 0 1px, transparent 1px 18px);
+}
+
+body {
+  @apply text-ink bg-izakaya-bg font-sans-body;
+  background-image: var(--bg-pattern-asanoha);
+  background-attachment: fixed;
+  transition: background-color 0.3s, color 0.3s; /* Smooth theme transition */
+}
+
+/* 
+  自定义滚动条 - 仿木质/纸质手感
+  Custom Scrollbar 
+*/
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-izakaya-wood-light/50 rounded-full;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-izakaya-wood/70;
+}
+
+/* 
+  实用工具类 
+  Utility Classes 
+*/
+
+.font-display {
+  font-family: var(--font-serif-display);
+}
+
+/* 玻璃拟态 - 和纸风格 */
+.glass-paper {
+  @apply bg-izakaya-paper/90 backdrop-blur-sm border border-izakaya-wood/10 shadow-paper;
+  transition: background-color 0.3s, border-color 0.3s;
+}
+
+/* 按钮风格 - 东方风 */
+.btn-touhou {
+  @apply px-4 py-2 rounded transition-all duration-200 font-medium flex items-center justify-center gap-2;
+  @apply bg-touhou-red text-white shadow-sm;
+  @apply hover:bg-touhou-red-dark hover:shadow-md hover:-translate-y-0.5;
+  @apply active:translate-y-0;
+}
+
+.btn-touhou-secondary {
+  @apply px-4 py-2 rounded transition-all duration-200 font-medium flex items-center justify-center gap-2;
+  @apply bg-white border border-izakaya-wood/20 text-izakaya-wood hover:bg-izakaya-bg hover:border-izakaya-wood/40;
+}
+
+/* Dark mode overrides for secondary button manually since we rely on CSS vars mostly but some might be hardcoded */
+html.theme-dark .btn-touhou-secondary {
+  @apply bg-izakaya-paper border-izakaya-wood/30 text-ink hover:bg-izakaya-wood/20;
+}
+html.theme-eye-protection .btn-touhou-secondary {
+  @apply bg-izakaya-paper/50;
+}
+
+.btn-touhou-ghost {
+  @apply p-2 rounded transition-colors text-ink-light hover:text-touhou-red hover:bg-touhou-red/5;
+}
+
+/* 卡片风格 */
+.card-touhou {
+  @apply bg-izakaya-paper/90 backdrop-blur-sm border border-izakaya-wood/10 shadow-paper rounded-lg p-4;
+  transition: background-color 0.3s, border-color 0.3s;
+}
+
+/* 输入框风格 */
+.input-touhou {
+  @apply w-full bg-white/80 border border-izakaya-wood/20 rounded px-3 py-2 text-ink outline-none transition-colors;
+  @apply focus:border-touhou-red/50 focus:ring-2 focus:ring-touhou-red/10;
+}
+html.theme-dark .input-touhou {
+  @apply bg-black/20 border-izakaya-wood/40 text-ink;
+}
+
+/* 全局输入框深色模式修正 - 已禁用 */
+input, textarea, select {
+  @apply text-ink; /* 默认亮色模式下的文字颜色 */
+}
+
+input::placeholder, textarea::placeholder {
+  @apply text-stone-400; /* 增加对比度，原为 text-ink-light/50 太淡 */
+}

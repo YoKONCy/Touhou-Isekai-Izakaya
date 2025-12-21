@@ -1,0 +1,278 @@
+<script setup lang="ts">
+import { ref, computed } from 'vue';
+import { usePromptStore, type PromptBlock } from '@/stores/prompt';
+import { useGameStore } from '@/stores/game';
+import draggable from 'vuedraggable';
+import { GripVertical, Eye, EyeOff, Edit, X, Save, RotateCcw, Play, Bug } from 'lucide-vue-next';
+import PromptDebugger from './PromptDebugger.vue';
+import { useConfirm } from '@/utils/confirm';
+
+const props = defineProps<{
+  isOpen: boolean;
+}>();
+
+const emit = defineEmits<{
+  (e: 'close'): void;
+}>();
+
+const promptStore = usePromptStore();
+const gameStore = useGameStore();
+const { confirm } = useConfirm();
+const isDebuggerOpen = ref(false);
+const isDebugMode = ref(false); // Controls drag-and-drop and other debug features
+
+// Edit mode state
+const editingBlock = ref<PromptBlock | null>(null);
+const editContent = ref('');
+const editMetadata = ref<any>({});
+
+function handleEdit(block: PromptBlock) {
+  editingBlock.value = block;
+  editContent.value = block.content || '';
+  editMetadata.value = block.metadata ? { ...block.metadata } : {};
+
+  // Sync user_persona with game state
+  if (block.id === 'user_persona') {
+    const player = gameStore.state.player;
+    
+    // Always sync display name metadata
+    if (player.name) {
+      editMetadata.value.playerName = player.name;
+    }
+
+    // Sync content if it seems outdated or default
+    const currentContent = editContent.value || '';
+    const nameMatch = currentContent.match(/姓名：(.+)(\n|$)/);
+    const currentNameInContent = nameMatch ? nameMatch[1].trim() : '';
+    
+    // Check if the current content is the "wrong" raw JSON dump
+    const rawJsonContent = `玩家信息：\n姓名：${player.name}\n描述：${player.persona}`;
+    const isRawJsonDump = currentContent.trim() === rawJsonContent.trim();
+
+    // If it's the default "小明", or if the name doesn't match the current player, or if it's empty, OR if it's the raw JSON dump
+    if (currentNameInContent === '小明' || 
+        (currentNameInContent && currentNameInContent !== player.name) || 
+        !currentContent.trim() ||
+        isRawJsonDump) {
+      
+      let textPersona = player.persona;
+      try {
+        const jsonObj = JSON.parse(player.persona);
+        if (jsonObj["详细人设"]) {
+           textPersona = jsonObj["详细人设"];
+        } else if (jsonObj["补充设定"]) {
+           textPersona = jsonObj["补充设定"];
+        }
+      } catch (e) {
+        // Not JSON, use as is
+      }
+      
+      editContent.value = `玩家信息：\n姓名：${player.name}\n描述：${textPersona}`;
+    }
+  }
+}
+
+function handleSaveContent() {
+  if (editingBlock.value) {
+    promptStore.updateBlockContent(editingBlock.value.id, editContent.value, editMetadata.value);
+    editingBlock.value = null;
+  }
+}
+
+async function handleReset() {
+  if (await confirm('确定要重置所有积木配置吗？这将恢复默认顺序和内容。', { destructive: true })) {
+    promptStore.resetToDefault();
+  }
+}
+
+// Drag options
+const dragOptions = computed(() => ({
+  animation: 200,
+  group: "description",
+  disabled: !isDebugMode.value,
+  ghostClass: "ghost"
+}));
+</script>
+
+<template>
+  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-izakaya-wood/30 backdrop-blur-sm p-4 animate-fade-in">
+    <div class="bg-izakaya-paper w-full max-w-4xl h-[85vh] rounded-xl shadow-paper flex flex-col overflow-hidden border border-izakaya-wood/10 relative">
+      <!-- Texture -->
+      <div class="absolute inset-0 pointer-events-none opacity-10 bg-texture-rice-paper"></div>
+      
+      <!-- Header -->
+      <div class="flex items-center justify-between p-4 border-b border-izakaya-wood/10 bg-white/40 relative z-10">
+        <h2 class="text-lg font-bold font-display text-izakaya-wood flex items-center gap-2">
+          <span class="text-touhou-red text-xl">🧩</span>
+          提示词拼接中心
+        </h2>
+        <div class="flex items-center gap-2">
+            <button 
+                @click="isDebuggerOpen = true"
+                class="px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-md text-sm font-medium transition-colors flex items-center gap-1 shadow-sm"
+            >
+                <Play class="w-4 h-4" />
+                预览生成结果
+            </button>
+            <button 
+                @click="isDebugMode = !isDebugMode"
+                class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 border shadow-sm"
+                :class="isDebugMode ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' : 'bg-white/50 text-izakaya-wood/70 border-izakaya-wood/10 hover:bg-white hover:text-izakaya-wood'"
+            >
+                <Bug class="w-4 h-4" />
+                {{ isDebugMode ? '关闭调试' : '开启调试' }}
+            </button>
+            <button 
+                @click="handleReset"
+                class="px-3 py-1.5 bg-white/50 text-izakaya-wood/70 border border-izakaya-wood/10 hover:bg-white hover:text-izakaya-wood rounded-md text-sm font-medium transition-colors flex items-center gap-1 shadow-sm"
+            >
+                <RotateCcw class="w-4 h-4" />
+                重置
+            </button>
+            <button @click="$emit('close')" class="p-1 hover:bg-touhou-red/10 rounded-full text-izakaya-wood/50 hover:text-touhou-red transition-colors">
+                <X class="w-5 h-5" />
+            </button>
+        </div>
+      </div>
+
+      <!-- Content -->
+      <div class="flex-1 flex overflow-hidden relative z-10">
+        
+        <!-- Left: Builder (Draggable List) -->
+        <div class="flex-1 p-6 overflow-y-auto bg-izakaya-wood/5 custom-scrollbar">
+          <p class="text-sm text-izakaya-wood/60 mb-4 font-serif">
+            开启调试模式后可拖拽调整积木顺序。点击编辑图标可修改静态积木的内容。
+          </p>
+          
+          <draggable 
+            v-model="promptStore.blocks" 
+            item-key="id"
+            v-bind="dragOptions"
+            handle=".drag-handle"
+            @end="promptStore.save()"
+            class="space-y-3"
+          >
+            <template #item="{ element }">
+              <div 
+                class="bg-white/80 backdrop-blur-sm rounded-lg border border-izakaya-wood/10 shadow-sm p-3 flex flex-col gap-3 transition-all hover:shadow-md hover:border-touhou-red/20 group"
+                :class="{'opacity-60 grayscale': !element.enabled, 'ring-2 ring-touhou-red/30 ring-offset-1': editingBlock?.id === element.id}"
+              >
+                <div class="flex items-center gap-3">
+                  <!-- Drag Handle -->
+                  <div 
+                    class="drag-handle p-1 transition-colors rounded hover:bg-izakaya-wood/5"
+                    :class="isDebugMode ? 'cursor-move text-izakaya-wood/40 hover:text-izakaya-wood' : 'cursor-default text-izakaya-wood/10'"
+                  >
+                    <GripVertical class="w-5 h-5" />
+                  </div>
+
+                  <!-- Info -->
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                      <h3 class="font-bold text-izakaya-wood font-display text-sm">{{ element.name }}</h3>
+                      <span v-if="element.role === 'system'" class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-purple-50 text-purple-700 border border-purple-100">SYSTEM</span>
+                      <span v-else class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-50 text-blue-700 border border-blue-100">USER</span>
+                    </div>
+                    <p class="text-xs text-izakaya-wood/50 truncate font-serif">{{ element.description }}</p>
+                  </div>
+
+                  <!-- Actions -->
+                  <div class="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      v-if="element.configurable"
+                      @click="handleEdit(element)"
+                      class="p-2 text-izakaya-wood/50 hover:text-touhou-red hover:bg-touhou-red/5 rounded-md transition-colors"
+                      title="编辑内容"
+                    >
+                      <Edit class="w-4 h-4" />
+                    </button>
+                    
+                    <button 
+                      @click="promptStore.toggleBlock(element.id)"
+                      class="p-2 rounded-md transition-colors"
+                      :class="element.enabled ? 'text-green-600 hover:bg-green-50' : 'text-izakaya-wood/30 hover:bg-izakaya-wood/5'"
+                      :title="element.enabled ? '已启用' : '已禁用'"
+                    >
+                      <Eye v-if="element.enabled" class="w-4 h-4" />
+                      <EyeOff v-else class="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Sub-options for blocks like Narrative Perspective -->
+                <div v-if="element.options && element.enabled" class="pl-9 pr-1 pb-1">
+                  <div class="flex flex-wrap gap-2 p-2 bg-izakaya-wood/5 rounded-lg border border-izakaya-wood/5">
+                    <button 
+                      v-for="opt in element.options" 
+                      :key="opt.id"
+                      @click.stop="promptStore.updateBlockOption(element.id, opt.id)"
+                      class="px-3 py-1.5 rounded-md text-xs border transition-all flex-1 text-center truncate font-display"
+                      :class="(element.selectedOptionId || element.options[0].id) === opt.id 
+                        ? 'bg-touhou-red text-white border-touhou-red shadow-sm' 
+                        : 'bg-white text-izakaya-wood/70 border-izakaya-wood/10 hover:bg-white hover:text-touhou-red hover:border-touhou-red/30'"
+                    >
+                      {{ opt.name }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </draggable>
+        </div>
+
+        <!-- Right: Editor (Context) -->
+        <div class="w-1/3 bg-white/60 border-l border-izakaya-wood/10 flex flex-col backdrop-blur-sm">
+          <div v-if="editingBlock" class="flex flex-col h-full">
+            <div class="p-4 border-b border-izakaya-wood/10 bg-white/40 flex justify-between items-center">
+              <span class="font-bold font-display text-sm text-izakaya-wood">编辑: {{ editingBlock.name }}</span>
+              <button @click="handleSaveContent" class="text-xs bg-touhou-red text-white px-3 py-1.5 rounded hover:bg-red-700 flex items-center gap-1 shadow-sm transition-colors">
+                <Save class="w-3 h-3" /> 保存
+              </button>
+            </div>
+            <div class="flex-1 p-4 overflow-hidden flex flex-col">
+              <!-- Special UI for User Persona Metadata -->
+              <!-- <div v-if="editingBlock.id === 'user_persona'" class="mb-4 space-y-2 border-b border-izakaya-wood/10 pb-4">
+                 <label class="block text-xs font-bold text-izakaya-wood/60 uppercase tracking-wide">玩家显示名称</label>
+                 <input 
+                   v-model="editMetadata.playerName" 
+                   type="text" 
+                   class="w-full bg-white border border-izakaya-wood/20 rounded p-2 text-sm text-izakaya-wood focus:ring-1 focus:ring-touhou-red/30 focus:border-touhou-red/50 outline-none transition-all placeholder:text-izakaya-wood/20"
+                   placeholder="例如：博丽灵梦"
+                 />
+                 <p class="text-[10px] text-izakaya-wood/40 font-serif">此名称用于界面显示，Prompt 内容请在下方编辑。</p>
+              </div> -->
+
+              <textarea 
+                v-model="editContent" 
+                class="flex-1 w-full h-full resize-none border border-izakaya-wood/20 rounded-md p-3 font-mono text-sm bg-white/50 text-izakaya-wood focus:ring-1 focus:ring-touhou-red/30 focus:border-touhou-red/50 outline-none custom-scrollbar transition-all"
+                placeholder="在此输入 Prompt 内容..."
+              ></textarea>
+              <p class="text-xs text-izakaya-wood/40 mt-2 font-serif">
+                支持标准文本。对于 System Prompt，请确保指令清晰明确。
+              </p>
+            </div>
+          </div>
+          
+          <div v-else class="flex-1 flex items-center justify-center text-izakaya-wood/30 p-8 text-center">
+            <div>
+              <Edit class="w-12 h-12 mx-auto mb-2 opacity-20" />
+              <p class="font-display">点击左侧列表中的编辑图标<br>以修改积木内容</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Nested Debugger -->
+    <PromptDebugger :is-open="isDebuggerOpen" @close="isDebuggerOpen = false" />
+  </div>
+</template>
+
+<style scoped>
+.ghost {
+  opacity: 0.5;
+  background: rgba(255, 255, 255, 0.5);
+  border: 2px dashed #d1d5db;
+}
+</style>
