@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useCharacterStore } from '@/stores/character';
 import { type CharacterCard } from '@/db';
-import { Folder, FileText, Plus, Trash2, Save, X, Edit2, Tag } from 'lucide-vue-next';
+import { Folder, FileText, Plus, Trash2, Save, X, Edit2 } from 'lucide-vue-next';
 import { useConfirm } from '@/utils/confirm';
 
 const props = defineProps<{
@@ -12,6 +12,12 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'close'): void;
 }>();
+
+const copyToClipboard = (text: string) => {
+  if (navigator && navigator.clipboard) {
+    navigator.clipboard.writeText(text);
+  }
+};
 
 const charStore = useCharacterStore();
 const { confirm } = useConfirm();
@@ -288,7 +294,7 @@ function removeTag(index: number) {
                        <label class="block text-xs font-bold text-izakaya-wood/60 dark:text-stone-400 mb-1.5">UUID (对应 npcId)</label>
                        <div class="flex gap-2">
                           <input :value="selectedCharId" type="text" readonly class="flex-1 text-xs bg-white dark:bg-stone-900 border border-izakaya-wood/10 rounded px-2 py-1.5 font-mono text-izakaya-wood/70 dark:text-stone-400">
-                          <button class="text-xs text-blue-500 hover:text-blue-600 font-bold px-2" @click="navigator.clipboard.writeText(selectedCharId || '')">复制</button>
+                          <button class="text-xs text-blue-500 hover:text-blue-600 font-bold px-2" @click="copyToClipboard(selectedCharId || '')">复制</button>
                        </div>
                     </div>
                     <div>

@@ -600,9 +600,10 @@ export class IzakayaScene {
 
         const currentTile = this.map[player.y]![player.x];
         // Safely get target tile
-        let targetTile = TileType.WALL;
+        let targetTile: TileType = TileType.WALL;
         if (this.isValid(targetX, targetY)) {
-             targetTile = this.map[targetY]![targetX];
+             const t = this.map[targetY]![targetX];
+             if (t !== undefined) targetTile = t;
         }
 
         // --- STAIRS TRIGGER LOGIC ---

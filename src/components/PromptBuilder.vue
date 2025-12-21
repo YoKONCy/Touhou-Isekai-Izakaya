@@ -42,8 +42,8 @@ function handleEdit(block: PromptBlock) {
 
     // Sync content if it seems outdated or default
     const currentContent = editContent.value || '';
-    const nameMatch = currentContent.match(/姓名：(.+)(\n|$)/);
-    const currentNameInContent = nameMatch ? nameMatch[1].trim() : '';
+    const nameMatch = currentContent.match(/User Persona: (.*?)\n/);
+    const currentNameInContent = nameMatch ? nameMatch[1]?.trim() || '' : '';
     
     // Check if the current content is the "wrong" raw JSON dump
     const rawJsonContent = `玩家信息：\n姓名：${player.name}\n描述：${player.persona}`;

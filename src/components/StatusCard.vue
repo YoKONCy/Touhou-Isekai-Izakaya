@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { useGameStore } from '@/stores/game';
-import { usePromptStore } from '@/stores/prompt';
 import { computed, ref } from 'vue';
 import { Coins, Heart, MapPin, Clock, Zap, Star, User, Shield, Package, Sparkles, X } from 'lucide-vue-next';
 import { audioManager } from '@/services/audio';
 
 const gameStore = useGameStore();
-const promptStore = usePromptStore();
 
 const player = computed(() => gameStore.state.player);
 
@@ -210,13 +208,13 @@ function formatBuffEffect(effect: any) {
       </div>
       <div class="flex items-center gap-2 group/stat relative" title="战斗力">
         <!-- Burning Effect Background -->
-        <div v-if="player.power >= 80" class="absolute -inset-3 bg-orange-500/20 rounded-full blur-md -z-10 animate-pulse pointer-events-none"></div>
+        <div v-if="Number(player.power) >= 80" class="absolute -inset-3 bg-orange-500/20 rounded-full blur-md -z-10 animate-pulse pointer-events-none"></div>
         
-        <Shield class="w-4 h-4 text-orange-500 group-hover/stat:scale-110 transition-transform" :class="{ 'text-red-500 animate-[bounce_2s_infinite]': player.power >= 80 }" />
-        <span class="font-mono text-izakaya-wood relative" :class="{ 'text-burning': player.power >= 80 }">
+        <Shield class="w-4 h-4 text-orange-500 group-hover/stat:scale-110 transition-transform" :class="{ 'text-red-500 animate-[bounce_2s_infinite]': Number(player.power) >= 80 }" />
+        <span class="font-mono text-izakaya-wood relative" :class="{ 'text-burning': Number(player.power) >= 80 }">
           {{ player.power }}
           <!-- Flame Particles -->
-          <template v-if="player.power >= 80">
+          <template v-if="Number(player.power) >= 80">
              <span class="flame-particle -top-3 -left-1 opacity-70" style="animation-delay: 0s;"></span>
              <span class="flame-particle -top-2 right-0 opacity-60" style="animation-delay: 0.3s;"></span>
              <span class="flame-particle bottom-0 -right-3 opacity-80" style="animation-delay: 0.6s;"></span>

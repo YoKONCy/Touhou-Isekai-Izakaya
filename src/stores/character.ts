@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { db, type CharacterCard } from '@/db';
-import { v4 as uuidv4 } from 'uuid'; // We need to install uuid or implement simple generator
 
 // Simple UUID generator if we don't want to install uuid package yet
 function generateUUID() {
