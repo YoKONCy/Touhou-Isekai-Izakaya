@@ -108,6 +108,15 @@
 
 <br/>
 
+<h3>🎮 <a href="https://yokoncy.github.io/Touhou-Isekai-Izakaya/">立即试玩 / Live Demo</a></h3>
+<p>
+  <b><a href="https://yokoncy.github.io/Touhou-Isekai-Izakaya/">👉 点击进入幻想乡 / Enter Gensokyo</a></b>
+  <br/>
+  <sub>⛩️ 东方异界食堂 beta 🍵 还没有任何对话... 点一杯茶，开始你的幻想乡物语吧。</sub>
+</p>
+
+<br/>
+
 **东方异界食堂** 是一款融合了 **LLM (大语言模型)** 叙事、**模拟经营** 与 **RPG 战斗** 的 Web 游戏。
 在一次时空乱流的作用下，你穿越来到了幻想乡。初来乍到的你决定通过开店来体验这个奇妙的世界。
 美食与力量，你将用何种方式与幻想乡的少女们进行邂逅呢？一切都取决于你自己。
