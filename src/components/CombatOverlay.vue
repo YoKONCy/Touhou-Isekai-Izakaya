@@ -161,7 +161,11 @@
         <div v-if="showSkillCutin" class="fixed inset-0 z-[190] pointer-events-none flex flex-col justify-center overflow-hidden font-display">
             <!-- Strip Background -->
             <div class="absolute w-full h-40 md:h-56 bg-black/60 backdrop-blur-sm border-y-4 border-white/20 flex items-center animate-slide-in-fast origin-left"
-                 :class="skillCutinData.isPlayer ? 'bg-gradient-to-r from-blue-900/90 to-transparent' : 'bg-gradient-to-l from-red-900/90 to-transparent'">
+                 :class="[
+                    !skillCutinData.isPlayer ? 'bg-gradient-to-l from-red-900/90 to-transparent' : 
+                    skillCutinData.isSpecial ? 'bg-gradient-to-r from-amber-500 via-yellow-400 to-transparent' : 
+                    'bg-gradient-to-r from-purple-900/95 via-rose-900/90 to-transparent'
+                 ]">
                  
                  <!-- Sprite (masked) -->
                  <div class="absolute top-[-50%] h-[200%] w-1/2 md:w-1/3 opacity-90 mix-blend-normal"
@@ -291,9 +295,25 @@
 
         <!-- 3. AOE Hit Effect (Massive Explosion) -->
         <div v-if="activeEffect.show && activeEffect.type === 'hit_aoe'" class="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
+             <!-- Background Flash -->
              <div class="absolute inset-0 bg-red-600 opacity-20 animate-flash-fade mix-blend-overlay"></div>
-             <div class="absolute w-[120vw] h-[120vw] border-[100px] border-white rounded-full animate-shockwave opacity-80"></div>
-             <div class="absolute inset-0 bg-white opacity-40 animate-flash-out"></div>
+             
+             <!-- 1. Expanding Shockwave Ring -->
+             <div class="absolute w-[120vw] h-[120vw] border-[100px] border-white/80 rounded-full animate-shockwave opacity-80 mix-blend-screen"></div>
+             
+             <!-- 2. Inner Explosion Core -->
+             <div class="absolute w-[50vw] h-[50vw] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-yellow-100 via-orange-500 to-transparent animate-ping-fast opacity-90 mix-blend-screen"></div>
+
+             <!-- 3. Burst Rays -->
+             <div class="absolute inset-0 animate-spin opacity-60 mix-blend-screen">
+                 <div class="absolute top-1/2 left-1/2 w-[200vw] h-[10vh] bg-gradient-to-r from-transparent via-white to-transparent -translate-y-1/2 -translate-x-1/2 rotate-0"></div>
+                 <div class="absolute top-1/2 left-1/2 w-[200vw] h-[10vh] bg-gradient-to-r from-transparent via-white to-transparent -translate-y-1/2 -translate-x-1/2 rotate-45"></div>
+                 <div class="absolute top-1/2 left-1/2 w-[200vw] h-[10vh] bg-gradient-to-r from-transparent via-white to-transparent -translate-y-1/2 -translate-x-1/2 rotate-90"></div>
+                 <div class="absolute top-1/2 left-1/2 w-[200vw] h-[10vh] bg-gradient-to-r from-transparent via-white to-transparent -translate-y-1/2 -translate-x-1/2 rotate-135"></div>
+             </div>
+
+             <!-- 4. Screen Whiteout -->
+             <div class="absolute inset-0 bg-white opacity-60 animate-flash-out mix-blend-screen"></div>
         </div>
         
         <!-- 3. Ultimate Impact (Fullscreen Beam) -->
@@ -471,7 +491,11 @@
                                <div v-for="(eff, idx) in buff.effects" :key="idx" class="flex justify-between text-gray-400">
                                    <span>{{ getEffectName(eff) }}</span>
                                    <span :class="eff.value > 0 ? 'text-green-400' : 'text-red-400'">
-                                       {{ eff.value > 0 ? '+' : '' }}{{ eff.isPercentage ? Math.round(eff.value * 100) + '%' : eff.value }}
+                                       {{ eff.value > 0 ? '+' : '' }}{{ 
+                                           eff.type === 'heal' || eff.type === 'damage_over_time' || (eff.type === 'stat_mod' && !eff.isPercentage)
+                                           ? Math.round(eff.value) 
+                                           : Math.round(eff.value * 100) + '%' 
+                                       }}
                                    </span>
                                </div>
                            </div>
@@ -732,7 +756,11 @@
                                 <div v-for="(eff, idx) in buff.effects" :key="idx" class="flex justify-between text-gray-400 text-[10px]">
                                     <span>{{ getEffectName(eff) }}</span>
                                     <span :class="eff.value > 0 ? 'text-green-400' : 'text-red-400'">
-                                        {{ eff.value > 0 ? '+' : '' }}{{ eff.isPercentage ? Math.round(eff.value * 100) + '%' : eff.value }}
+                                        {{ eff.value > 0 ? '+' : '' }}{{ 
+                                            eff.type === 'heal' || eff.type === 'damage_over_time' || (eff.type === 'stat_mod' && !eff.isPercentage)
+                                            ? Math.round(eff.value) 
+                                            : Math.round(eff.value * 100) + '%' 
+                                        }}
                                     </span>
                                 </div>
                             </div>
@@ -1302,6 +1330,7 @@ const ultimateCutinData = ref({
 const showSkillCutin = ref(false);
 const skillCutinData = ref({
     isPlayer: true,
+    isSpecial: false,
     charName: '',
     spellName: '',
     spriteUrl: ''
@@ -1352,10 +1381,11 @@ async function playUltimateAnimation(combatant: Combatant | UICombatant, spellNa
     showUltimateCutin.value = false;
 }
 
-async function playSkillAnimation(combatant: Combatant | UICombatant, spellName: string) {
+async function playSkillAnimation(combatant: Combatant | UICombatant, spellName: string, isSpecial: boolean = false) {
     const isPlayerTeam = combatant.isPlayer || combatant.team === 'player';
     skillCutinData.value = {
         isPlayer: isPlayerTeam,
+        isSpecial: isSpecial,
         charName: combatant.name,
         spellName: spellName,
         spriteUrl: getSpriteUrl(combatant.id === 'player' ? '主角' : combatant.name)
@@ -1405,19 +1435,19 @@ function getEffectName(effect: BuffEffect): string {
             'attack': '攻击',
             'defense': '防御',
             'dodge': '闪避',
-            'damage_taken': '易伤'
+            'damage_taken': '受伤修正'
         };
         return statMap[effect.targetStat || ''] || '属性';
     } else if (effect.type === 'damage_reduction') {
         return '减伤';
     } else if (effect.type === 'dodge_mod') {
-        return '闪避';
+        return '闪避修正';
     } else if (effect.type === 'shield') {
         return '护盾';
     } else if (effect.type === 'heal') {
-        return '回复';
+        return '每回合回复';
     } else if (effect.type === 'damage_over_time') {
-        return '持续易伤';
+        return '持续受伤';
     }
     return '效果';
 }
@@ -1508,7 +1538,7 @@ async function triggerShake() {
 }
 
 async function triggerEffect(
-    type: 'slash' | 'spell' | 'enemy' | 'hit' | 'talk' | 'ultimate_impact', 
+    type: 'slash' | 'spell' | 'spell_aoe' | 'spell_single' | 'enemy' | 'hit' | 'hit_aoe' | 'talk' | 'ultimate_impact', 
     x: number, 
     y: number,
     extra?: string
@@ -1516,10 +1546,11 @@ async function triggerEffect(
   activeEffect.value = { type, x, y, show: true, extra };
   
   let duration = 1000;
-  if (type === 'spell') duration = 2200;
+  if (type === 'spell' || type === 'spell_aoe' || type === 'spell_single') duration = 2200;
   else if (type === 'ultimate_impact') duration = 2500;
   else if (type === 'talk') duration = 2000;
   else if (type === 'slash') duration = 800;
+  else if (type === 'hit_aoe') duration = 1000;
   else if (type === 'hit') duration = 500;
 
   await sleep(duration);
@@ -1715,11 +1746,15 @@ async function executeAction(attacker: Combatant, defender: UICombatant, actionN
   }
 
   // P-Point Gain Logic (Player Normal Attack)
-  // Independent Check
   if ((attacker.isPlayer || attacker.team === 'player') && !spell) {
-       // Only gain P-points if the attack landed
-       if (result.isHit) {
-           const pGain = calculatePPointGain(attacker, result.damage);
+       // Gain P-points even if missed (60% gain on miss)
+       let pGain = calculatePPointGain(attacker, result.damage);
+       
+       if (!result.isHit) {
+           pGain *= 0.6; // 60% penalty for missing
+       }
+
+       if (pGain > 0) {
            const currentP = attacker.pPoints || 0;
            const maxP = attacker.maxPPoints || 100;
            const newP = Math.min(maxP, currentP + pGain);
@@ -1820,8 +1855,13 @@ async function handleAction(type: string, payload?: any) {
             isActing.value = true;
             currentMenu.value = 'main';
 
-            // Ultimate Cut-in
-            if (spell.isUltimate) await playUltimateAnimation(player.value, spell.name);
+            // Ultimate Cut-in or Skill Cut-in
+            if (spell.isUltimate) {
+                await playUltimateAnimation(player.value, spell.name);
+            } else {
+                playSkillAnimation(player.value, spell.name); // Non-blocking or short wait?
+                await sleep(800); // Wait for skill cut-in
+            }
 
             const newMp = player.value.mp - spell.cost;
             player.value.mp = newMp;
@@ -1862,8 +1902,13 @@ async function handleAction(type: string, payload?: any) {
             isActing.value = true;
             currentMenu.value = 'main';
 
-            // Ultimate Cut-in
-            if (spell.isUltimate) await playUltimateAnimation(player.value, spell.name);
+            // Ultimate Cut-in or Skill Cut-in
+            if (spell.isUltimate) {
+                await playUltimateAnimation(player.value, spell.name);
+            } else {
+                playSkillAnimation(player.value, spell.name);
+                await sleep(800);
+            }
 
             const newMp = player.value.mp - spell.cost;
             player.value.mp = newMp;
@@ -1900,6 +1945,11 @@ async function handleAction(type: string, payload?: any) {
                        enemy.shield -= result.damage;
                        updateCombatantState(enemy.id, { shield: enemy.shield });
                        addPopup(enemy, result.damage, 'buff');
+                       
+                       if (enemy.shield <= 0) {
+                           addLog(`${player.value.name} ${spell.name}，击碎了 ${enemy.name} 的护盾！`);
+                           audioManager.playShatter();
+                       }
                    } else {
                        const newHp = Math.max(0, enemy.hp - result.damage);
                        enemy.hp = newHp;
@@ -2093,6 +2143,12 @@ async function handleSpecialAction(skill: any) {
     
     isActing.value = true;
     currentMenu.value = 'main';
+    
+    // Play Skill Animation
+    if (player.value) {
+        playSkillAnimation(player.value, skill.name, true);
+        await sleep(800);
+    }
     
     try {
         const baseDmg = getBaseDamage(player.value.power);
@@ -2456,6 +2512,9 @@ async function selectTarget(target: UICombatant) {
                  actionPoints: Math.max(0, currentAP - skill.costAP)
               });
 
+              playSkillAnimation(player.value, skill.name, true);
+              await sleep(800);
+
               audioManager.playSpellCast();
               const rect = document.body.getBoundingClientRect();
               triggerEffect('spell', rect.width * 0.7, rect.height * 0.3); // Visual on target
@@ -2492,8 +2551,13 @@ async function selectTarget(target: UICombatant) {
           // Single Target Spell
           const spell = payload as SpellCard;
           if (player.value) {
-              // Ultimate Cut-in
-              if (spell.isUltimate) await playUltimateAnimation(player.value, spell.name);
+              // Ultimate Cut-in or Skill Cut-in
+              if (spell.isUltimate) {
+                  await playUltimateAnimation(player.value, spell.name);
+              } else {
+                  playSkillAnimation(player.value, spell.name);
+                  await sleep(800);
+              }
 
               const newMp = player.value.mp - spell.cost;
               player.value.mp = newMp;
@@ -2515,24 +2579,8 @@ async function selectTarget(target: UICombatant) {
               triggerShake();
               audioManager.playHeavyHit();
               
-              // Execute Damage
-              // Use spell.damage + power bonus?
-              const dmg = spell.damage; // Simplified
-              const newHp = Math.max(0, target.hp - dmg);
-              target.hp = newHp;
-              updateCombatantState(target.id, { hp: newHp });
-              
-              addPopup(target, dmg, 'damage');
-              
-              // Hit Spark
-              triggerEffect('hit', rect.width * 0.75, rect.height * 0.4);
-
-              addLog(`${player.value.name} 释放了符卡 ${spell.name}，对 ${target.name} 造成了 ${dmg} 点伤害！`);
-              
-              // Apply Debuffs (if any)
-              if (spell.buffDetails) {
-                  applyBuff(target, spell.buffDetails, 'debuff');
-              }
+              // Execute Damage using central logic (handles shields, shatter, logs, buffs)
+              await executeAction(player.value, target, spell.name, spell);
               
               if (target.hp <= 0) {
                  audioManager.playShatter();

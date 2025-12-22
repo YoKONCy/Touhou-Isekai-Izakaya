@@ -93,11 +93,14 @@ export function getEffectiveStats(combatant: Combatant) {
 }
 
 export function calculatePPointGain(attacker: Combatant, damageDealt: number): number {
+  if (damageDealt <= 0) return 5; // Base gain for misses/blocked attacks
+
   const basePowerVal = getBaseDamage(attacker.power);
-  const safeDamage = Math.max(1, damageDealt); // Prevent division by zero
   // Formula: 2 + 8 * (Base / Damage)
-  const gain = 2 + 8 * (basePowerVal / safeDamage);
-  return Math.max(0, gain); // Sanity check
+  const gain = 2 + 8 * (basePowerVal / damageDealt);
+  
+  // Cap at 30 to prevent explosion from very low damage or division by zero
+  return Math.min(30, Math.max(0, gain));
 }
 
 export function calculateDamage(
