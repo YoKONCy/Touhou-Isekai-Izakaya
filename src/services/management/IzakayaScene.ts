@@ -20,7 +20,6 @@ export class IzakayaScene {
   // private currentFloor: number = 1; // Current active floor (Removed)
   // private floorChairs: Record<number, Position[]> = {}; // Chairs per floor (Removed)
   // private floorExits: Record<number, Position[]> = {}; // Exits per floor (Removed)
-  private currentFloor: number = 1; // Keep for compatibility if needed, but always 1
   private placedItems: Map<string, Item> = new Map();
 
   // Input State
@@ -50,7 +49,6 @@ export class IzakayaScene {
 
         // Add Furniture Entities
         furniture.forEach(f => {
-            f.floor = 1; // Always floor 1
             this.addEntity(f);
         });
     } else {
@@ -70,7 +68,6 @@ export class IzakayaScene {
     this.addEntity({
       id: 'player',
       type: 'player',
-      floor: 1, // Start on floor 1
       x: 10,
       y: 10,
       pixelX: 10 * this.GRID_SIZE,
@@ -346,12 +343,11 @@ export class IzakayaScene {
 
      const tile = this.map[targetY]![targetX]!;
      
-     // Check if there is an entity at target position on the current floor
+     // Check if there is an entity at target position
      const targetEntity = this.entities.find(e => 
         e.x === targetX && 
         e.y === targetY && 
-        e.id !== player.id &&
-        (e.floor === undefined || e.floor === this.currentFloor)
+        e.id !== player.id
      );
 
      const event = new CustomEvent('izakaya-interact', { 
@@ -617,7 +613,6 @@ export class IzakayaScene {
       const customer: Customer = {
           id: `customer_${Date.now()}`,
           type: 'customer',
-          floor: 1, // Always on Floor 1
           name: specialData.name || 'Guest',
           isSpecial: specialData.isSpecial || false,
           dialogue: specialData.dialogue,
@@ -820,10 +815,8 @@ export class IzakayaScene {
           }
       }
 
-      // Draw Entities
-      // Filter by current floor and Z-Index sort by Y
+      // Draw Entities (Z-Index sort by Y)
       const sortedEntities = this.entities
-        .filter(e => e.floor === undefined || e.floor === this.currentFloor)
         .sort((a, b) => a.pixelY - b.pixelY);
       
       for (const entity of sortedEntities) {

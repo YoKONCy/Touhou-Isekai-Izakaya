@@ -133,7 +133,7 @@ export async function generateMap(theme: string = "cozy wooden izakaya", context
 
     // --- POPULATE ZONES ---
     console.log("[MapGenerator] Populating Ground Floor...");
-    const populator1 = new ZonePopulator(data.layout, true); // Ground Floor
+    const populator1 = new ZonePopulator(data.layout); // Ground Floor
     data.layout = populator1.generate();
 
     // if (data.floors) {

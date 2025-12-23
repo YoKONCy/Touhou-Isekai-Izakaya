@@ -182,6 +182,37 @@
         </div>
       </transition>
 
+      <!-- Combat Flow Animation Overlay -->
+      <Teleport to="body">
+          <div v-if="showCombatFlowAnim" class="fixed inset-0 z-[200] flex items-center justify-center overflow-hidden pointer-events-none font-display">
+              <!-- Background: Deep Void -->
+              <div class="absolute inset-0 bg-black animate-fade-in duration-500"></div>
+              
+              <!-- Moving Purple Fog/Nebula -->
+              <div class="absolute inset-0 bg-gradient-to-br from-purple-900/60 via-transparent to-black mix-blend-screen animate-pulse-slow"></div>
+              
+              <!-- Character Cut-in (Centered, Glowing) -->
+              <div class="absolute inset-0 flex items-center justify-center z-10 transition-all duration-1000"
+                   :class="combatFlowPhase === 'start' ? 'opacity-0 scale-150 blur-sm' : 'opacity-100 scale-100 blur-0'">
+                  <img :src="getSpriteUrl('主角')" class="h-[80vh] object-contain drop-shadow-[0_0_50px_rgba(168,85,247,0.8)] filter brightness-125 contrast-125 animate-float-slow" />
+              </div>
+    
+              <!-- Text Layer -->
+              <div class="absolute z-20 flex flex-col items-center justify-center gap-4 mix-blend-hard-light"
+                   v-if="combatFlowPhase === 'impact' || combatFlowPhase === 'end'">
+                  <h1 class="text-8xl md:text-9xl font-black italic text-transparent bg-clip-text bg-gradient-to-t from-white to-purple-300 font-display animate-glitch-slam tracking-tighter drop-shadow-[0_0_20px_rgba(255,255,255,0.8)]">
+                      COMBAT FLOW
+                  </h1>
+                  <div class="h-1 w-0 bg-white animate-expand-width shadow-[0_0_10px_white]"></div>
+                  <p class="text-2xl md:text-3xl text-purple-200 font-mono tracking-[1em] animate-fade-in-up uppercase">Zone Activated</p>
+              </div>
+              
+              <!-- Vignette & Speed lines -->
+              <div class="absolute inset-0 bg-[radial-gradient(circle,transparent_40%,#000_100%)] z-30"></div>
+              <div class="absolute inset-0 z-10 opacity-30 animate-pulse-fast bg-[repeating-linear-gradient(90deg,transparent,transparent_50px,rgba(168,85,247,0.1)_50px,rgba(168,85,247,0.1)_51px)]" v-if="combatFlowPhase === 'impact'"></div>
+          </div>
+      </Teleport>
+
       <!-- Layer 0: Background -->
       <div class="absolute inset-0 bg-gradient-to-br from-red-900/20 via-black to-blue-900/20 z-0">
         <div class="absolute inset-0 bg-texture-stardust opacity-10 mix-blend-overlay"></div>
@@ -443,21 +474,34 @@
                  </div>
 
                  <!-- P Point Gauge (Charging Ring) -->
-                 <div class="absolute -left-24 top-0 w-20 h-20 bg-black/80 rounded-full border-2 border-red-500 flex items-center justify-center shadow-[0_0_15px_rgba(239,68,68,0.5)] transition-transform hover:scale-110">
+                 <div class="absolute -left-24 top-0 w-20 h-20 bg-black/80 rounded-full border-2 flex items-center justify-center transition-transform hover:scale-110"
+                      :class="[
+                        (player.pPoints || 0) >= 80 
+                          ? 'border-orange-500 animate-burning z-[60]' 
+                          : 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]'
+                      ]">
+                    <!-- Burning Aura -->
+                    <div v-if="(player.pPoints || 0) >= 80" class="absolute inset-[-4px] rounded-full border-4 border-orange-400/30 blur-sm animate-pulse"></div>
+                    
                     <svg class="w-full h-full transform -rotate-90 p-1" viewBox="0 0 100 100">
                         <!-- Background -->
                         <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.1)" stroke-width="8" fill="none" />
                         <!-- Progress -->
-                        <circle cx="50" cy="50" r="40" stroke="#ef4444" stroke-width="8" fill="none"
+                        <circle cx="50" cy="50" r="40" 
+                            :stroke="(player.pPoints || 0) >= 80 ? '#ff8c00' : '#ef4444'" 
+                            stroke-width="8" fill="none"
                             stroke-linecap="round"
                             :stroke-dasharray="251.2"
                             :stroke-dashoffset="251.2 * (1 - ((player.pPoints || 0) / 100))"
                             class="transition-all duration-500 ease-out"
+                            :class="{ 'animate-fire-flicker': (player.pPoints || 0) >= 80 }"
                         />
                     </svg>
                     <div class="absolute inset-0 flex flex-col items-center justify-center font-bold font-mono">
-                        <span class="text-[10px] text-red-400 leading-none">P</span>
-                        <span class="text-xl text-white leading-none">{{ (player.pPoints || 0).toFixed(0) }}</span>
+                        <span class="text-[10px] leading-none" :class="(player.pPoints || 0) >= 80 ? 'text-orange-400' : 'text-red-400'">P</span>
+                        <span class="text-xl text-white leading-none" :class="{ 'drop-shadow-[0_0_5px_rgba(255,140,0,0.8)]': (player.pPoints || 0) >= 80 }">
+                            {{ (player.pPoints || 0).toFixed(0) }}
+                        </span>
                     </div>
                  </div>
 
@@ -507,7 +551,7 @@
 
                      <!-- Allies Stack (Parallel Folded Cards) -->
                      <div v-if="allies.length > 0" class="relative mt-2 ml-12 w-[280px] h-[140px] transform skew-x-[10deg] pointer-events-none perspective-[1000px]">
-                        <transition-group name="list-complete" tag="div">
+                        <transition-group name="list-complete" tag="div" class="relative w-full h-full">
                             <div 
                                 v-for="(ally, index) in sortedAllies" 
                                 :key="ally.id" 
@@ -793,13 +837,30 @@
                </div>
                
                <!-- Message Carousel/Log HUD -->
-               <div class="mt-4 w-[450px] flex flex-col gap-1 pointer-events-none mask-image-fade min-h-[100px]">
+               <div 
+                  class="mt-4 w-[450px] flex flex-col gap-1 transition-all duration-300 ease-out origin-top-left relative group/log"
+                  :class="[
+                      isLogExpanded 
+                        ? 'pointer-events-auto h-[500px] overflow-y-auto bg-black/90 border border-white/20 backdrop-blur-md p-4 rounded-lg z-[100] shadow-2xl custom-scrollbar' 
+                        : 'pointer-events-auto mask-image-fade min-h-[100px] max-h-[150px] overflow-hidden cursor-pointer hover:bg-black/20 rounded'
+                  ]"
+                  @click="isLogExpanded = !isLogExpanded"
+               >
+                  <div v-if="isLogExpanded" class="flex justify-between items-center mb-2 sticky top-0 bg-black/95 pb-2 border-b border-white/10 z-10">
+                      <span class="text-white font-bold font-display italic">COMBAT LOG</span>
+                      <span class="text-xs text-gray-400 font-mono hover:text-white transition-colors">[CLICK TO CLOSE]</span>
+                  </div>
+                  
                   <transition-group name="log-fade" tag="div" class="flex flex-col gap-1">
-                     <div v-for="log in combatLogs" :key="log.id" class="text-sm font-mono text-shadow-sm flex gap-2 items-start">
+                     <div v-for="log in (isLogExpanded ? combatLogs : combatLogs.slice(0, 5))" :key="log.id" class="text-sm font-mono text-shadow-sm flex gap-2 items-start">
                         <span class="text-yellow-400 font-bold whitespace-nowrap drop-shadow-md">TURN {{ log.turn }}</span>
                         <span class="text-white/90 drop-shadow-md leading-tight">{{ log.content }}</span>
                      </div>
                   </transition-group>
+                  
+                  <div v-if="!isLogExpanded" class="absolute bottom-0 w-full text-center pb-1 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover/log:opacity-100 transition-opacity pointer-events-none">
+                      <span class="text-[10px] text-gray-300 font-mono tracking-widest uppercase">Click to expand</span>
+                  </div>
                </div>
             </div>
             
@@ -937,17 +998,17 @@
               
               <button 
                  v-for="(spell, idx) in spells" :key="idx"
-                 @click="(player && player.mp >= spell.cost) ? handleAction('spell', spell) : null"
+                 @click="(player && player.mp >= getSpellCost(spell, player)) ? handleAction('spell', spell) : null"
                  @mouseenter="audioManager.playHover(); hoveredSpell = spell"
                  @mouseleave="hoveredSpell = null"
                  class="w-full text-right px-6 py-3 border-r-4 transition-all clip-rect-left"
                  :class="[
-                    (player && player.mp >= spell.cost)
+                    (player && player.mp >= getSpellCost(spell, player))
                     ? 'bg-black/80 border-purple-500 hover:bg-purple-900/50 hover:border-white text-white hover:-translate-x-4 cursor-pointer' 
                     : 'bg-gray-900/80 border-gray-700 text-gray-500 cursor-not-allowed opacity-60'
                  ]"
               >
-                 {{ spell.name }} <span class="text-xs ml-2" :class="(player && player.mp >= spell.cost) ? 'text-purple-300' : 'text-gray-600'">MP {{ spell.cost }}</span>
+                 {{ spell.name }} <span class="text-xs ml-2" :class="(player && player.mp >= getSpellCost(spell, player)) ? 'text-purple-300' : 'text-gray-600'">MP {{ getSpellCost(spell, player) }}</span>
               </button>
               
               <button @click="currentMenu = 'main'" @mouseenter="audioManager.playHover()" class="mt-4 text-gray-400 hover:text-white font-bold italic transition-colors">BACK</button>
@@ -1206,22 +1267,19 @@ const activeAllyId = ref<string | null>(null);
 // Watch allies to maintain a valid activeAllyId and handle auto-switching when pinned ally dies
 watch(allies, (newAllies) => {
     if (!newAllies || newAllies.length === 0) {
-        activeAllyId.value = null;
         return;
     }
 
-    // If no active ID, set one
-    if (!activeAllyId.value) {
+    const exists = newAllies.some(a => a.id === activeAllyId.value);
+    if (!activeAllyId.value || !exists) {
         const firstAlive = newAllies.find(a => a.hp > 0);
         activeAllyId.value = firstAlive ? firstAlive.id : (newAllies[0]?.id || null);
         return;
     }
 
-    // If currently pinned ally is dead, check if we should auto-switch to an alive one
     const currentActive = newAllies.find(a => a.id === activeAllyId.value);
     if (currentActive && currentActive.hp <= 0) {
         const firstAlive = newAllies.find(a => a.hp > 0);
-        // Only auto-switch if there is at least one alive ally to switch to
         if (firstAlive && firstAlive.id !== activeAllyId.value) {
             activeAllyId.value = firstAlive.id;
         }
@@ -1249,7 +1307,20 @@ const sortedAllies = computed(() => {
 });
 
 function activateAlly(id: string) {
-    activeAllyId.value = id;
+    // If clicking the already active ally, cycle to the next one
+    if (activeAllyId.value === id && sortedAllies.value.length > 1) {
+        const currentIndex = sortedAllies.value.findIndex(a => a.id === id);
+        if (currentIndex !== -1) {
+            const nextIndex = (currentIndex + 1) % sortedAllies.value.length;
+            const nextAlly = sortedAllies.value[nextIndex];
+            if (nextAlly) {
+                activeAllyId.value = nextAlly.id;
+            }
+        }
+    } else {
+        activeAllyId.value = id;
+    }
+    
     audioManager.playClick();
 }
 
@@ -1307,6 +1378,7 @@ const hoveredEnemyId = ref<string | null>(null);
 const isGameOver = ref(false);
 const gameResult = ref<'win' | 'loss' | 'escape' | null>(null);
 const combatLogs = ref<CombatLog[]>([]);
+const isLogExpanded = ref(false);
 
 // --- Enemy Queue System ---
 const exitedEnemyIds = ref<string[]>([]);
@@ -1344,6 +1416,8 @@ const ultimateCutinData = ref({
 
 // Skill Cut-in State
 const showSkillCutin = ref(false);
+const showCombatFlowAnim = ref(false);
+const combatFlowPhase = ref('start'); // 'start', 'impact', 'end'
 const skillCutinData = ref({
     isPlayer: true,
     isSpecial: false,
@@ -1373,6 +1447,32 @@ watch(isActive, (val) => {
 
 // --- Helpers ---
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function playCombatFlowAnimation() {
+    // 1. Init
+    showCombatFlowAnim.value = true;
+    combatFlowPhase.value = 'start';
+    
+    // SFX: Init
+    audioManager.playSkillCutin(); 
+
+    // 2. Start (0-1000ms): Dim background, Character appears
+    await sleep(1000);
+
+    // 3. Impact (1000-2500ms): Text Glitch, Purple Flash
+    combatFlowPhase.value = 'impact';
+    audioManager.playSpellCastAoE(); // Burst sound
+    // Trigger impact effect in background too
+    const rect = document.body.getBoundingClientRect();
+    triggerEffect('ultimate_impact', rect.width/2, rect.height/2);
+    
+    await sleep(2500);
+
+    // 4. End
+    combatFlowPhase.value = 'end';
+    await sleep(500); // Fade out
+    showCombatFlowAnim.value = false;
+}
 
 async function playUltimateAnimation(combatant: Combatant | UICombatant, spellName: string) {
     const isPlayerTeam = combatant.isPlayer || combatant.team === 'player';
@@ -1427,7 +1527,8 @@ function addLog(content: string) {
     turn: turn.value,
     content
   });
-  if (combatLogs.value.length > 5) combatLogs.value.pop();
+  // Removed limit to allow full history viewing
+  // if (combatLogs.value.length > 5) combatLogs.value.pop();
 
   // Sync to Store (Full History for LLM)
   if (combatState.value) {
@@ -1497,6 +1598,24 @@ function getSpriteUrl(name?: string) {
     const path = `/src/assets/images/battle_sprites/${name}_战斗立绘.png`;
     const found = characterSprites[path];
     return (found as string) || defaultSprite;
+}
+
+function getSpellCost(spell: SpellCard, combatant: UICombatant | null) {
+    if (!combatant) return spell.cost;
+    
+    let reduction = 0;
+    if (combatant.buffs) {
+        combatant.buffs.forEach(b => {
+            b.effects.forEach(e => {
+                if (e.type === 'stat_mod' && e.targetStat === 'mp_cost_reduction') {
+                    reduction += e.value;
+                }
+            });
+        });
+    }
+    
+    if (reduction <= 0) return spell.cost;
+    return Math.max(0, Math.floor(spell.cost * (1 - reduction)));
 }
 
 function getEnemyEffectiveDodge(enemy: UICombatant) {
@@ -1865,7 +1984,8 @@ async function handleAction(type: string, payload?: any) {
      const spell = payload as SpellCard;
      if (!player.value) return;
      
-     if (player.value.mp >= spell.cost) {
+     const actualCost = getSpellCost(spell, player.value);
+     if (player.value.mp >= actualCost) {
         // Special Case: Self-Buff / Shield / Heal (Immediate Execution) - Non-AOE only
         if ((spell.type === 'buff' || spell.type === 'shield' || spell.type === 'heal') && spell.scope !== 'aoe') {
             isActing.value = true;
@@ -1879,7 +1999,7 @@ async function handleAction(type: string, payload?: any) {
                 await sleep(800); // Wait for skill cut-in
             }
 
-            const newMp = player.value.mp - spell.cost;
+            const newMp = player.value.mp - actualCost;
             player.value.mp = newMp;
             updateCombatantState(player.value.id, { mp: newMp });
 
@@ -1926,7 +2046,7 @@ async function handleAction(type: string, payload?: any) {
                 await sleep(800);
             }
 
-            const newMp = player.value.mp - spell.cost;
+            const newMp = player.value.mp - actualCost;
             player.value.mp = newMp;
             updateCombatantState(player.value.id, { mp: newMp });
             
@@ -2158,9 +2278,9 @@ const isProcessingTalk = ref(false);
 
 const specialSkills = [
     { id: 'active_defense', name: '主动防御', costP: 30, costAP: 1, description: '获得一层数值为“0.5 * 基础攻击力”的护盾', theme: 'blue' },
-    { id: 'inner_power', name: '内源之力', costP: 40, costAP: 2, description: '施加“内伤”DEBUFF，下回合造成(1.2~1.5)倍攻击力的真实伤害', theme: 'red' },
-    { id: 'indomitable_will', name: '不屈意志', costP: 60, costAP: 2, description: '恢复1倍攻击力的生命，并获得30%伤害减免(2回合)', theme: 'orange' },
-    { id: 'combat_flow', name: '战斗心流', costP: 80, costAP: 1, description: '3回合内增加25%增伤、25%减伤及20%闪避率', theme: 'purple' }
+    { id: 'inner_power', name: '内源之力', costP: 50, costAP: 2, description: '施加“内伤”DEBUFF，下三回合造成(1.2~1.5)倍攻击力的真实伤害', theme: 'red' },
+    { id: 'indomitable_will', name: '不屈意志', costP: 60, costAP: 1, description: '恢复1倍攻击力的生命，并获得60%伤害减免(2回合)', theme: 'orange' },
+    { id: 'combat_flow', name: '战斗心流', costP: 100, costAP: 1, description: '3回合内增加40%增伤、40%减伤及40%闪避率，且MP消耗降低20%', theme: 'purple' }
 ];
 
 function getSkillThemeClasses(theme: string) {
@@ -2241,16 +2361,16 @@ async function handleSpecialAction(skill: any) {
              player.value.hp = newHp;
              updateCombatantState(player.value.id, { hp: newHp });
 
-             // Buff: 30% Damage Reduction for 2 turns
+             // Buff: 60% Damage Reduction for 2 turns
              const buff: Buff = {
                  id: `buff_will_${Date.now()}`,
                  name: '不屈意志',
                 type: 'buff',
-                description: '受到的伤害降低30%',
+                description: '受到的伤害降低60%',
                 duration: 2,
                 createdTurn: turn.value,
                 effects: [
-                    { type: 'damage_reduction', value: 0.30, isPercentage: true }
+                    { type: 'damage_reduction', value: 0.60, isPercentage: true }
                 ]
              };
              
@@ -2268,17 +2388,21 @@ async function handleSpecialAction(skill: any) {
              await sleep(1000);
              checkTurnEnd();
         } else if (skill.id === 'combat_flow') {
+             // Play Animation
+             await playCombatFlowAnimation();
+
              const buff: Buff = {
                  id: `buff_flow_${Date.now()}`,
                  name: '战斗心流',
-                type: 'buff',
-                description: '攻防提升，闪避提升',
-                duration: 3,
-                createdTurn: turn.value,
-                effects: [
-                    { type: 'stat_mod', targetStat: 'attack', value: 0.25, isPercentage: true },
-                     { type: 'damage_reduction', value: 0.25, isPercentage: true },
-                     { type: 'dodge_mod', value: 0.20, isPercentage: true }
+                 type: 'buff',
+                 description: '攻防提升，闪避提升，MP消耗降低',
+                 duration: 3,
+                 createdTurn: turn.value,
+                 effects: [
+                    { type: 'stat_mod', targetStat: 'attack', value: 0.40, isPercentage: true },
+                     { type: 'damage_reduction', value: 0.40, isPercentage: true },
+                     { type: 'dodge_mod', value: 0.40, isPercentage: true },
+                     { type: 'stat_mod', targetStat: 'mp_cost_reduction', value: 0.20, isPercentage: true }
                  ]
              };
              
@@ -2286,10 +2410,7 @@ async function handleSpecialAction(skill: any) {
              player.value.buffs.push(buff);
              updateCombatantState(player.value.id, { buffs: player.value.buffs });
              
-             const rect = document.body.getBoundingClientRect();
-             triggerEffect('spell', rect.width * 0.25, rect.height * 0.6); // Visual
              addLog(`${player.value.name} 进入了【战斗心流】状态！`);
-             audioManager.playSpellCast();
              
              await sleep(1000);
              checkTurnEnd();
@@ -2596,8 +2717,8 @@ async function selectTarget(target: UICombatant) {
                   id: `debuff_inner_${Date.now()}`,
                   name: '内伤',
                   type: 'debuff',
-                  description: `将在下回合受到 ${trueDmg} 点真实伤害`,
-                  duration: 1, // Triggers once at start of next round
+                  description: `将在三回合内受到 ${trueDmg} 点真实伤害`,
+                  duration: 3, 
                   effects: [
                       { type: 'damage_over_time', value: trueDmg, isPercentage: false }
                   ]
@@ -2627,7 +2748,8 @@ async function selectTarget(target: UICombatant) {
                   await sleep(800);
               }
 
-              const newMp = player.value.mp - spell.cost;
+              const actualCost = getSpellCost(spell, player.value);
+              const newMp = player.value.mp - actualCost;
               player.value.mp = newMp;
               updateCombatantState(player.value.id, { mp: newMp });
               
@@ -3307,6 +3429,61 @@ function closeCombat() {
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-10px); }
+}
+
+/* Combat Flow Animations */
+@keyframes glitch-slam {
+  0% { transform: scale(2) skew(20deg); opacity: 0; filter: blur(10px); }
+  20% { transform: scale(1) skew(0deg); opacity: 1; filter: blur(0px); }
+  25% { transform: translate(-5px, 0); }
+  30% { transform: translate(5px, 0); }
+  35% { transform: translate(0, 0); }
+  100% { transform: scale(1.05); }
+}
+
+@keyframes expand-width {
+  0% { width: 0; opacity: 0; }
+  100% { width: 100%; opacity: 1; }
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+
+@keyframes burning-pulse {
+  0% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.5); border-color: #ef4444; }
+  50% { box-shadow: 0 0 30px rgba(255, 140, 0, 0.8), 0 0 50px rgba(239, 68, 68, 0.4); border-color: #ff8c00; }
+  100% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.5); border-color: #ef4444; }
+}
+
+@keyframes fire-flicker {
+  0%, 100% { opacity: 0.8; transform: scale(1); filter: brightness(1); }
+  50% { opacity: 1; transform: scale(1.05); filter: brightness(1.3); }
+}
+
+.animate-burning {
+  animation: burning-pulse 1.5s infinite ease-in-out;
+}
+
+.animate-fire-flicker {
+  animation: fire-flicker 0.4s infinite ease-in-out;
+}
+
+.animate-glitch-slam {
+  animation: glitch-slam 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.animate-expand-width {
+  animation: expand-width 0.8s ease-out forwards 0.5s;
+}
+
+.animate-float-slow {
+  animation: float-slow 4s ease-in-out infinite;
+}
+
+.mix-blend-hard-light {
+  mix-blend-mode: hard-light;
 }
 
 /* New Spell Effect Animations */

@@ -59,7 +59,7 @@ export interface Combatant {
 
 export interface BuffEffect {
   type: 'stat_mod' | 'heal' | 'shield' | 'damage_over_time' | 'dodge_mod' | 'damage_reduction';
-  targetStat?: 'attack' | 'defense' | 'dodge' | 'damage_taken';
+  targetStat?: 'attack' | 'defense' | 'dodge' | 'damage_taken' | 'mp_cost_reduction';
   value: number; // For percentage use 0.1 for 10%, for flat use integer
   isPercentage: boolean;
 }

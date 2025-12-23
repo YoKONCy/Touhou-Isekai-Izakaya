@@ -22,7 +22,6 @@ export interface ManagementState {
   storeDescription?: string; // Explicit store description for map generation
   previousMap?: {
     layout: string[];
-    floors?: Record<string, string[]>;
     theme: string;
     description: string;
   }; // Previous map data for renovation
@@ -48,7 +47,6 @@ export interface Position {
 export interface Entity {
   id: string;
   type: 'player' | 'customer' | 'staff' | 'furniture';
-  floor?: number; // The floor this entity is on (default 1)
   x: number; // Grid X
   y: number; // Grid Y
   pixelX: number; // Smooth animation X

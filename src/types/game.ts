@@ -120,7 +120,6 @@ export interface GameSystemState {
   // Custom Map Data
   customMap?: {
     layout: string[];
-    floors?: Record<string, string[]>;
     theme: string;
     description: string;
   } | null;

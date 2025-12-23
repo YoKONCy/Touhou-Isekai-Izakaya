@@ -569,7 +569,6 @@ watch(() => gameStore.state.system.customMap, (newMap) => {
         console.log("Map updated, re-initializing scene...", newMap);
         // Deep log to verify content
         if (newMap.layout) console.log("New Layout Rows:", newMap.layout.length);
-        if (newMap.floors) console.log("New Floors:", Object.keys(newMap.floors));
         
         initScene(newMap);
         toastStore.addToast({

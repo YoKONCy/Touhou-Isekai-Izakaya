@@ -18,12 +18,10 @@ export class ZonePopulator {
     private width: number;
     private height: number;
     private resultMap: string[][]; // Working copy of the final tile map
-    private isGroundFloor: boolean;
     private reservedCells: Set<string> = new Set(); // Cells reserved for doors/paths
 
-    constructor(zoneLayout: string[], isGroundFloor: boolean = true) {
+    constructor(zoneLayout: string[]) {
         this.layout = zoneLayout;
-        this.isGroundFloor = isGroundFloor;
         this.height = zoneLayout.length;
         this.width = zoneLayout[0]?.length || 0;
         
@@ -62,14 +60,11 @@ export class ZonePopulator {
         this.processLiving(zones.filter(z => z.type === 'B' || z.type === 'L'));
         this.processRestroom(zones.filter(z => z.type === 'R'));
 
-        // 5. Decorate Walls (Windows) & Stairs
+        // 5. Decorate Walls (Windows)
         this.decorateWalls();
-        this.processStairs(zones.filter(z => z.type === 'S'));
 
         // 6. Final Cleanup (Ensure Exits)
-        if (this.isGroundFloor) {
-            this.ensureExits();
-        }
+        this.ensureExits();
 
         return this.resultMap.map(row => row.join(''));
     }
@@ -1196,79 +1191,6 @@ export class ZonePopulator {
             // Place at (fixed, pos) and (fixed, pos+1)
             this.setTile(fixed, pos, 'W');
             this.setTile(fixed, pos+1, 'W');
-        }
-    }
-
-    private processStairs(stairsZones: Zone[]) {
-        // 1. Process explicit 'S' zones
-        if (stairsZones.length > 0) {
-            stairsZones.forEach(zone => {
-                // Check height and expand if necessary (Fault Tolerance for 1-height stairs)
-                const ys = zone.cells.map(c => c.y);
-                const minY = Math.min(...ys);
-                const maxY = Math.max(...ys);
-                const height = maxY - minY + 1;
-                
-                if (height < 2) {
-                     // Expand downwards to ensure at least 2 height
-                     // This prevents getting stuck on 1-tile stairs against a wall
-                     const newMaxY = maxY + 1;
-                     if (newMaxY < this.height) {
-                         zone.cells.filter(c => c.y === maxY).forEach(c => {
-                             this.setTile(c.x, newMaxY, 'H');
-                             // We must treat this new tile as part of the zone for the entry-clearing logic below
-                             // But we can't easily modify 'zone.cells' iteration mid-stream if we rely on it.
-                             // Instead, we just set it here.
-                             // And we need to ensure the entry is BELOW this new row.
-                         });
-                     }
-                }
-
-                // Apply 'H' to all original cells
-                zone.cells.forEach(c => this.setTile(c.x, c.y, 'H'));
-
-                // Determine effective bottom of the stairs (considering expansion)
-                // We re-scan the map for 'H' in this zone's x-range?
-                // Or just rely on the fact that we expanded downwards.
-                
-                // Clear entry point
-                // We group by X column to find the bottom-most 'H' for each column
-                const xs = [...new Set(zone.cells.map(c => c.x))];
-                
-                xs.forEach(x => {
-                    // Find bottom-most 'H' in this column
-                    let bottomY = -1;
-                    for(let y = this.height - 1; y >= 0; y--) {
-                        if (this.getTile(x, y) === 'H') {
-                            bottomY = y;
-                            break;
-                        }
-                    }
-                    
-                    if (bottomY !== -1) {
-                         const entryY = bottomY + 1;
-                         if (entryY < this.height) {
-                             // Force clear entry
-                             this.setTile(x, entryY, '.');
-                             this.reservedCells.add(`${x},${entryY}`);
-                         }
-                    }
-                });
-            });
-            return;
-        }
-
-        // 2. Fallback: Look for 'W' in top row (old logic)
-        const row0 = this.layout[0];
-        if (!row0) return;
-
-        for(let x=0; x<this.width; x++) {
-            if (row0[x] === 'W') {
-                this.setTile(x, 0, 'H');
-                if (this.height > 1) {
-                    this.setTile(x, 1, '.');
-                }
-            }
         }
     }
 
