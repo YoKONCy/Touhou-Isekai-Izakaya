@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { db, type SaveSlot } from '@/db';
 import { useSettingsStore } from './settings';
 import { useChatStore } from './chat';
@@ -227,9 +227,15 @@ export const useSaveStore = defineStore('save', () => {
     }
   }
 
+  const isDefaultSave = computed(() => {
+    const current = saves.value.find(s => s.id === currentSaveId.value);
+    return current?.name === '默认存档';
+  });
+
   return {
     saves,
     currentSaveId,
+    isDefaultSave,
     init,
     createSave,
     switchSave,

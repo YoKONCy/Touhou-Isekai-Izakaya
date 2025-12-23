@@ -13,8 +13,10 @@ import CharacterEditor from '@/components/CharacterEditor.vue';
 import SaveManager from '@/components/SaveManager.vue';
 import MemoryPanel from '@/components/MemoryPanel.vue';
 import SummaryModal from '@/components/SummaryModal.vue';
+import HelpModal from '@/components/HelpModal.vue';
 import ToastContainer from '@/components/ToastContainer.vue';
-import { Send, Settings as SettingsIcon, Save, Loader2, Square, Book, Database, Blocks, Brain, Hammer, Store, RefreshCw } from 'lucide-vue-next';
+import NewPlayerGuide from '@/components/NewPlayerGuide.vue';
+import { Send, Settings as SettingsIcon, Save, Loader2, Square, Book, Database, Blocks, Brain, Hammer, Store, RefreshCw, HelpCircle } from 'lucide-vue-next';
 import PromptBuilder from '@/components/PromptBuilder.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import { useConfirm } from '@/utils/confirm';
@@ -62,6 +64,7 @@ const isCharEditorOpen = ref(false);
 const isSaveManagerOpen = ref(false);
 const isPromptBuilderOpen = ref(false);
 const isMemoryPanelOpen = ref(false);
+const isHelpOpen = ref(false);
 const isSummaryModalOpen = ref(false);
 const summaryTurnCount = ref(20);
 
@@ -187,6 +190,39 @@ async function handleRefresh() {
     await gameLoop.handleUserAction(textToResend);
   }
 }
+
+function handleHelpAction(action: string) {
+  switch (action) {
+    case 'openSettings':
+      isSettingsOpen.value = true;
+      break;
+    case 'openSaveManager':
+      isSaveManagerOpen.value = true;
+      break;
+    case 'openMemoryPanel':
+      isMemoryPanelOpen.value = true;
+      break;
+    case 'openCharEditor':
+      isCharEditorOpen.value = true;
+      break;
+    case 'openPromptBuilder':
+      isPromptBuilderOpen.value = true;
+      break;
+    case 'highlightQuests':
+    case 'highlightCharacters':
+      // TODO: Maybe scroll to or highlight these sections?
+      // For now, just open a toast or log
+      // But actually, on mobile these might be hidden, so we could open the drawer if we had one.
+      // On desktop, they are visible.
+      // Let's just play a sound.
+      audioManager.playClick();
+      break;
+    case 'highlightRefresh':
+      // Flash the refresh button?
+      // For now, no-op or just sound
+      break;
+  }
+}
 </script>
 
 <template>
@@ -228,6 +264,9 @@ async function handleRefresh() {
         <button @click="isPromptBuilderOpen = true; audioManager.playPageFlip()" class="btn-touhou-ghost" title="提示词拼接中心">
           <Blocks class="w-5 h-5" />
         </button>
+        <button @click="isHelpOpen = true; audioManager.playPageFlip()" class="btn-touhou-ghost" title="帮助与引导">
+          <HelpCircle class="w-5 h-5" />
+        </button>
         <button @click="isSettingsOpen = true; audioManager.playPageFlip()" class="btn-touhou-ghost" title="设置">
           <SettingsIcon class="w-5 h-5" />
         </button>
@@ -239,6 +278,7 @@ async function handleRefresh() {
     <CharacterEditor :is-open="isCharEditorOpen" @close="isCharEditorOpen = false" />
     <SaveManager :is-open="isSaveManagerOpen" @close="isSaveManagerOpen = false" />
     <MemoryPanel :is-open="isMemoryPanelOpen" @close="isMemoryPanelOpen = false" />
+    <HelpModal :is-open="isHelpOpen" @close="isHelpOpen = false" @action="handleHelpAction" />
     <SummaryModal :is-open="isSummaryModalOpen" @close="isSummaryModalOpen = false" :turn-count="summaryTurnCount" />
     <PromptBuilder :is-open="isPromptBuilderOpen" @close="isPromptBuilderOpen = false" />
     <ConfirmDialog />
@@ -259,6 +299,9 @@ async function handleRefresh() {
       <main class="flex-1 flex flex-col relative min-w-0">
         <!-- Chat Area -->
         <div ref="chatContainer" class="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth">
+          <!-- New Player Guide -->
+          <NewPlayerGuide @open-save-manager="isSaveManagerOpen = true" @open-help="isHelpOpen = true" />
+
           <div v-if="chatStore.messages.length === 0" class="text-center text-izakaya-wood/50 mt-20 flex flex-col items-center gap-4">
             <div class="text-4xl opacity-50 filter drop-shadow-sm">🍵</div>
             <p class="font-display text-lg">还没有任何对话...</p>

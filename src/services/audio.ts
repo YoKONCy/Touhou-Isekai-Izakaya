@@ -323,6 +323,14 @@ class AudioManager {
     noise.start();
   }
 
+  public playWindowOpen() {
+    this.playPageFlip();
+  }
+
+  public playWindowClose() {
+    this.playSoftClick();
+  }
+
   // Sound: Soft click for minor interactions
   public playSoftClick() {
     this.init();
