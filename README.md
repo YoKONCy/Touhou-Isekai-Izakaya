@@ -54,6 +54,7 @@
 | � | **AI Agent** - 智能体架构解析 | [Jump](#-ai-agent-architecture) |
 | � | **Memory System** - 独特的长记忆机制 | [Jump](#-long-term-memory) |
 | 🏗️ | **Architecture** - 系统架构与技术栈 | [Jump](#️-architecture) |
+| ⚔️ | **Combat System** - 策略弹幕战斗 | [Jump](#-combat-system) |
 | 🚀 | **Quick Start** - 快速开始指南 | [Jump](#-quick-start) |
 | 📅 | **Roadmap** - 开发计划与待办 | [Jump](#-roadmap) |
 | ⚠️ | **Disclaimer** - 版权与声明 | [Jump](#-disclaimer) |
@@ -236,6 +237,29 @@ graph TD
 | **Facility** | 🏗️ | **设施档案**: 记录店铺/房屋改造。当玩家处于相关区域时优先检索。 |
 | **Variable** | 🔢 | **状态快照**: 数值层面的“硬事实”（如金钱变动、物品获取）。 |
 | **Alliance** | 🤝 | **盟约与情报**: 全局性重要记忆，具有极高检索优先级。 |
+
+<br/>
+
+<!-- 动态分隔线 -->
+<img src="https://user-images.githubusercontent.com/73097560/115834477-dbab4500-a447-11eb-908a-139a6edaec5c.gif" width="100%">
+
+<br/>
+
+## ⚔️ Combat System
+
+> 幻想乡的解决异变方式——符卡规则 (Spell Card System) 与 LLM 逻辑判断的完美结合。
+
+<div align="center">
+  <img src="./src/assets/github_cover/战斗系统.png" width="100%" alt="Combat System Cover" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);" />
+</div>
+
+### 🎮 系统特色
+
+- **符卡决斗 (Spell Card Duel)**: 完美还原原作设定，角色拥有独特的符卡、弹幕类型与奥义演出。
+- **P 点系统 (P-Point System)**: 通过行动积攒 P 点，当 P 点达到 80% 以上时进入“爆发状态”，强化所有输出并解锁特殊视觉特效。
+- **动态血条与护盾**: 结合了实时数值反馈，包含护盾 (Shield)、闪避 (Dodge) 以及多种 Buff/Debuff 机制。
+- **友军支援 (Ally Support)**: 玩家可以与幻想乡的少女们组队，通过卡片堆栈系统自由切换当前激活的支援角色。
+- **LLM 嘴遁 (Persuasion)**: 除了武力解决，你还可以尝试通过对话说服对手。AI 会根据你的发言内容、当前好感度以及性格逻辑，判定对手是否会产生动摇甚至直接结束战斗。
 
 <br/>
 
