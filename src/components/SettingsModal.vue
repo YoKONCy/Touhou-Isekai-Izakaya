@@ -498,7 +498,7 @@ function handleVolumeChangeTest() {
                     ></textarea>
 
                    <p class="text-xs text-izakaya-wood/50 font-serif">
-                     提示：Nanobanana 使用中文自然语言；NovelAI V4/V4.5 使用英文自然语言；NovelAI V3 使用英文 Tags。
+                     提示：Nanobanana 的提示词使用中文自然语言；NovelAI V4/V4.5 的提示词使用英文自然语言；NovelAI V3 的提示词使用英文 Tags；若不会编写提示词，使用默认配置即可。
                    </p>
                  </div>
 
