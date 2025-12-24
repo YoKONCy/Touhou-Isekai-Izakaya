@@ -1,5 +1,6 @@
 import { generateCompletion } from '@/services/llm';
 import { ZonePopulator } from '@/services/management/ZonePopulator';
+import { useSettingsStore } from '@/stores/settings';
 
 export interface MapData {
   layout: string[];
@@ -7,6 +8,28 @@ export interface MapData {
   theme: string;
   description: string;
 }
+
+export const DEFAULT_MAP_DATA: MapData = {
+  theme: "default",
+  description: "Standard Izakaya Layout",
+  layout: [
+    "####################",
+    "#,,,,S,O,B,,,,,,,,,#",
+    "#,,,,,,,,P,,,,,,,,,#",
+    "#CCCCCCCCCC........#",
+    "#..........T..T....#",
+    "#..........h..h....#",
+    "#..................#",
+    "#...T..T...........#",
+    "#...h..h...........#",
+    "#..................#",
+    "#..................#",
+    "#..................#",
+    "#..................#",
+    "#..................#",
+    "##########E#########"
+  ]
+};
 
 // Zone Types from LLM
 export type ZoneChar = '#' | '.' | 'K' | 'D' | 'W' | 'E' | 'L' | 'R'; 
@@ -73,6 +96,14 @@ Return ONLY a JSON object.
 `;
 
 export async function generateMap(theme: string = "cozy wooden izakaya", context: string = "", previousMap?: MapData, throwOnError: boolean = false): Promise<MapData> {
+  const settingsStore = useSettingsStore();
+  
+  // Debug: Use default map if enabled
+  if (settingsStore.useDefaultTilemap) {
+      console.log("[MapGenerator] Debug mode: Using default map data.");
+      return JSON.parse(JSON.stringify(DEFAULT_MAP_DATA));
+  }
+
   try {
     let userContent = `Generate a ZONE map with the theme: ${theme}`;
     if (context) {
@@ -157,26 +188,6 @@ export async function generateMap(theme: string = "cozy wooden izakaya", context
 
     console.log("Using fallback map due to error.");
     // Fallback map (Standard Tile Map)
-    return {
-      theme: "default",
-      description: "Fallback Map",
-      layout: [
-        "####################",
-        "#,,,,S,O,B,,,,,,,,,#",
-        "#,,,,,,,,P,,,,,,,,,#",
-        "#CCCCCCCCCC........#",
-        "#..........T..T....#",
-        "#..........h..h....#",
-        "#..................#",
-        "#...T..T...........#",
-        "#...h..h...........#",
-        "#..................#",
-        "#..................#",
-        "#..................#",
-        "#..................#",
-        "#..................#",
-        "##########E#########"
-      ]
-    };
+    return JSON.parse(JSON.stringify(DEFAULT_MAP_DATA));
   }
 }

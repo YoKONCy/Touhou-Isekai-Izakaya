@@ -24,6 +24,8 @@ export interface PlayerStatus {
   // Combat Proficiency
   combatLevel: number; // 1-100
   combatExp: number; // 0-1000 per level
+  skillPoints: number; // Skill Points for Talent Tree
+  unlockedTalents: string[]; // IDs of unlocked talents
 
   // Descriptive Stats
   identity: string;
@@ -33,6 +35,10 @@ export interface PlayerStatus {
   residence: string; // Home/Base
   time: string; // e.g., "12:00"
   date: string; // e.g., "纪元123年1月1日"
+  
+  // Visuals
+  avatarUrl?: string; // Cropped avatar URL (data URI or path)
+  referenceImageUrl?: string; // Original design image URL for AI reference
   
   // Collections
   authorities: string[];
@@ -160,9 +166,13 @@ export const INITIAL_GAME_STATE: GameState = {
     date: '纪元123年1月1日',
     combatLevel: 1,
     combatExp: 0,
+    skillPoints: 0,
+    unlockedTalents: [],
     authorities: [],
     items: [],
-    spell_cards: []
+    spell_cards: [],
+    avatarUrl: '',
+    referenceImageUrl: ''
   },
   npcs: {},
   system: {

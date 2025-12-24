@@ -13,7 +13,7 @@ import {
     DEFAULT_NOVELAI_V3_PROMPT_SYSTEM,
     DEFAULT_NOVELAI_V4_PROMPT_SYSTEM
   } from '@/services/drawing';
-import { generateMap } from '@/services/management/MapGenerator';
+import { generateMap, DEFAULT_MAP_DATA } from '@/services/management/MapGenerator';
 
 const props = defineProps<{
   isOpen: boolean;
@@ -167,6 +167,12 @@ async function handleGenerateMap() {
   } finally {
     isGeneratingMap.value = false;
   }
+}
+
+function handleUseDefaultMap() {
+  gameStore.state.system.customMap = JSON.parse(JSON.stringify(DEFAULT_MAP_DATA));
+  toastStore.addToast({ message: "已恢复默认瓦片地图布局", type: "success" });
+  emit('close');
 }
 
 function handleTabChange(id: any) {
@@ -879,9 +885,21 @@ function handleVolumeChangeTest() {
                 </div>
 
                 <div class="p-3 border border-izakaya-wood/10 rounded-lg bg-white/30">
-                   <div class="font-bold text-sm text-izakaya-wood font-display mb-2">生成新瓦片地图</div>
-                   <div class="mb-2">
-                     <label class="block text-xs font-bold text-izakaya-wood mb-1">地图描述 / 提示词</label>
+                  <div class="font-bold text-sm text-izakaya-wood font-display mb-2">生成新瓦片地图</div>
+                  
+                  <div class="flex items-center justify-between mb-3 pb-3 border-b border-izakaya-wood/5">
+                    <div>
+                      <div class="text-xs font-bold text-izakaya-wood font-display">始终使用默认地图</div>
+                      <div class="text-[10px] text-izakaya-wood/50 font-serif">开启后，地图生成将跳过 LLM 阶段</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" v-model="settingsStore.useDefaultTilemap" class="sr-only peer">
+                      <div class="w-9 h-5 bg-izakaya-wood/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-touhou-red"></div>
+                    </label>
+                  </div>
+
+                  <div class="mb-2">
+                    <label class="block text-xs font-bold text-izakaya-wood mb-1">地图描述 / 提示词</label>
                      <textarea 
                        v-model="mapGenerationPrompt" 
                        rows="2"
@@ -897,6 +915,14 @@ function handleVolumeChangeTest() {
                      <RefreshCw v-if="isGeneratingMap" class="w-4 h-4 mr-2 animate-spin" />
                      {{ isGeneratingMap ? '正在生成...' : '生成新瓦片地图 (Debug)' }}
                    </button>
+
+                   <button 
+                     @click="handleUseDefaultMap" 
+                     class="mt-2 w-full flex items-center justify-center px-4 py-2 border border-izakaya-wood/20 rounded-md text-xs font-bold text-izakaya-wood hover:bg-izakaya-wood/5 transition-all"
+                   >
+                     立即重置为默认瓦片地图 (Debug)
+                   </button>
+
                    <p class="mt-2 text-xs text-izakaya-wood/60 font-serif">
                      根据提示词重新生成瓦片地图，并直接应用到当前游戏中。
                    </p>

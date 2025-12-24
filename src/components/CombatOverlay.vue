@@ -369,8 +369,22 @@
               <!-- Character Sprite Placeholder -->
               <div class="relative w-full h-full flex items-end justify-center pointer-events-auto">
                  <!-- Alive State -->
-                 <div v-if="player && player.hp > 0" class="w-80 h-[500px] relative animate-float transform skew-x-[-5deg]">
-                    <!-- 1. Card Base (Background & Border) -->
+                <div v-if="player && player.hp > 0" class="w-80 h-[500px] relative animate-float transform skew-x-[-5deg]">
+                   <!-- Ally Sprite (Blurred Background) with Transition -->
+                   <transition name="ally-fade" mode="out-in">
+                      <div v-if="sortedAllies[0]" :key="sortedAllies[0].id" class="absolute -top-32 -left-32 w-[110%] h-[100%] z-[-1] pointer-events-none opacity-50 blur-[2px] grayscale-[0.1] brightness-90 scale-105">
+                         <img 
+                            :src="getSpriteUrl(sortedAllies[0].name)" 
+                            @error="(e) => (e.target as HTMLImageElement).src = defaultSprite"
+                            class="w-full h-full object-cover object-top" 
+                            :alt="sortedAllies[0].name" 
+                         />
+                         <!-- Glow behind ally -->
+                         <div class="absolute inset-0 bg-blue-400/10 mix-blend-screen rounded-full blur-2xl"></div>
+                      </div>
+                   </transition>
+
+                   <!-- 1. Card Base (Background & Border) -->
                     <div class="absolute inset-0 rounded-t-3xl overflow-hidden backdrop-blur-sm border-b-4 border-red-500 shadow-[0_0_50px_rgba(220,38,38,0.3)] bg-gradient-to-t from-red-900/40 to-transparent z-0">
                     </div>
 
@@ -1109,6 +1123,7 @@ import { Zap, Shield, MessageSquare, Send } from 'lucide-vue-next';
 import type { Combatant, SpellCard, Buff, BuffEffect } from '@/types/combat';
 import type { Item } from '@/types/game';
 import { calculateDamage, processPersuasion, calculatePPointGain, getBaseDamage, getEffectiveStats } from '@/services/combatLogic';
+import { applyLifecycleHook, applyStatModifiers } from '@/services/combatModifiers';
 import { useGameStore } from '@/stores/game';
 import { useToastStore } from '@/stores/toast';
 import { gameLoop } from '@/services/gameLoop';
@@ -1600,22 +1615,51 @@ function getSpriteUrl(name?: string) {
     return (found as string) || defaultSprite;
 }
 
+import { getLevelCostReduction, addSpellExp, getCombatLevelCostReduction } from '@/utils/spellGrowth';
+
+// ... existing code ...
+
 function getSpellCost(spell: SpellCard, combatant: UICombatant | null) {
     if (!combatant) return spell.cost;
     
-    let reduction = 0;
+    let baseReduction = 0;
+    
+    // 1. Spell Level-based reduction (0% - 29%)
+    if (spell.level && spell.level > 1) {
+        baseReduction += getLevelCostReduction(spell.level);
+    }
+
+    // 2. Buff-based reduction (Legacy manual check - kept for backward compatibility if needed)
     if (combatant.buffs) {
         combatant.buffs.forEach(b => {
             b.effects.forEach(e => {
                 if (e.type === 'stat_mod' && e.targetStat === 'mp_cost_reduction') {
-                    reduction += e.value;
+                    baseReduction += e.value;
                 }
             });
         });
     }
     
-    if (reduction <= 0) return spell.cost;
-    return Math.max(0, Math.floor(spell.cost * (1 - reduction)));
+    // Apply first layer of reduction
+    let finalCost = spell.cost * (1 - Math.min(1.0, baseReduction));
+
+    // 3. New: Lifecycle Hook for MP Cost Reduction (e.g. BOMB专家, 灵力回收)
+    const context = { 
+        attacker: combatant as Combatant, 
+        spell, 
+        actionType: spell.isUltimate ? 'ultimate' : 'spell' as any,
+        spellType: spell.isUltimate ? 'ultimate' : (spell.type || 'normal') as any
+    };
+    finalCost = applyStatModifiers(finalCost, 'onCalculateMpCost', combatant as Combatant, context);
+
+    // 4. Combat Level-based reduction (Layer 2, multiplicative)
+    // Starts from Level 51, up to 25% at Level 100
+    if (combatant.isPlayer && combatant.combatLevel && combatant.combatLevel > 50) {
+        const combatReduction = getCombatLevelCostReduction(combatant.combatLevel);
+        finalCost *= (1 - combatReduction);
+    }
+    
+    return Math.max(0, Math.floor(finalCost));
 }
 
 function getEnemyEffectiveDodge(enemy: UICombatant) {
@@ -1700,6 +1744,20 @@ function startCombat() {
       showIntro.value = true;
       playIntroSequence();
       
+      // Trigger onCombatStart for all participants
+      const allCombatants = [player.value, ...allies.value, ...enemies.value].filter(c => c !== null) as UICombatant[];
+      const startContext = { 
+          attacker: null as any, 
+          turn: turn.value,
+          applyBuff: (target: Combatant, buff: any, type: 'buff' | 'debuff' = 'buff') => applyBuff(target as UICombatant, buff, type),
+          addPopup: (target: Combatant, val: string | number, type: 'damage' | 'heal' | 'crit' | 'buff' | 'debuff' = 'damage') => addPopup(target as UICombatant, val, type),
+          addLog: (msg: string) => addLog(msg)
+      };
+      for (const c of allCombatants) {
+          startContext.attacker = c;
+          applyLifecycleHook('onCombatStart', c, startContext);
+      }
+
       gameStore.updateState({
         system: {
           ...gameStore.state.system,
@@ -1806,107 +1864,107 @@ function updateCombatantState(id: string, updates: Partial<Combatant>) {
 
 // Core Logic Wrapper
 async function executeAction(attacker: Combatant, defender: UICombatant, actionName: string = '普通攻击', spell?: SpellCard) {
-  // Use existing service logic for calculation
-  const result = calculateDamage(attacker, defender, spell);
-  
-  // Apply Spell Effects (Debuffs or Buffs)
-  if (spell && spell.buffDetails) {
-      // Fix: Determine type based on spell type (buff/shield/heal -> buff, attack/debuff -> debuff)
-      const type = ['buff', 'shield', 'heal'].includes(spell.type || '') ? 'buff' : 'debuff';
-      applyBuff(defender, spell.buffDetails, type);
-  }
-
-  if (result.damage > 0) {
-      if (defender.shield && defender.shield > 0) {
-          // Shield Gate Logic: Damage is capped at shield value by calculateDamage
-          defender.shield -= result.damage;
-          updateCombatantState(defender.id, { shield: defender.shield });
-          
-          addPopup(defender, result.damage, 'buff'); 
-          if (defender.shield <= 0) {
-              addLog(`${attacker.name} ${actionName}，击碎了 ${defender.name} 的护盾！`);
-              audioManager.playShatter();
-          } else {
-              addLog(`${attacker.name} ${actionName}，造成了 ${result.damage} 点护盾伤害！`);
-          }
-      } else {
-          const newHp = Math.max(0, defender.hp - result.damage);
-          defender.hp = newHp; // Local visual update
-          updateCombatantState(defender.id, { hp: newHp });
-          
-          addPopup(defender, result.damage, 'damage');
-          
-          // Trigger Hit Spark
-          // Only if it's not a generic AOE where we can't target individually easily? 
-          // Actually we can, but let's keep it simple. 
-          // If defender is enemy (right side), hit effect is on right.
-          // If defender is player (left side), hit effect is on left.
-          // We don't have exact coordinates, so we estimate.
-          const isPlayer = defender.isPlayer || defender.team === 'player';
-          const rect = document.body.getBoundingClientRect();
-          const targetX = isPlayer ? rect.width * 0.25 : rect.width * 0.75;
-          const targetY = rect.height * 0.4;
-          
-          // Don't await this, let it play
-          triggerEffect('hit', targetX, targetY);
-
-          addLog(result.description);
+  // Determine number of attacks
+  let attackCount = 1;
+  if (actionName === '普通攻击' && !spell) {
+      const doubleChance = applyStatModifiers(0, 'onCalculateDoubleAttackChance', attacker, { attacker, defender: defender as any });
+      if (Math.random() < doubleChance) {
+          attackCount = 2;
       }
   }
 
-  // Handle Heal
-  if (result.heal > 0) {
-      const newHp = Math.min(defender.maxHp, defender.hp + result.heal);
-      defender.hp = newHp;
-      updateCombatantState(defender.id, { hp: newHp });
-      
-      addPopup(defender, result.heal, 'heal');
-      addLog(`${attacker.name} ${actionName}，恢复了 ${result.heal} 点HP！`);
-  } else if (result.damage <= 0) {
-      // Handle Miss / 0 Damage (Only if no damage and no heal)
-      // Check if it was a hit despite 0 damage (e.g. debuff only or 0 dmg spell)
-      if (result.isHit && spell && spell.buffDetails) {
-          // It was a hit, but 0 damage. Since we have buffs, show success.
-          addPopup(defender, spell.buffDetails.name, 'buff');
-          addLog(result.description);
-      } else if (result.isHit) {
-          // Hit but 0 damage and no buffs? (Weak attack)
-          addPopup(defender, '0', 'damage');
-          addLog(result.description);
-      } else {
-          // Miss
-          addPopup(defender, 'MISS', 'damage');
-          addLog(result.description || `${attacker.name} 的${actionName}对 ${defender.name} 未命中！`);
-      }
-  }
+  for (let i = 0; i < attackCount; i++) {
+    if (i > 0) {
+        if (defender.hp <= 0) break;
+        addLog(`触发连击！${attacker.name} 再次发动了攻击！`);
+        await sleep(600);
+    }
 
-  // P-Point Gain Logic (Player Normal Attack)
-  if ((attacker.isPlayer || attacker.team === 'player') && !spell) {
-       // Gain P-points even if missed (60% gain on miss)
-       let pGain = calculatePPointGain(attacker, result.damage);
-       
-       if (!result.isHit) {
-           pGain *= 0.6; // 60% penalty for missing
-       }
+    // Use existing service logic for calculation
+    const result = calculateDamage(attacker, defender, spell);
+    
+    // Apply Spell Effects (Debuffs or Buffs) - Only on first hit for multi-hit spells if any
+    if (spell && spell.buffDetails && i === 0) {
+        // Fix: Determine type based on spell type (buff/shield/heal -> buff, attack/debuff -> debuff)
+        const type = ['buff', 'shield', 'heal'].includes(spell.type || '') ? 'buff' : 'debuff';
+        applyBuff(defender, spell.buffDetails, type);
+    }
 
-       if (pGain > 0) {
-           const currentP = attacker.pPoints || 0;
-           const maxP = attacker.maxPPoints || 100;
-           const newP = Math.min(maxP, currentP + pGain);
-           
-           updateCombatantState(attacker.id, { pPoints: newP });
-           
-           // Optional: Add P-point popup
-           const uiAttacker = attacker.id === player.value?.id ? player.value : null;
-           if (uiAttacker) {
-               addPopup(uiAttacker, `+${pGain.toFixed(1)} P`, 'buff');
-           }
-       }
-  }
-  
-  // Check Death
-  if (defender.hp <= 0 && defender.id && gameStore.state.npcs[defender.id]) {
-      // Already synced via helper
+    if (result.damage > 0) {
+        if (defender.shield && defender.shield > 0) {
+            // Shield Gate Logic: Damage is capped at shield value by calculateDamage
+            defender.shield -= result.damage;
+            updateCombatantState(defender.id, { shield: defender.shield });
+            
+            addPopup(defender, result.damage, 'buff'); 
+            if (defender.shield <= 0) {
+                addLog(`${attacker.name} ${actionName}，击碎了 ${defender.name} 的护盾！`);
+                audioManager.playShatter();
+            } else {
+                addLog(`${attacker.name} ${actionName}，造成了 ${result.damage} 点护盾伤害！`);
+            }
+        } else {
+            const newHp = Math.max(0, defender.hp - result.damage);
+            defender.hp = newHp; // Local visual update
+            updateCombatantState(defender.id, { hp: newHp });
+            
+            addPopup(defender, result.damage, 'damage');
+            
+            // Trigger Hit Spark
+            const isPlayer = defender.isPlayer || defender.team === 'player';
+            const rect = document.body.getBoundingClientRect();
+            const targetX = isPlayer ? rect.width * 0.25 : rect.width * 0.75;
+            const targetY = rect.height * 0.4;
+            
+            triggerEffect('hit', targetX, targetY);
+            addLog(result.description);
+        }
+    }
+
+    // Handle Heal
+    if (result.heal > 0) {
+        const newHp = Math.min(defender.maxHp, defender.hp + result.heal);
+        defender.hp = newHp;
+        updateCombatantState(defender.id, { hp: newHp });
+        
+        addPopup(defender, result.heal, 'heal');
+        addLog(`${attacker.name} ${actionName}，恢复了 ${result.heal} 点HP！`);
+    } else if (result.damage <= 0) {
+        // Handle Miss / 0 Damage (Only if no damage and no heal)
+        if (result.isHit && spell && spell.buffDetails) {
+            addPopup(defender, spell.buffDetails.name, 'buff');
+            addLog(result.description);
+        } else if (result.isHit) {
+            addPopup(defender, '0', 'damage');
+            addLog(result.description);
+        } else {
+            addPopup(defender, 'MISS', 'damage');
+            addLog(result.description || `${attacker.name} 的${actionName}对 ${defender.name} 未命中！`);
+        }
+    }
+
+    // P-Point Gain Logic (Player Normal Attack)
+    if ((attacker.isPlayer || attacker.team === 'player') && !spell) {
+         // Gain P-points even if missed (60% gain on miss)
+         let pGain = calculatePPointGain(attacker, result.damage);
+         
+         if (!result.isHit) {
+             pGain *= 0.6; // 60% penalty for missing
+         }
+
+         if (pGain > 0) {
+             const currentP = attacker.pPoints || 0;
+             const maxP = attacker.maxPPoints || 100;
+             const newP = Math.min(maxP, currentP + pGain);
+             
+             updateCombatantState(attacker.id, { pPoints: newP });
+             
+             const uiAttacker = attacker.id === player.value?.id ? player.value : null;
+             if (uiAttacker) {
+                 addPopup(uiAttacker, `+${pGain.toFixed(1)} P`, 'buff');
+             }
+         }
+    }
   }
 }
 
@@ -2030,6 +2088,13 @@ async function handleAction(type: string, payload?: any) {
             
             // End Turn Check
             checkTurnEnd();
+            
+            // Gain Exp (Self/Buff)
+            const expGain = Math.floor(Math.random() * 6) + 5; // 5-10
+            const { levelUp, newLevel } = addSpellExp(spell, expGain);
+            if (levelUp) {
+                addPopup(player.value, `符卡升级! Lv.${newLevel}`, 'buff');
+            }
             return;
         }
 
@@ -2192,6 +2257,13 @@ async function handleAction(type: string, payload?: any) {
             
             // End Turn Check
             checkTurnEnd();
+
+            // Gain Exp (AOE)
+            const expGain = Math.floor(Math.random() * 6) + 5; // 5-10
+            const { levelUp, newLevel } = addSpellExp(spell, expGain);
+            if (levelUp) {
+                addPopup(player.value, `符卡升级! Lv.${newLevel}`, 'buff');
+            }
         } else {
             // Single Target -> Selection Mode
             audioManager.playClick();
@@ -2772,6 +2844,13 @@ async function selectTarget(target: UICombatant) {
               // Execute Damage using central logic (handles shields, shatter, logs, buffs)
               await executeAction(player.value, target, spell.name, spell);
               
+              // Gain Exp (Single Target)
+              const expGain = Math.floor(Math.random() * 6) + 5; // 5-10
+              const { levelUp, newLevel } = addSpellExp(spell, expGain);
+              if (levelUp) {
+                  addPopup(player.value, `符卡升级! Lv.${newLevel}`, 'buff');
+              }
+
               if (target.hp <= 0) {
                  audioManager.playShatter();
               }
@@ -2838,6 +2917,14 @@ function processTurnStart() {
     const allCombatants = [player.value, ...allies.value, ...enemies.value].filter(c => c !== null) as UICombatant[];
     
     for (const c of allCombatants) {
+        // Trigger onTurnStart lifecycle hooks (handles DoT, HoT, and other turn-based talent effects)
+        applyLifecycleHook('onTurnStart', c, { 
+            attacker: c, 
+            turn: turn.value,
+            onLog: (msg) => addLog(msg),
+            onPopup: (target, val, type) => addPopup(target as UICombatant, val, type)
+        });
+
         if (!c.buffs || c.buffs.length === 0) continue;
         
         const expiredBuffs: Buff[] = [];
@@ -2845,50 +2932,6 @@ function processTurnStart() {
         let changed = false;
         
         for (const buff of c.buffs) {
-            // Process DoT / HoT Effects
-            for (const effect of buff.effects) {
-                if (effect.type === 'damage_over_time') {
-                    // True Damage Logic (Cannot be dodged)
-                     // 1. Shield Logic
-                     let damage = Number(effect.value);
-                     if (c.shield && c.shield > 0) {
-                         if (damage > c.shield) {
-                             damage -= c.shield;
-                             c.shield = 0;
-                             addLog(`${c.name} 的护盾被 ${buff.name} 击碎！`);
-                             audioManager.playShatter();
-                         } else {
-                             c.shield -= damage;
-                             damage = 0;
-                             // Shield absorbed all
-                         }
-                         updateCombatantState(c.id, { shield: c.shield });
-                     }
-
-                     // 2. Apply to HP
-                     if (damage > 0) {
-                         const newHp = Math.max(0, c.hp - damage);
-                         c.hp = newHp;
-                         updateCombatantState(c.id, { hp: newHp });
-                         addPopup(c, damage, 'damage');
-                         addLog(`${c.name} 受到 ${buff.name} 的持续伤害 ${damage}点！`);
-                         
-                         if (c.hp <= 0) {
-                             audioManager.playShatter(); // Death sound
-                         }
-                     }
-                } else if (effect.type === 'heal') {
-                    const heal = Number(effect.value);
-                    if (heal > 0) {
-                        const newHp = Math.min(c.maxHp, c.hp + heal);
-                        c.hp = newHp;
-                        updateCombatantState(c.id, { hp: newHp });
-                        addPopup(c, heal, 'heal');
-                        addLog(`${c.name} 因 ${buff.name} 恢复了 ${heal} 点生命！`);
-                    }
-                }
-            }
-
             // Duration Logic Optimization:
             // Ensure buffs last for full round cycles by skipping decrement if applied recently
             let shouldDecrement = true;
@@ -2917,7 +2960,9 @@ function processTurnStart() {
                 changed = true;
             } else {
                 activeBuffs.push(buff);
-                changed = true; // Duration changed
+                // Note: changed = true if duration changed, but we only need to sync if it's new or removed?
+                // Actually, duration is displayed in UI, so we should sync.
+                changed = true; 
             }
         }
         
@@ -2926,10 +2971,6 @@ function processTurnStart() {
              updateCombatantState(c.id, { buffs: activeBuffs });
              
              for (const b of expiredBuffs) {
-                 // Only log expiration if it wasn't a 1-turn instant effect (optional optimization)
-                 if (b.duration < 0) { // It was 0 before decrement? No, duration becomes 0 implies it expires now.
-                    // If original duration was 1, it runs once then expires.
-                 }
                  addLog(`${c.name} 的状态 【${b.name}】 已失效。`);
              }
         }
@@ -3281,6 +3322,16 @@ function checkWinLoss() {
   if (enemies.value.every(e => e.hp <= 0)) {
     isGameOver.value = true;
     gameResult.value = 'win';
+    
+    // Trigger onCombatWin lifecycle hook
+    if (player.value) {
+      applyLifecycleHook('onCombatWin', player.value, { 
+        attacker: player.value, 
+        turn: turn.value,
+        onLog: (msg) => addLog(msg),
+        onPopup: (target, val, type) => addPopup(target as UICombatant, val, type)
+      });
+    }
   } else if (player.value && player.value.hp <= 0) {
     isGameOver.value = true;
     gameResult.value = 'loss';
@@ -3294,7 +3345,27 @@ function closeCombat() {
 
   // Sync Player
   if (player.value) {
-    gameStore.updatePlayer({ hp: player.value.hp, mp: player.value.mp });
+    // 战斗胜利全符卡经验加成
+    if (gameResult.value === 'win' && player.value.spellCards) {
+        let levelUpMsg = '';
+        player.value.spellCards.forEach(spell => {
+             const { levelUp, newLevel } = addSpellExp(spell, 50);
+             if (levelUp) {
+                 levelUpMsg += `\n- ${spell.name} 升级至 Lv.${newLevel}`;
+             }
+        });
+        if (levelUpMsg) {
+            addLog(`【系统】战斗胜利！所有符卡获得50点经验。${levelUpMsg}`);
+        } else {
+             addLog(`【系统】战斗胜利！所有符卡获得50点经验。`);
+        }
+    }
+
+    gameStore.updatePlayer({ 
+        hp: player.value.hp, 
+        mp: player.value.mp,
+        spell_cards: player.value.spellCards 
+    });
   }
 
   // Sync Enemies
@@ -3424,6 +3495,19 @@ function closeCombat() {
   0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
   20% { transform: translate(-50%, -40px) scale(1.5); opacity: 1; }
   100% { transform: translate(-50%, -100px) scale(1); opacity: 0; }
+}
+
+.ally-fade-enter-active,
+.ally-fade-leave-active {
+  transition: all 0.5s ease;
+}
+.ally-fade-enter-from {
+  opacity: 0;
+  transform: translateX(-20px) scale(1);
+}
+.ally-fade-leave-to {
+  opacity: 0;
+  transform: translateX(20px) scale(1);
 }
 
 @keyframes float {

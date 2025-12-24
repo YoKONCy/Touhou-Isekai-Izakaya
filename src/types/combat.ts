@@ -17,6 +17,11 @@ export interface SpellCard {
   effects?: Record<string, any>; // 附加DEBUFF/BUFF
   isUltimate?: boolean; // 是否为终极符卡 (释放时有特效)
   hitRate?: number; // 命中率 (默认 0.1, 终极符卡 1.0)
+  
+  // 熟练度系统
+  level?: number;      // 当前等级 (默认 1)
+  experience?: number; // 当前经验值 (0-100 升级)
+
   buffDetails?: { // Structure matching PersuasionEffect buffDetails
     name: string;
     duration: number;
@@ -53,12 +58,13 @@ export interface Combatant {
   maxActionPoints?: number; // Default 2
   
   combatLevel?: number; // Player Combat Proficiency Level (1-100)
+  unlockedTalents?: string[]; // IDs of unlocked talents
 
   hasUsedUltimate?: boolean; // Track if Ultimate has been used in this battle
 }
 
 export interface BuffEffect {
-  type: 'stat_mod' | 'heal' | 'shield' | 'damage_over_time' | 'dodge_mod' | 'damage_reduction';
+  type: 'stat_mod' | 'heal' | 'heal_mp' | 'shield' | 'damage_over_time' | 'dodge_mod' | 'damage_reduction';
   targetStat?: 'attack' | 'defense' | 'dodge' | 'damage_taken' | 'mp_cost_reduction';
   value: number; // For percentage use 0.1 for 10%, for flat use integer
   isPercentage: boolean;

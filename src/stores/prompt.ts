@@ -576,7 +576,7 @@ role_profile:
     name: '玩家人设',
     description: '注入玩家的身份、外貌和能力设定。',
     enabled: true,
-    configurable: true,
+    configurable: false,
     role: 'system',
     metadata: { playerName: '小明' },
     content: `玩家信息：

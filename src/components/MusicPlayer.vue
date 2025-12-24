@@ -1,15 +1,44 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, onUnmounted } from 'vue';
+import { ref, onMounted, computed, onUnmounted, watch } from 'vue';
 import { useMusicPlayerStore } from '@/stores/musicPlayer';
+import { useGameStore } from '@/stores/game';
 import { 
   Play, Pause, SkipBack, SkipForward, 
-  ListMusic, X, Plus, Music, Disc, Repeat, Shuffle, GripHorizontal, ChevronDown 
+  ListMusic, X, Plus, Music, Disc, Repeat, Repeat1, Shuffle, GripHorizontal, ChevronDown 
 } from 'lucide-vue-next';
 
 const store = useMusicPlayerStore();
+const gameStore = useGameStore();
 const showSettings = ref(false);
 const isHovered = ref(false);
 const isExpanded = ref(false); // Changed to false by default
+
+// Combat State Integration
+const isCombatActive = computed(() => {
+  const combat = gameStore.state.system.combat;
+  return !!combat && (combat.isActive || combat.isPending);
+});
+
+const wasPlayingBeforeCombat = ref(false);
+
+// Auto-pause music when entering combat and resume when leaving
+watch(isCombatActive, (active) => {
+  if (active) {
+    if (store.isPlaying) {
+      wasPlayingBeforeCombat.value = true;
+      console.log('[MusicPlayer] Combat active, auto-pausing music.');
+      store.pause();
+    } else {
+      wasPlayingBeforeCombat.value = false;
+    }
+  } else {
+    if (wasPlayingBeforeCombat.value) {
+      console.log('[MusicPlayer] Combat ended, auto-resuming music.');
+      store.play();
+      wasPlayingBeforeCombat.value = false;
+    }
+  }
+});
 
 // Draggable logic
 const position = ref({ x: window.innerWidth - 300, y: window.innerHeight - 100 });
@@ -103,6 +132,7 @@ function toggleExpand() {
 
 <template>
   <div 
+    v-show="!isCombatActive"
     class="fixed z-[9999] flex flex-col items-end gap-2 font-serif text-izakaya-wood select-none"
     :style="{ left: position.x + 'px', top: position.y + 'px' }"
     @mouseenter="isHovered = true"
@@ -130,7 +160,7 @@ function toggleExpand() {
             >
               <Repeat v-if="store.mode === 'loop'" class="w-4 h-4" />
               <Shuffle v-else-if="store.mode === 'random'" class="w-4 h-4" />
-              <Repeat v-else class="w-4 h-4 text-touhou-red" />
+              <Repeat1 v-else class="w-4 h-4 text-touhou-red" />
             </button>
             <button @click.stop="showSettings = false" class="hover:text-touhou-red"><X class="w-4 h-4" /></button>
           </div>

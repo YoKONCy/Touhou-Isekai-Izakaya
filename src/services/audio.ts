@@ -843,6 +843,57 @@ class AudioManager {
     noiseGain.connect(this.sfxGain);
     noise.start(t);
   }
+
+  // Sound: Level Up (Triumphant Chime)
+  public playLevelUp() {
+    this.init();
+    if (!this.ctx || !this.sfxGain) return;
+
+    const t = this.ctx.currentTime;
+
+    // Triumphant Major Chord Arpeggio
+    // C Major: C4 (261.63), E4 (329.63), G4 (392.00), C5 (523.25)
+    [261.63, 329.63, 392.00, 523.25].forEach((freq, i) => {
+        const osc = this.ctx!.createOscillator();
+        const gain = this.ctx!.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, t + (i * 0.1));
+        
+        gain.gain.setValueAtTime(0, t + (i * 0.1));
+        gain.gain.linearRampToValueAtTime(0.2, t + (i * 0.1) + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + (i * 0.1) + 1.0);
+
+        osc.connect(gain);
+        gain.connect(this.sfxGain!);
+        osc.start(t + (i * 0.1));
+        osc.stop(t + (i * 0.1) + 1.0);
+    });
+  }
+
+  // Sound: Error (Dull Buzz)
+  public playError() {
+    this.init();
+    if (!this.ctx || !this.sfxGain) return;
+
+    const t = this.ctx.currentTime;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(150, t);
+    osc.frequency.linearRampToValueAtTime(100, t + 0.2);
+    
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.1, t + 0.05);
+    gain.gain.linearRampToValueAtTime(0, t + 0.2);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(t);
+    osc.stop(t + 0.2);
+  }
 }
 
 export const audioManager = new AudioManager();

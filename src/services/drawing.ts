@@ -552,7 +552,7 @@ ${storyText}
   },
 
   // Main Workflow
-  async process(storyText: string, location?: string, characters?: any[]) {
+  async process(storyText: string, location?: string, characters?: any[], extraReferenceImages: string[] = []) {
     const settingsStore = useSettingsStore();
     const toastStore = useToastStore();
     const config = settingsStore.drawingConfig;
@@ -589,8 +589,8 @@ ${storyText}
         console.log('[DrawingService] Final Prompt:', finalPrompt);
         console.log('[DrawingService] Final Negative Prompt:', finalNegativePrompt);
         
-        // 3. Load Reference Images (CGs)
-        const refImages: string[] = [];
+        // 3. Load Reference Images (CGs + Extra)
+        const refImages: string[] = [...extraReferenceImages];
         if (characters && characters.length > 0) {
             console.log(`[DrawingService] Checking for character CGs among: ${characters.map(c => c.name).join(', ')}`);
             for (const char of characters) {

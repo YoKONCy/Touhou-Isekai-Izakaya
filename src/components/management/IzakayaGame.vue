@@ -674,6 +674,8 @@ canvas {
   background: #2c3e50;
   box-shadow: 0 0 20px rgba(0,0,0,0.5);
   border-radius: 4px;
+  image-rendering: pixelated; /* Sharp pixels */
+  image-rendering: crisp-edges;
 }
 
 .ui-overlay {

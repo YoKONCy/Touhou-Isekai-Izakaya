@@ -66,6 +66,13 @@ const isSaveManagerOpen = ref(false);
 const isPromptBuilderOpen = ref(false);
 const isMemoryPanelOpen = ref(false);
 const isHelpOpen = ref(false);
+const helpInitialSectionId = ref<string | undefined>(undefined);
+
+function handleOpenHelp(sectionId?: string) {
+  helpInitialSectionId.value = sectionId;
+  isHelpOpen.value = true;
+  audioManager.playPageFlip();
+}
 const isSummaryModalOpen = ref(false);
 const summaryTurnCount = ref(20);
 
@@ -266,7 +273,7 @@ function handleHelpAction(action: string) {
         <button @click="isPromptBuilderOpen = true; audioManager.playPageFlip()" class="btn-touhou-ghost" title="提示词拼接中心">
           <Blocks class="w-5 h-5" />
         </button>
-        <button @click="isHelpOpen = true; audioManager.playPageFlip()" class="btn-touhou-ghost" title="帮助与引导">
+        <button @click="handleOpenHelp()" class="btn-touhou-ghost" title="帮助与引导">
           <HelpCircle class="w-5 h-5" />
         </button>
         <button @click="isSettingsOpen = true; audioManager.playPageFlip()" class="btn-touhou-ghost" title="设置">
@@ -280,7 +287,7 @@ function handleHelpAction(action: string) {
     <CharacterEditor :is-open="isCharEditorOpen" @close="isCharEditorOpen = false" />
     <SaveManager :is-open="isSaveManagerOpen" @close="isSaveManagerOpen = false" />
     <MemoryPanel :is-open="isMemoryPanelOpen" @close="isMemoryPanelOpen = false" />
-    <HelpModal :is-open="isHelpOpen" @close="isHelpOpen = false" @action="handleHelpAction" />
+    <HelpModal :is-open="isHelpOpen" :initial-section-id="helpInitialSectionId" @close="isHelpOpen = false" @action="handleHelpAction" />
     <SummaryModal :is-open="isSummaryModalOpen" @close="isSummaryModalOpen = false" :turn-count="summaryTurnCount" />
     <PromptBuilder :is-open="isPromptBuilderOpen" @close="isPromptBuilderOpen = false" />
     <ConfirmDialog />
@@ -293,7 +300,7 @@ function handleHelpAction(action: string) {
       
       <!-- Left Sidebar (Status) -->
       <aside class="w-72 bg-izakaya-paper/60 backdrop-blur-md border-r border-izakaya-wood/10 p-4 hidden md:flex flex-col gap-4 h-full shadow-[2px_0_10px_rgba(0,0,0,0.02)] overflow-y-auto custom-scrollbar">
-        <StatusCard class="flex-shrink-0" />
+        <StatusCard class="flex-shrink-0" @open-help="handleOpenHelp" />
         <QuestList class="flex-1 min-h-[300px]" />
       </aside>
 
@@ -471,26 +478,18 @@ function handleHelpAction(action: string) {
                 <span v-if="shouldRegenerateMap" class="absolute top-0 right-0 w-2.5 h-2.5 bg-touhou-red rounded-full border border-white"></span>
               </button>
 
-              <!-- Management System Toggle -->
+              <!-- Management System Toggle (Temporarily Disabled) -->
               <button
-                @click="settingsStore.enableManagementSystem = !settingsStore.enableManagementSystem; if (!settingsStore.enableManagementSystem) shouldRegenerateMap = false;"
-                class="flex-shrink-0 mb-1.5 ml-2 p-3 rounded-full border-2 transition-all duration-300 relative group/mgmt"
-                :class="[
-                  settingsStore.enableManagementSystem 
-                    ? 'bg-blue-50 text-blue-600 border-blue-200 shadow-md' 
-                    : 'bg-transparent text-izakaya-wood/40 border-izakaya-wood/10 hover:border-izakaya-wood/30 hover:text-izakaya-wood/60'
-                ]"
-                title="营业系统开关 (开启后可触发店铺经营)"
+                disabled
+                class="flex-shrink-0 mb-1.5 ml-2 p-3 rounded-full border-2 transition-all duration-300 relative group/mgmt opacity-50 cursor-not-allowed bg-transparent text-izakaya-wood/20 border-izakaya-wood/10"
+                title="营业系统 (开发中 - 暂时禁用)"
               >
-                <Store class="w-5 h-5" :class="{ 'text-blue-500': settingsStore.enableManagementSystem }" />
+                <Store class="w-5 h-5 text-izakaya-wood/40" />
                 
                 <!-- Tooltip / Label -->
                 <span class="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs font-bold px-2 py-1 rounded bg-izakaya-wood text-izakaya-paper opacity-0 group-hover/mgmt:opacity-100 transition-opacity pointer-events-none shadow-sm">
-                  {{ settingsStore.enableManagementSystem ? '营业系统: 开启' : '营业系统: 关闭' }}
+                  营业系统: 开发中
                 </span>
-                
-                <!-- Status Indicator Dot -->
-                <span v-if="settingsStore.enableManagementSystem" class="absolute top-0 right-0 w-2.5 h-2.5 bg-blue-500 rounded-full border border-white"></span>
               </button>
             </div>
           </div>

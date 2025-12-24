@@ -77,7 +77,7 @@ export interface Customer extends Entity {
 
 export interface Furniture extends Entity {
   type: 'furniture';
-  furnitureType: 'table' | 'chair' | 'counter' | 'stove' | 'exit' | 'bed' | 'sofa' | 'lamp' | 'bookshelf' | 'toilet' | 'sink' | 'mirror';
+  furnitureType: 'table' | 'chair' | 'counter' | 'stove' | 'exit' | 'bed' | 'sofa' | 'lamp' | 'bookshelf' | 'toilet' | 'sink' | 'mirror' | 'prep_table';
   interactionPoint?: Position; // Where the player stands to interact
   isOccupied?: boolean;
   occupiedBy?: string; // Customer ID

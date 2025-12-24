@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, reactive } from 'vue';
-import { User, Wallet, Swords, Wand2, ArrowRight, Check, X, Settings, BookUser, Store, Users, Brain } from 'lucide-vue-next';
+import { User, Wallet, Swords, Wand2, ArrowRight, Check, X, Settings, BookUser, Store, Users, Brain, Sparkles, Save, Trash2 } from 'lucide-vue-next';
 
 const emit = defineEmits(['complete', 'cancel']);
 
@@ -8,6 +8,57 @@ type StartMode = 'preset' | 'custom';
 
 const mode = ref<StartMode>('preset');
 const isStoreStart = ref(false);
+
+// Custom Presets Management
+const CUSTOM_ORIGINS_KEY = 'izakaya_custom_origins';
+const customOrigins = ref<any[]>([]);
+
+function loadCustomOrigins() {
+  try {
+    const saved = localStorage.getItem(CUSTOM_ORIGINS_KEY);
+    if (saved) {
+      customOrigins.value = JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Failed to load custom origins:', e);
+  }
+}
+
+function saveCustomOrigins() {
+  localStorage.setItem(CUSTOM_ORIGINS_KEY, JSON.stringify(customOrigins.value));
+}
+
+function deleteCustomOrigin(id: string) {
+  customOrigins.value = customOrigins.value.filter(o => o.id !== id);
+  saveCustomOrigins();
+  if (formData.originId === id) {
+    formData.originId = 'traveler';
+  }
+}
+
+function saveCurrentAsPreset() {
+  const name = prompt('请输入预设名称：', '我的自定义开局');
+  if (!name) return;
+
+  const newOrigin = {
+    id: 'custom_' + Date.now(),
+    name: name,
+    desc: '自定义预设：' + (formData.persona ? formData.persona.slice(0, 30) + '...' : '无描述'),
+    setting: {
+      "详细人设": formData.persona,
+      "详细设定": formData.detailedSetting
+    },
+    stats: { ...formData.customStats },
+    icon: Sparkles,
+    isCustom: true
+  };
+
+  customOrigins.value.push(newOrigin);
+  saveCustomOrigins();
+  alert('预设保存成功！您可以在“预设开局”中选择它。');
+}
+
+loadCustomOrigins();
 
 const steps = computed(() => {
   const baseSteps: { id: string, title: string }[] = [
@@ -109,7 +160,37 @@ const origins = [
       "身份": "退魔师学徒",
       "特殊能力": "来自异世界的退魔师，对灵力感知敏锐，能够快速识别出各类异常源。"
     },
-    stats: { money: 0, power: 'C', hp: 1000, mp: 1000, identity: '退魔师', clothing: '狩衣', location: '人间之里', time: '7:00', date: '纪元2018年12月25日' },
+    stats: { 
+      money: 0, 
+      power: 'C', 
+      hp: 1000, 
+      mp: 1000, 
+      identity: '退魔师', 
+      clothing: '狩衣', 
+      location: '人间之里', 
+      time: '7:00', 
+      date: '纪元2018年12月25日',
+      spell_cards: [
+        {
+          name: '净符「鬼退治」',
+          description: '通过净化的力量驱散邪祟。造成伤害并削弱敌方。',
+          damage: 20,
+          cost: 100,
+          scope: 'single',
+          type: 'attack',
+          effects: {
+            debuffs: [
+              {
+                name: '无力化',
+                duration: 2,
+                description: '减少15%伤害',
+                effects: [{ type: 'stat_mod', targetStat: 'attack', value: -0.15, isPercentage: true }]
+              }
+            ]
+          }
+        }
+      ]
+    },
     icon: Swords
   },
   {
@@ -120,8 +201,50 @@ const origins = [
       "身份": "流浪魔术师",
       "特殊能力": "掌握一些魔术把戏；对‘命运’有敏锐的感知能力。"
     },
-    stats: { money: 20000, power: 'E+', hp: 500, mp: 500, identity: '魔术师', clothing: '魔术师礼服', location: '人间之里', time: '7:00', date: '纪元2018年12月25日' },
+    stats: { 
+      money: 20000, 
+      power: 'E+', 
+      hp: 500, 
+      mp: 500, 
+      identity: '魔术师', 
+      clothing: '魔术师礼服', 
+      location: '人间之里', 
+      time: '7:00', 
+      date: '纪元2018年12月25日',
+      spell_cards: [
+        {
+          name: '戏法「迷人眼」',
+          description: '通过眼花缭乱的手法干扰敌人的视线。',
+          damage: 0,
+          cost: 100,
+          scope: 'single',
+          type: 'buff',
+          effects: {
+            buffs: [
+              {
+                name: '惑乱',
+                duration: 3,
+                description: '增加15%闪避率',
+                effects: [{ type: 'dodge_mod', value: 0.15, isPercentage: true }]
+              }
+            ]
+          }
+        }
+      ]
+    },
     icon: Wand2
+  },
+  {
+    id: 'isekai_visitor',
+    name: '异界来客',
+    desc: '因时空乱流而穿越到这个世界的普通人。对这里一无所知，但带着异世界的特质。',
+    setting: {
+      "身份": "异界穿越者",
+      "穿越原因": "在原本的世界遭遇了罕见的时空乱流，醒来时已身处幻想乡。作为一个普通人，你必须在这个充满幻想与危险的世界找到生存之道。",
+      "特殊特质": "由于来自异界，你的存在方式似乎略微游离于此地的法则之外。"
+    },
+    stats: { money: 1000, power: 'F', hp: 400, mp: 200, identity: '穿越者', clothing: '破损的现代服饰', location: '博丽神社', time: '12:00', date: '纪元2018年12月25日' },
+    icon: Sparkles
   },
   {
     id: 'god',
@@ -167,7 +290,9 @@ const PRESET_LOCATIONS = [
   '博丽神社', '人间之里', '雾之湖', '妖怪之山', '迷途竹林', '旧地狱', '地灵殿', '辉针城'
 ];
 
-const selectedOrigin = computed(() => origins.find(o => o.id === formData.originId)!);
+const allOrigins = computed(() => [...origins, ...customOrigins.value]);
+
+const selectedOrigin = computed(() => allOrigins.value.find(o => o.id === formData.originId)!);
 
 // Validation
 const canProceed = computed(() => {
@@ -639,7 +764,7 @@ function finish() {
           </h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div 
-              v-for="origin in origins" 
+              v-for="origin in allOrigins" 
               :key="origin.id"
               @click="() => { formData.originId = origin.id; formData.presetLocation = origin.stats.location; }"
               class="relative p-4 rounded-xl border-2 cursor-pointer transition-all flex flex-col gap-2 group overflow-hidden"
@@ -650,6 +775,15 @@ function finish() {
                   <component :is="origin.icon" class="w-6 h-6" />
                 </div>
                 <div class="font-bold text-izakaya-wood dark:text-stone-200">{{ origin.name }}</div>
+                <!-- Delete button for custom origins -->
+                <button 
+                  v-if="(origin as any).isCustom" 
+                  @click.stop="deleteCustomOrigin(origin.id)"
+                  class="ml-auto p-1 text-izakaya-wood/40 hover:text-red-500 transition-colors"
+                  title="删除预设"
+                >
+                  <Trash2 class="w-4 h-4" />
+                </button>
               </div>
               <p class="text-sm text-izakaya-wood/70 dark:text-stone-400 mt-2 relative z-10">{{ origin.desc }}</p>
               <div class="mt-auto pt-4 flex gap-2 text-xs font-mono text-izakaya-wood/60 flex-wrap relative z-10">
@@ -799,6 +933,16 @@ function finish() {
                <label class="text-xs text-izakaya-wood/70 dark:text-stone-400">初始日期</label>
                <input v-model="formData.customStats.date" type="text" class="w-full p-2 rounded border border-izakaya-wood/30 dark:border-stone-600 bg-white/50 dark:bg-stone-700 dark:text-stone-100 text-stone-900 focus:border-touhou-red focus:outline-none" />
              </div>
+          </div>
+          
+          <div class="pt-4 border-t border-izakaya-wood/10 dark:border-stone-700 flex justify-end">
+            <button 
+              @click="saveCurrentAsPreset"
+              class="flex items-center gap-2 px-4 py-2 bg-izakaya-wood/10 hover:bg-izakaya-wood/20 dark:bg-stone-700 dark:hover:bg-stone-600 text-izakaya-wood dark:text-stone-200 rounded-lg transition-colors text-sm font-medium"
+            >
+              <Save class="w-4 h-4" />
+              <span>保存为预设</span>
+            </button>
           </div>
         </div>
 

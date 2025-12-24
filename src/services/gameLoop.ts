@@ -532,10 +532,17 @@ class GameLoopService {
       // Fire and forget - don't block background processing state for this
       const currentSceneCharacters = gameStore.state.system.current_scene_npcs.map((id: string) => gameStore.state.npcs[id] || { id, name: id });
       
+      // Pass player reference image if exists
+      const extraRefImages: string[] = [];
+      if (gameStore.state.player.referenceImageUrl) {
+        extraRefImages.push(gameStore.state.player.referenceImageUrl);
+      }
+
       drawingService.process(
         finalStory,
         gameStore.state.player.location,
-        currentSceneCharacters
+        currentSceneCharacters,
+        extraRefImages
       ).then(async (result) => {
         if (result && assistantMsgId) {
            await chatStore.updateMessage(assistantMsgId, {
@@ -576,53 +583,10 @@ class GameLoopService {
     }
   }
 
-  private initializeManagement(triggerData: any) {
-    const gameStore = useGameStore();
-    const settingsStore = useSettingsStore();
-    
-    if (!settingsStore.enableManagementSystem) {
-        console.warn('[GameLoop] Management trigger received but system is disabled. Ignoring.');
-        return;
-    }
-
-    const toastStore = useToastStore();
-
-    console.log('[GameLoop] Initializing Management Mode:', triggerData);
-
-    // 1. Reset/Initialize Management State
-    const initialState = {
-      isActive: false, // Will be set to true when the UI actually opens the modal
-      isTriggered: true,
-      context: triggerData.context || '',
-      specialGuests: triggerData.special_guests || [],
-      difficulty: triggerData.difficulty || 'normal',
-      stats: {
-        totalRevenue: 0,
-        customersServed: 0,
-        reputationGained: 0,
-        startTime: Date.now()
-      }
-    };
-
-    gameStore.state.system.management = initialState as any;
-
-    // 2. Notify User
-    toastStore.addToast('店铺经营模式已触发！点击右下角按钮开始经营', 'success', 8000);
-
-    // 3. Handle Map Regeneration Preference
-    if (gameStore.state.system.regenerateMapOnTrigger) {
-        console.log('[GameLoop] Regenerate Map flag is set. Clearing customMap to force regeneration.');
-        
-        // Save existing map as previousMap if available
-        if (gameStore.state.system.customMap && gameStore.state.system.management) {
-            gameStore.state.system.management.previousMap = JSON.parse(JSON.stringify(gameStore.state.system.customMap));
-            console.log('[GameLoop] Saved existing map for renovation context.');
-        }
-
-        gameStore.state.system.customMap = null; // Force regeneration on next open
-        // Optional: Reset flag? Or keep it as "Always Regenerate"?
-        // Given it's a toggle in UI, let's keep it (user preference).
-    }
+  private initializeManagement(_triggerData: any) {
+    // Force disabled: even if trigger received, ignore it.
+    console.warn('[GameLoop] Management system is temporarily disabled. Ignoring trigger.');
+    return;
   }
 
   // Public method to abort current processing

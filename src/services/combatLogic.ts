@@ -49,35 +49,14 @@ export interface DamageResult {
   description: string;
 }
 
+import { applyStatModifiers, applyLifecycleHook, checkMechanic } from './combatModifiers';
+
 export function getEffectiveStats(combatant: Combatant) {
   let dodgeMod = 0;
   let atkMod = 1.0;
   let defMod = 1.0; 
 
-  if (combatant.buffs) {
-    for (const buff of combatant.buffs) {
-      for (const effect of buff.effects) {
-        if (effect.type === 'dodge_mod') {
-          dodgeMod += Number(effect.value);
-        } else if (effect.type === 'stat_mod') {
-          if (effect.targetStat === 'attack') {
-             atkMod += Number(effect.value);
-          } else if (effect.targetStat === 'defense') {
-             // Defense increase = Damage reduction
-             defMod -= Number(effect.value);
-          } else if (effect.targetStat === 'damage_taken') {
-             // Damage taken increase (Debuff) or decrease (Buff if negative)
-             defMod += Number(effect.value);
-          } else if (effect.targetStat === 'dodge') {
-             dodgeMod += Number(effect.value);
-          }
-        } else if (effect.type === 'damage_reduction') {
-          defMod -= Number(effect.value);
-        }
-      }
-    }
-  }
-  
+  // --- Base Stat Initialization ---
   let baseDodge = combatant.dodgeRate !== undefined ? combatant.dodgeRate : 0.15;
 
   // --- Proficiency Dodge (Player Only) ---
@@ -87,12 +66,25 @@ export function getEffectiveStats(combatant: Combatant) {
       // 0.05 + 0.25 * ((L-1)/99)
       baseDodge = 0.05 + 0.25 * ((level - 1) / 99);
   }
-  // ---------------------------------------
 
+  // --- Modifier Hooks ---
+  const context = { attacker: combatant };
+  baseDodge = applyStatModifiers(baseDodge, 'onCalculateDodge', combatant, context);
+  atkMod = applyStatModifiers(atkMod, 'onCalculateAtk', combatant, context);
+  defMod = applyStatModifiers(defMod, 'onCalculateDef', combatant, context);
+  
+  // New: P-Point Gain Modifier
+  const pGainMod = applyStatModifiers(1.0, 'onCalculatePPointGain', combatant, context);
+  
+  // New: Max AP Modifier
+  const maxAp = applyStatModifiers(2, 'onCalculateApMax', combatant, context);
+  
   return {
     dodgeRate: Math.min(1.0, Math.max(0, baseDodge + dodgeMod)),
     atkMod: Math.max(0, atkMod),
-    defMod: Math.max(0, defMod)
+    defMod: Math.max(0, defMod),
+    pGainMod,
+    maxAp
   };
 }
 
@@ -101,7 +93,11 @@ export function calculatePPointGain(attacker: Combatant, damageDealt: number): n
 
   const basePowerVal = getBaseDamage(attacker.power);
   // Formula: 2 + 8 * (Base / Damage)
-  const gain = 2 + 8 * (basePowerVal / damageDealt);
+  let gain = 2 + 8 * (basePowerVal / damageDealt);
+  
+  // Apply Modifiers (e.g., 厚积薄发)
+  const stats = getEffectiveStats(attacker);
+  gain *= stats.pGainMod;
   
   // Cap at 30 to prevent explosion from very low damage or division by zero
   return Math.min(30, Math.max(0, gain));
@@ -112,6 +108,9 @@ export function calculateDamage(
   defender: Combatant, 
   spell?: SpellCard
 ): DamageResult {
+  const context = { attacker, defender, spell };
+  const isCrit = false;
+  let description = '';
   
   // 0. Handle Non-Attack Types
   if (spell) {
@@ -146,6 +145,9 @@ export function calculateDamage(
   const effectiveDodgeRate = Math.max(0, defStats.dodgeRate - hitRate);
 
   if (Math.random() < effectiveDodgeRate) {
+       // New: After Dodge Hook (e.g., 反击架势)
+       applyLifecycleHook('onAfterDodge', defender, { ...context, attacker: defender, defender: attacker });
+
        return {
         damage: 0,
         heal: 0,
@@ -162,12 +164,23 @@ export function calculateDamage(
   
   let totalBaseDmg = powerBaseDmg + spellFlatDmg;
 
+  // New: Apply Flat Damage Modifiers (e.g., 力量训练)
+  totalBaseDmg = applyStatModifiers(totalBaseDmg, 'onCalculateFlatDamage', attacker, context);
+
   // --- Proficiency Modifier (Player Only) ---
   // Formula: (Base + Spell) * (1 + 0.5 * (Level - 1) / 99)
   // Range: x1.0 (Lv1) to x1.5 (Lv100)
   if (attacker.isPlayer && attacker.combatLevel) {
     const level = Math.max(1, Math.min(100, attacker.combatLevel));
-    const profMod = 1.0 + 0.5 * ((level - 1) / 99);
+    
+    // New: Spell Level Bonus (e.g., 符卡掌握)
+    let effectiveSpellLevel = level;
+    if (spell) {
+       effectiveSpellLevel = applyStatModifiers(level, 'onCalculateSpellLevel', attacker, context);
+       effectiveSpellLevel = Math.min(100, effectiveSpellLevel); // Still capped at 100 for formula
+    }
+
+    const profMod = 1.0 + 0.5 * ((effectiveSpellLevel - 1) / 99);
     totalBaseDmg *= profMod;
   }
   // ------------------------------------------
@@ -179,18 +192,23 @@ export function calculateDamage(
   
   let rankModifier = 1.0;
   
-  if (rankDiff < 0) {
-    // Attacker is stronger
-    // Recursive +4% per level: Base * (1.04 ^ levels)
-    const levels = Math.abs(rankDiff);
-    rankModifier = Math.pow(1.04, levels);
-  } else if (rankDiff > 0) {
-    // Attacker is weaker
-    // Recursive -7% per level: Base * (0.93 ^ levels)
-    const levels = Math.abs(rankDiff);
-    rankModifier = Math.pow(0.93, levels);
-    // Hard cap min modifier to avoid 0 damage? Let's keep it pure for now, or min 0.01
-    rankModifier = Math.max(0.01, rankModifier);
+  // New: Check if Level Suppression should be ignored (e.g., 裁决天平)
+  const ignoreSuppression = checkMechanic('shouldIgnoreSuppression', attacker, context);
+
+  if (!ignoreSuppression) {
+    if (rankDiff < 0) {
+      // Attacker is stronger
+      // Recursive +4% per level: Base * (1.04 ^ levels)
+      const levels = Math.abs(rankDiff);
+      rankModifier = Math.pow(1.04, levels);
+    } else if (rankDiff > 0) {
+      // Attacker is weaker
+      // Recursive -7% per level: Base * (0.93 ^ levels)
+      const levels = Math.abs(rankDiff);
+      rankModifier = Math.pow(0.93, levels);
+      // Hard cap min modifier to avoid 0 damage? Let's keep it pure for now, or min 0.01
+      rankModifier = Math.max(0.01, rankModifier);
+    }
   }
 
   // Apply Rank Modifier
@@ -199,33 +217,56 @@ export function calculateDamage(
   // Apply Attack Buffs
   currentDamage *= attStats.atkMod;
 
-  // Final Calc
+  // Final Damage Calculation
   let finalDamage = currentDamage;
 
-  // Random Fluctuation for Non-Player Normal Attacks (0.85 ~ 1.15)
-  if (!attacker.isPlayer && !spell) {
-      const fluctuation = 0.85 + Math.random() * 0.30;
-      finalDamage *= fluctuation;
-  }
-
-  // P-Point Damage Bonus (0% - Max%)
-  // Max Bonus scales from 20% (Lv1) to 80% (Lv100) based on Proficiency
+  // New: P-Point Bonus Calculation with Crit Hooks
   if (attacker.pPoints && attacker.pPoints > 0) {
       const pRatio = Math.min(100, attacker.pPoints) / 100;
       
       let maxBonus = 0.5; // Default 50% for enemies/NPCs
       if (attacker.isPlayer && attacker.combatLevel) {
           const level = Math.max(1, Math.min(100, attacker.combatLevel));
+          
+          // New: Spell Level Bonus also applies to P-Point Max Bonus calculation
+          let effectiveSpellLevel = level;
+          if (spell) {
+             effectiveSpellLevel = applyStatModifiers(level, 'onCalculateSpellLevel', attacker, context);
+             effectiveSpellLevel = Math.min(100, effectiveSpellLevel);
+          }
+
           // 0.2 + 0.6 * ((L-1)/99) -> 0.2 to 0.8
-          maxBonus = 0.2 + 0.6 * ((level - 1) / 99);
+          maxBonus = 0.2 + 0.6 * ((effectiveSpellLevel - 1) / 99);
       }
+
+      // New: Crit Damage Modifier (e.g., 暴击强化)
+      // Note: Our system uses P-points to simulate "critical power".
+      let critMod = applyStatModifiers(1.0, 'onCalculateCritDmg', attacker, context);
+      
+      // New: Defender Crit Resist (e.g., 强韧肉体)
+      critMod = applyStatModifiers(critMod, 'onCalculateCritDmgTaken', defender, context);
+
+      maxBonus *= critMod;
 
       const pBonus = pRatio * maxBonus; 
       finalDamage *= (1 + pBonus);
   }
 
+  // New: Apply Base Damage Hook (after P-Point bonus but before defense)
+  finalDamage = applyStatModifiers(finalDamage, 'onCalculateBaseDamage', attacker, context);
+
+  // Random Fluctuation for Normal Attacks (0.85 ~ 1.15)
+  // Now applies to everyone for consistency, but only for normal attacks
+  if (!spell) {
+      const fluctuation = 0.85 + Math.random() * 0.30;
+      finalDamage *= fluctuation;
+  }
+
   // Apply Defense/Damage Reduction Buffs
   finalDamage *= defStats.defMod;
+
+  // Modifier Hook: Incoming Damage (Defender)
+  finalDamage = applyStatModifiers(finalDamage, 'onCalculateIncomingDamage', defender, context);
 
   // Ally Vulnerability: Allies take extra damage based on favorability
   // Favorability <= 0: 2.5x (Max Vulnerability)
@@ -273,39 +314,20 @@ export function calculateDamage(
 
   finalDamage = Math.floor(finalDamage);
 
+  // Modifier Hook: Final Damage (Attacker)
+  finalDamage = applyStatModifiers(finalDamage, 'onCalculateFinalDamage', attacker, context);
+
+  // New: Post-Damage Hooks (Bloodlust, etc.)
+  applyLifecycleHook('onAfterDamageDealt', attacker, context, finalDamage);
+
+  description = `${attacker.name} 对 ${defender.name} 造成了 ${finalDamage} 点伤害。`;
+
   // --- Shield Logic ---
-  // If shield exists, damage cannot exceed shield value (Shield Gate)
-  const shieldVal = defender.shield || 0;
-  if (shieldVal > 0) {
-      if (finalDamage > shieldVal) {
-          finalDamage = shieldVal;
-      }
-  }
-  
-  let description = "";
-  if (spell) {
-      if (finalDamage > 0) {
-          description = `${attacker.name} 释放了【${spell.name}】，造成了 ${finalDamage} 点伤害`;
-          if (spell.buffDetails) {
-              description += `，并附加了【${spell.buffDetails.name}】`;
-          }
-          description += "！";
-      } else {
-          // Damage is 0, check for effects
-          if (spell.buffDetails) {
-               description = `${attacker.name} 释放了【${spell.name}】，施加了【${spell.buffDetails.name}】效果！`;
-          } else {
-               description = `${attacker.name} 释放了【${spell.name}】，造成了 ${finalDamage} 点伤害！`;
-          }
-      }
-  } else {
-      description = `${attacker.name} 对 ${defender.name} 发起了普通攻击，造成了 ${finalDamage} 点伤害！`;
-  }
 
   return {
     damage: finalDamage,
     heal: 0,
-    isCrit: false,
+    isCrit: isCrit,
     isHit: true,
     description: description
   };
@@ -526,8 +548,24 @@ Output JSON Format:
     });
 
     console.log('[CombatLogic] Raw response from LLM4:', response);
+    
+    // Clean response: remove Markdown code blocks and conversational text
+    let cleaned = response.trim();
+    if (cleaned.includes('```')) {
+      const match = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+      if (match && match[1]) {
+        cleaned = match[1].trim();
+      }
+    }
+    
+    // Find first '{' and last '}' to isolate JSON object
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    }
 
-    const result = JSON.parse(response) as PersuasionResult;
+    const result = JSON.parse(cleaned) as PersuasionResult;
     console.log('[CombatLogic] Parsed PersuasionResult:', result);
     return result;
   } catch (error) {

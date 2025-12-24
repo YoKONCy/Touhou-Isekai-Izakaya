@@ -1,12 +1,191 @@
 <script setup lang="ts">
 import { useGameStore } from '@/stores/game';
 import { computed, ref } from 'vue';
-import { Coins, Heart, MapPin, Clock, Zap, Star, User, Shield, Package, Sparkles, X } from 'lucide-vue-next';
+import { 
+  Coins, Heart, MapPin, Clock, Zap, Star, User, Shield, Package, Sparkles, X, 
+  GitBranch, Lock, Check, Sword, Activity, Wind, Target, Brain, 
+  Flame, Droplets, Sun, Moon, Search, HelpCircle, Camera
+} from 'lucide-vue-next';
 import { audioManager } from '@/services/audio';
+import { TALENTS } from '@/data/talents';
+
+import PlayerConfigModal from './PlayerConfigModal.vue';
 
 const gameStore = useGameStore();
 
+const emit = defineEmits<{
+  (e: 'open-help', sectionId?: string): void;
+}>();
+
 const player = computed(() => gameStore.state.player);
+
+// Player Config Modal
+const showPlayerConfig = ref(false);
+
+function openPlayerConfig() {
+  showPlayerConfig.value = true;
+  audioManager.playSoftClick();
+}
+
+// Talent Tree Logic
+const activeTalentTab = ref<'combat' | 'knowledge'>('combat');
+const selectedTalentId = ref<string | null>(null);
+
+// Drag to scroll logic
+const treeContainer = ref<HTMLElement | null>(null);
+const isDragging = ref(false);
+const startX = ref(0);
+const startY = ref(0);
+const scrollLeft = ref(0);
+const scrollTop = ref(0);
+const hasMoved = ref(false);
+const zoomLevel = ref(1);
+
+function handleWheel(e: WheelEvent) {
+  if (!treeContainer.value) return;
+  e.preventDefault();
+  
+  const zoomStep = 0.1;
+  const minZoom = 0.4;
+  const maxZoom = 2.0;
+  
+  if (e.deltaY < 0) {
+    // Zoom in
+    zoomLevel.value = Math.min(maxZoom, zoomLevel.value + zoomStep);
+  } else {
+    // Zoom out
+    zoomLevel.value = Math.max(minZoom, zoomLevel.value - zoomStep);
+  }
+}
+
+function handleMouseDown(e: MouseEvent) {
+  const container = treeContainer.value;
+  if (!container) return;
+  isDragging.value = true;
+  hasMoved.value = false;
+  startX.value = e.pageX - container.offsetLeft;
+  startY.value = e.pageY - container.offsetTop;
+  scrollLeft.value = container.scrollLeft;
+  scrollTop.value = container.scrollTop;
+  container.style.cursor = 'grabbing';
+}
+
+function handleMouseMove(e: MouseEvent) {
+  const container = treeContainer.value;
+  if (!isDragging.value || !container) return;
+  e.preventDefault();
+  const x = e.pageX - container.offsetLeft;
+  const y = e.pageY - container.offsetTop;
+  
+  // Natural dragging: move 1:1 with mouse movement
+  // The scrollable area already scales with zoomLevel, so we don't need to compensate here
+  const walkX = (x - startX.value) * 1.5;
+  const walkY = (y - startY.value) * 1.5;
+  
+  if (Math.abs(walkX) > 5 || Math.abs(walkY) > 5) {
+    hasMoved.value = true;
+  }
+  
+  container.scrollLeft = scrollLeft.value - walkX;
+  container.scrollTop = scrollTop.value - walkY;
+}
+
+function handleMouseUp() {
+  isDragging.value = false;
+  if (treeContainer.value) {
+    treeContainer.value.style.cursor = 'grab';
+  }
+}
+
+function handleMouseLeave() {
+  isDragging.value = false;
+  if (treeContainer.value) {
+    treeContainer.value.style.cursor = 'grab';
+  }
+}
+
+const combatTalents = computed(() => {
+  return Object.values(TALENTS).filter(t => t.category === 'combat');
+});
+
+const selectedTalent = computed(() => {
+  return selectedTalentId.value ? TALENTS[selectedTalentId.value] : null;
+});
+
+function handleTalentClick(talent: any) {
+  if (hasMoved.value) return;
+  selectedTalentId.value = talent.id;
+  audioManager.playSoftClick();
+}
+
+function getTalentStatus(talent: any) {
+  const unlocked = player.value.unlockedTalents || [];
+  if (unlocked.includes(talent.id)) return 'unlocked';
+  
+  // Check prerequisites
+  const prereqs = talent.prerequisites || [];
+  if (prereqs.length === 0) return 'available';
+  
+  const allMet = prereqs.every((id: string) => unlocked.includes(id));
+  
+  if (allMet) return 'available';
+  return 'locked';
+}
+
+function getLineStatus(fromId: string, toId: string) {
+  const unlocked = player.value.unlockedTalents || [];
+  // Path is active if both are unlocked
+  if (unlocked.includes(fromId) && unlocked.includes(toId)) return 'active';
+  // Path is "potential" if prerequisite is unlocked but child is not
+  if (unlocked.includes(fromId)) return 'available';
+  return 'inactive';
+}
+
+function getCurvedPath(fromNode: any, toNode: any) {
+  // Calculate coordinates based on the same logic as the nodes
+  const x1 = fromNode.position.x * 160 + 800 + 55; // center x (offset 800 for 1600px width)
+  const y1 = fromNode.position.y * 140 + 100 + 55; // center y
+  const x2 = toNode.position.x * 160 + 800 + 55; // center x
+  const y2 = toNode.position.y * 140 + 100 + 55; // center y
+  
+  // If they are in the same column, draw a straighter line
+  if (Math.abs(x1 - x2) < 5) {
+    return `M ${x1} ${y1} L ${x2} ${y2}`;
+  }
+  
+  // Use a more "tensioned" cubic bezier curve
+  // Control points are adjusted based on vertical distance to prevent deep S-curves
+  const distY = Math.abs(y2 - y1);
+  const cpOffset = Math.min(distY * 0.5, 60); // Cap the offset for long vertical jumps
+  
+  return `M ${x1} ${y1} C ${x1} ${y1 + cpOffset}, ${x2} ${y2 - cpOffset}, ${x2} ${y2}`;
+}
+
+function getTalentIcon(talent: any) {
+  const id = talent.id;
+  if (id.includes('vitality') || id.includes('spirit')) return Activity;
+  if (id.includes('strength')) return Sword;
+  if (id.includes('agility') || id.includes('reflex')) return Wind;
+  if (id.includes('focus') || id.includes('insight')) return Target;
+  if (id.includes('guard') || id.includes('toughness') || id.includes('iron_skin')) return Shield;
+  if (id.includes('meditation') || id.includes('wisdom')) return Brain;
+  if (id.includes('lethal') || id.includes('burst')) return Flame;
+  if (id.includes('recycling')) return Droplets;
+  if (id.includes('potential')) return Sun;
+  if (id.includes('fantasy_killer')) return Moon;
+  return GitBranch;
+}
+
+async function handleUnlockTalent() {
+  if (!selectedTalent.value) return;
+  
+  const success = gameStore.unlockTalent(selectedTalent.value.id, selectedTalent.value.cost);
+  if (success) {
+    audioManager.playLevelUp();
+  } else {
+    audioManager.playError();
+  }
+}
 
 // Display Name: Prioritize PromptStore's metadata, fallback to GameStore
 const displayName = computed(() => {
@@ -43,6 +222,7 @@ const reputationLabel = computed(() => {
 // Modals
 const showItemsModal = ref(false);
 const showSpellsModal = ref(false);
+const showTalentTreeModal = ref(false);
 const selectedItem = ref<any>(null);
 const selectedSpell = ref<any>(null);
 
@@ -53,6 +233,11 @@ function handleOpenItems() {
 
 function handleOpenSpells() {
   showSpellsModal.value = true;
+  audioManager.playPageFlip();
+}
+
+function handleOpenTalentTree() {
+  showTalentTreeModal.value = true;
   audioManager.playPageFlip();
 }
 
@@ -78,6 +263,11 @@ function handleCloseSpells() {
   audioManager.playSoftClick();
 }
 
+function handleCloseTalentTree() {
+  showTalentTreeModal.value = false;
+  audioManager.playSoftClick();
+}
+
 function handleBackToItems() {
   selectedItem.value = null;
   audioManager.playPageFlip();
@@ -87,6 +277,9 @@ function handleBackToSpells() {
   selectedSpell.value = null;
   audioManager.playPageFlip();
 }
+
+// Avatar Upload & Crop Logic
+// Logic moved to PlayerConfigModal.vue
 
 function getItemTypeLabel(type: string) {
   const map: Record<string, string> = {
@@ -155,8 +348,18 @@ function formatBuffEffect(effect: any) {
     
     <!-- Header: Name & Identity -->
     <div class="border-b-2 border-dashed border-izakaya-wood/20 pb-3 relative z-10 flex flex-col items-center">
-      <div class="w-16 h-16 rounded-full border-4 border-izakaya-wood/10 bg-white/50 flex items-center justify-center mb-2 overflow-hidden shadow-inner">
-         <User class="w-8 h-8 text-touhou-red opacity-80" />
+      <div 
+        @click="openPlayerConfig"
+        class="w-16 h-16 rounded-full border-4 border-izakaya-wood/10 bg-white/50 flex items-center justify-center mb-2 overflow-hidden shadow-inner cursor-pointer hover:border-touhou-red/50 transition-all group/avatar relative"
+        title="点击配置玩家信息"
+      >
+        <img v-if="player.avatarUrl" :src="player.avatarUrl" class="w-full h-full object-cover animate-in fade-in zoom-in duration-500" />
+        <User v-else class="w-8 h-8 text-touhou-red opacity-80" />
+        
+        <!-- Hover Overlay -->
+        <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+          <Camera class="w-6 h-6 text-white" />
+        </div>
       </div>
       <h2 class="text-2xl font-display font-bold flex items-center gap-2 text-izakaya-wood group-hover/card:text-touhou-red transition-colors duration-300">
         {{ displayName }}
@@ -239,7 +442,7 @@ function formatBuffEffect(effect: any) {
         <div class="flex justify-between items-center text-xs mb-1">
             <span class="font-bold text-izakaya-wood flex items-center gap-1">
                 <Sparkles class="w-3.5 h-3.5 text-pink-500 group-hover/lvl:animate-spin" />
-                符卡熟练 Lv.{{ combatLevel }}
+                战斗熟练度 Lv.{{ combatLevel }}
             </span>
             <span class="font-mono text-[10px] text-izakaya-wood/60">{{ combatExp }} / 1000 EXP</span>
         </div>
@@ -257,23 +460,39 @@ function formatBuffEffect(effect: any) {
     </div>
 
     <!-- Interactive Collections -->
-    <div class="grid grid-cols-2 gap-3 pt-1 relative z-10">
-      <button 
-        @click="handleOpenItems"
-        class="flex flex-col items-center justify-center p-3 bg-white/40 hover:bg-white/80 hover:shadow-md rounded-xl transition-all duration-300 border border-izakaya-wood/5 hover:border-touhou-red/30 group hover:-translate-y-1"
-      >
-        <Package class="w-6 h-6 text-izakaya-wood/60 group-hover:text-touhou-red mb-1.5 transition-colors" />
-        <span class="text-xs font-medium text-izakaya-wood group-hover:text-touhou-red font-display">物品栏</span>
-        <span class="text-[10px] text-izakaya-wood/50">{{ player.items?.length || 0 }} 个物品</span>
-      </button>
+    <div class="space-y-2 pt-1 relative z-10">
+      <div class="grid grid-cols-2 gap-2">
+        <button 
+          @click="handleOpenItems"
+          class="flex flex-col items-center justify-center p-2.5 bg-white/40 hover:bg-white/80 hover:shadow-md rounded-xl transition-all duration-300 border border-izakaya-wood/5 hover:border-touhou-red/30 group hover:-translate-y-1"
+        >
+          <Package class="w-5 h-5 text-izakaya-wood/60 group-hover:text-touhou-red mb-1 transition-colors" />
+          <span class="text-xs font-medium text-izakaya-wood group-hover:text-touhou-red font-display">物品栏</span>
+          <span class="text-[10px] text-izakaya-wood/50">{{ player.items?.length || 0 }}</span>
+        </button>
+
+        <button 
+          @click="handleOpenSpells"
+          class="flex flex-col items-center justify-center p-2.5 bg-white/40 hover:bg-white/80 hover:shadow-md rounded-xl transition-all duration-300 border border-izakaya-wood/5 hover:border-marisa-gold/50 group hover:-translate-y-1"
+        >
+          <Sparkles class="w-5 h-5 text-izakaya-wood/60 group-hover:text-marisa-gold mb-1 transition-colors" />
+          <span class="text-xs font-medium text-izakaya-wood group-hover:text-marisa-gold-dim font-display">符卡技能</span>
+          <span class="text-[10px] text-izakaya-wood/50">{{ player.spell_cards?.length || 0 }}</span>
+        </button>
+      </div>
 
       <button 
-        @click="handleOpenSpells"
-        class="flex flex-col items-center justify-center p-3 bg-white/40 hover:bg-white/80 hover:shadow-md rounded-xl transition-all duration-300 border border-izakaya-wood/5 hover:border-marisa-gold/50 group hover:-translate-y-1"
+        @click="handleOpenTalentTree"
+        class="w-full flex items-center justify-between px-4 py-2.5 bg-white/40 hover:bg-white/80 hover:shadow-md rounded-xl transition-all duration-300 border border-izakaya-wood/5 hover:border-green-500/50 group hover:-translate-y-0.5"
       >
-        <Sparkles class="w-6 h-6 text-izakaya-wood/60 group-hover:text-marisa-gold mb-1.5 transition-colors" />
-        <span class="text-xs font-medium text-izakaya-wood group-hover:text-marisa-gold-dim font-display">符卡技能</span>
-        <span class="text-[10px] text-izakaya-wood/50">{{ player.spell_cards?.length || 0 }} 张符卡</span>
+        <div class="flex items-center gap-3">
+          <GitBranch class="w-5 h-5 text-izakaya-wood/60 group-hover:text-green-600 transition-colors" />
+          <span class="text-xs font-medium text-izakaya-wood group-hover:text-green-700 font-display">技能天赋树</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="text-[10px] text-izakaya-wood/50">可用点数</span>
+          <span class="text-xs font-bold text-green-600">{{ player.skillPoints || 0 }}</span>
+        </div>
       </button>
     </div>
 
@@ -381,9 +600,24 @@ function formatBuffEffect(effect: any) {
                   <span v-else>符</span>
                 </div>
                 <div class="flex-1">
-                   <div class="font-bold text-izakaya-wood font-display text-sm group-hover:text-marisa-gold-dim transition-colors">{{ typeof spell === 'object' ? spell.name : spell }}</div>
-                   <div class="text-[10px] text-izakaya-wood/60 line-clamp-1" v-if="typeof spell === 'object'">
-                      消耗: {{ spell.cost }} MP
+                   <div class="flex items-center gap-2">
+                      <div class="font-bold text-izakaya-wood font-display text-sm group-hover:text-marisa-gold-dim transition-colors">{{ typeof spell === 'object' ? spell.name : spell }}</div>
+                      <div v-if="typeof spell === 'object' && spell.level" class="text-[10px] px-1 bg-marisa-gold/20 text-marisa-gold-dim rounded border border-marisa-gold/30">
+                        Lv.{{ spell.level }}
+                      </div>
+                   </div>
+                   <div v-if="typeof spell === 'object'" class="mt-1">
+                      <div class="text-[10px] text-izakaya-wood/60 flex justify-between mb-0.5">
+                         <span>消耗: {{ spell.cost }} MP</span>
+                         <span v-if="(spell.level || 1) < 30">{{ spell.experience || 0 }} / 100 EXP</span>
+                         <span v-else class="text-touhou-red font-bold">MAX</span>
+                      </div>
+                      <div class="w-full h-1 bg-stone-200 rounded-full overflow-hidden">
+                         <div 
+                           class="h-full bg-gradient-to-r from-marisa-gold to-marisa-gold-dim transition-all duration-500"
+                           :style="{ width: `${(spell.level || 1) >= 30 ? 100 : (spell.experience || 0)}%` }"
+                         ></div>
+                      </div>
                    </div>
                 </div>
                 <div class="text-xs text-izakaya-wood/30 group-hover:translate-x-1 transition-transform">&rarr;</div>
@@ -403,6 +637,23 @@ function formatBuffEffect(effect: any) {
                  </div>
                  <h4 class="text-xl font-bold mb-1 font-display text-izakaya-wood relative z-10">{{ selectedSpell.name }}</h4>
                  
+                 <!-- Level & Experience -->
+                 <div class="w-full max-w-[200px] mb-4 relative z-10">
+                    <div class="flex justify-between items-end mb-1">
+                       <span class="text-xs font-bold text-izakaya-wood/70">等级 {{ selectedSpell.level || 1 }}</span>
+                       <span class="text-[10px] text-izakaya-wood/50" v-if="(selectedSpell.level || 1) < 30">
+                          {{ selectedSpell.experience || 0 }} / 100 EXP
+                       </span>
+                       <span class="text-[10px] text-touhou-red font-bold" v-else>MAX LEVEL</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-stone-200 rounded-full overflow-hidden shadow-inner">
+                       <div 
+                         class="h-full bg-gradient-to-r from-marisa-gold to-marisa-gold-dim transition-all duration-700"
+                         :style="{ width: `${(selectedSpell.level || 1) >= 30 ? 100 : (selectedSpell.experience || 0)}%` }"
+                       ></div>
+                    </div>
+                 </div>
+
                  <!-- Stats Badge -->
                  <div class="flex flex-wrap justify-center gap-2 mb-4 relative z-10">
                     <span class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded border border-blue-200">
@@ -454,5 +705,311 @@ function formatBuffEffect(effect: any) {
       </div>
     </Teleport>
 
+    <!-- Talent Tree Modal -->
+    <Teleport to="body">
+      <div v-if="showTalentTreeModal" class="fixed inset-0 z-[100] flex items-center justify-center bg-izakaya-wood/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div class="bg-izakaya-paper w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden flex flex-col h-[85vh] border-2 border-green-500/30 relative">
+          <!-- Texture -->
+          <div class="absolute inset-0 pointer-events-none opacity-10 bg-texture-stardust"></div>
+          
+          <!-- Header -->
+          <div class="p-4 border-b border-izakaya-wood/10 flex justify-between items-center bg-green-500/5 relative z-10">
+            <div class="flex items-center gap-4">
+               <h3 class="font-bold font-display flex items-center gap-2 text-izakaya-wood text-lg"><GitBranch class="w-5 h-5 text-green-600"/> 技能天赋树</h3>
+               
+               <!-- Tabs -->
+               <div class="flex bg-white/40 p-1 rounded-lg border border-izakaya-wood/10">
+                  <button 
+                    @click="activeTalentTab = 'combat'"
+                    class="px-3 py-1 text-xs font-bold rounded-md transition-all"
+                    :class="activeTalentTab === 'combat' ? 'bg-green-600 text-white shadow-sm' : 'text-izakaya-wood/60 hover:text-green-600'"
+                  >
+                    武炼极意
+                  </button>
+                  <button 
+                    @click="activeTalentTab = 'knowledge'"
+                    class="px-3 py-1 text-xs font-bold rounded-md transition-all"
+                    :class="activeTalentTab === 'knowledge' ? 'bg-blue-600 text-white shadow-sm' : 'text-izakaya-wood/60 hover:text-blue-600'"
+                  >
+                    森罗万象
+                  </button>
+               </div>
+            </div>
+            
+            <div class="flex items-center gap-4">
+               <div class="flex items-center gap-2 bg-green-100 px-3 py-1 rounded-full border border-green-200">
+                  <span class="text-xs text-green-800 font-medium">可用点数</span>
+                  <span class="font-mono font-bold text-green-700">{{ player.skillPoints || 0 }}</span>
+               </div>
+               <button 
+                  @click="emit('open-help', 'talent-tree')" 
+                  class="text-izakaya-wood/50 hover:text-touhou-red transition-colors bg-white/50 rounded-full p-1.5 hover:bg-white"
+                  title="帮助与引导"
+               >
+                  <HelpCircle class="w-5 h-5"/>
+               </button>
+               <button @click="handleCloseTalentTree" class="text-izakaya-wood/50 hover:text-touhou-red transition-colors bg-white/50 rounded-full p-1.5 hover:bg-white"><X class="w-5 h-5"/></button>
+            </div>
+          </div>
+          
+          <div class="flex-1 flex overflow-hidden relative z-10 bg-white/30">
+             <!-- Zoom Indicator (Fixed relative to viewport) -->
+             <div class="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-full border border-izakaya-wood/20 shadow-md pointer-events-none transition-opacity duration-300">
+                <Search class="w-3.5 h-3.5 text-izakaya-wood/60" />
+                <span class="text-xs font-mono font-bold text-izakaya-wood/80">{{ Math.round(zoomLevel * 100) }}%</span>
+             </div>
+
+             <!-- Tree View (Left/Center) -->
+             <div 
+               ref="treeContainer"
+               class="flex-1 overflow-auto custom-scrollbar relative p-8 bg-izakaya-paper/50 cursor-grab active:cursor-grabbing select-none group"
+               @mousedown="handleMouseDown"
+               @mousemove="handleMouseMove"
+               @mouseup="handleMouseUp"
+               @mouseleave="handleMouseLeave"
+               @wheel.prevent="handleWheel"
+             >
+                <!-- Scaling Wrapper: 
+                     1. Outer div expands to the scaled size to ensure scrollbars work correctly 
+                     2. Inner div uses transform: scale and origin: 0 0 for performance
+                -->
+                <div 
+                  class="relative mx-auto" 
+                  :style="{ 
+                    width: `${1600 * zoomLevel}px`, 
+                    height: `${1200 * zoomLevel}px`,
+                    minWidth: '100%'
+                  }"
+                >
+                   <div 
+                     class="absolute top-0 left-0 transition-transform duration-200 ease-out origin-top-left" 
+                     :style="{ 
+                       width: '1600px', 
+                       height: '1200px',
+                       willChange: 'transform',
+                       transform: `scale(${zoomLevel})`
+                     }"
+                   >
+                      
+                      <!-- Web Background Effect (Optimized) -->
+                      <div class="absolute inset-0 pointer-events-none opacity-[0.02] overflow-hidden">
+                         <svg width="100%" height="100%" style="will-change: transform;">
+                            <defs>
+                               <pattern id="hexagons" width="50" height="43.4" patternUnits="userSpaceOnUse" patternTransform="scale(2)">
+                                  <path d="M25 0 L50 14.4 L50 43.4 L25 57.8 L0 43.4 L0 14.4 Z" fill="none" stroke="currentColor" stroke-width="1" class="text-izakaya-wood" />
+                               </pattern>
+                            </defs>
+                            <rect width="100%" height="100%" fill="url(#hexagons)" />
+                         </svg>
+                      </div>
+
+                      <!-- Connecting Lines (Curved Paths) -->
+                      <svg class="absolute inset-0 w-full h-full pointer-events-none z-0" style="will-change: transform;">
+                         <template v-for="talent in (activeTalentTab === 'combat' ? combatTalents : [])" :key="'lines-' + talent.id">
+                            <template v-for="prereqId in talent.prerequisites" :key="prereqId">
+                              <path 
+                                v-if="TALENTS[prereqId]"
+                                :d="getCurvedPath(TALENTS[prereqId], talent)"
+                                fill="none"
+                                stroke="currentColor" 
+                                :stroke-width="getLineStatus(prereqId, talent.id) === 'active' ? 3 : (getLineStatus(prereqId, talent.id) === 'available' ? 2 : 1.5)"
+                                :class="{
+                                   'text-green-500/60 transition-colors duration-500': getLineStatus(prereqId, talent.id) === 'active',
+                                   'text-green-500/20': getLineStatus(prereqId, talent.id) === 'available',
+                                   'text-izakaya-wood/5': getLineStatus(prereqId, talent.id) === 'inactive'
+                                }"
+                                :style="getLineStatus(prereqId, talent.id) === 'active' ? 'filter: drop-shadow(0 0 5px rgba(34, 197, 94, 0.4));' : ''"
+                              />
+                            </template>
+                         </template>
+                      </svg>
+
+                      <!-- Nodes -->
+                      <div 
+                         v-for="talent in (activeTalentTab === 'combat' ? combatTalents : [])" 
+                         :key="talent.id"
+                         class="talent-node absolute w-[110px] h-[110px] flex flex-col items-center justify-center p-3 transition-transform cursor-pointer z-10"
+                         :class="{
+                            'is-unlocked': getTalentStatus(talent) === 'unlocked',
+                            'is-available': getTalentStatus(talent) === 'available',
+                            'is-locked': getTalentStatus(talent) === 'locked',
+                            'is-selected': selectedTalentId === talent.id
+                         }"
+                         :style="{ 
+                           transform: `translate(${talent.position.x * 160 + 800}px, ${talent.position.y * 140 + 100}px)`,
+                           willChange: 'transform'
+                         }"
+                         @click="handleTalentClick(talent)"
+                      >
+                      <!-- Hexagonal Shape via Clip-path -->
+                      <div class="absolute inset-0 bg-current opacity-10 rounded-xl transform rotate-45 scale-90 border-2 border-transparent transition-transform duration-300 node-bg"></div>
+                      
+                      <div class="relative z-10 flex flex-col items-center text-center">
+                        <div class="w-8 h-8 mb-1.5 flex items-center justify-center rounded-full bg-white/50 shadow-inner">
+                           <component 
+                              :is="getTalentIcon(talent)" 
+                              class="w-4 h-4"
+                              :class="getTalentStatus(talent) === 'unlocked' ? 'text-green-600' : 'text-izakaya-wood/40'"
+                           />
+                        </div>
+                        <div class="text-[10px] font-bold mb-0.5 leading-tight line-clamp-2 px-1">{{ talent.name }}</div>
+                        <div class="flex items-center gap-1 text-[8px] font-mono opacity-60">
+                           <span v-if="getTalentStatus(talent) === 'unlocked'" class="flex items-center"><Check class="w-2.5 h-2.5"/></span>
+                           <span v-else>{{ talent.cost }}P</span>
+                        </div>
+                      </div>
+
+                      <!-- Connection Points (Visual only) -->
+                      <div v-if="talent.prerequisites.length > 0" class="absolute -top-1 w-2 h-2 rounded-full bg-current opacity-40"></div>
+                   </div>
+                   
+                   <div v-if="activeTalentTab === 'knowledge'" class="flex flex-col items-center justify-center w-full h-full text-izakaya-wood/40">
+                      <Lock class="w-12 h-12 mb-2"/>
+                      <span>森罗万象板块尚未开放</span>
+                   </div>
+                   </div>
+                </div>
+             </div>
+             
+             <!-- Sidebar Info (Right) -->
+             <div class="w-64 bg-white/60 border-l border-izakaya-wood/10 p-4 flex flex-col shadow-xl backdrop-blur-sm z-20">
+                <div v-if="selectedTalent" class="animate-in slide-in-from-right-4 fade-in duration-200">
+                   <h4 class="text-xl font-bold text-izakaya-wood font-display mb-1">{{ selectedTalent.name }}</h4>
+                   <div class="flex gap-2 mb-4">
+                      <span 
+                        class="text-xs px-2 py-0.5 rounded border"
+                        :class="getTalentStatus(selectedTalent) === 'unlocked' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-izakaya-wood/10 text-izakaya-wood/60 border-izakaya-wood/20'"
+                      >
+                         {{ getTalentStatus(selectedTalent) === 'unlocked' ? '已掌握' : (getTalentStatus(selectedTalent) === 'available' ? '可学习' : '未解锁') }}
+                      </span>
+                      <span class="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 border border-yellow-200 rounded">
+                         消耗: {{ selectedTalent.cost }} 点
+                      </span>
+                   </div>
+                   
+                   <div class="bg-white/50 p-3 rounded-lg border border-izakaya-wood/10 mb-4 min-h-[80px]">
+                      <p class="text-sm text-izakaya-wood leading-relaxed">{{ selectedTalent.description }}</p>
+                   </div>
+                   
+                   <!-- Prerequisites Section -->
+                   <div v-if="selectedTalent.prerequisites.length > 0" class="mb-6">
+                      <div class="text-[10px] uppercase tracking-wider text-izakaya-wood/40 font-bold mb-2">前置需求</div>
+                      <div class="flex flex-wrap gap-1.5">
+                         <div 
+                           v-for="prereqId in selectedTalent.prerequisites" 
+                           :key="prereqId"
+                           class="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] border transition-colors"
+                           :class="{
+                             'bg-green-50 text-green-700 border-green-200': player.unlockedTalents?.includes(prereqId),
+                             'bg-red-50 text-red-700 border-red-200': !player.unlockedTalents?.includes(prereqId)
+                           }"
+                         >
+                            <component 
+                              :is="player.unlockedTalents?.includes(prereqId) ? Check : Lock" 
+                              class="w-2.5 h-2.5"
+                            />
+                            {{ TALENTS[prereqId]?.name || '未知天赋' }}
+                         </div>
+                      </div>
+                   </div>
+                   
+                   <button 
+                     @click="handleUnlockTalent"
+                     :disabled="getTalentStatus(selectedTalent) !== 'available' || (player.skillPoints || 0) < selectedTalent.cost"
+                     class="w-full py-3 rounded-lg font-bold shadow-md transition-all flex items-center justify-center gap-2"
+                     :class="{
+                        'bg-gradient-to-r from-green-500 to-green-600 text-white hover:shadow-lg hover:-translate-y-0.5': getTalentStatus(selectedTalent) === 'available' && (player.skillPoints || 0) >= selectedTalent.cost,
+                        'bg-gray-200 text-gray-400 cursor-not-allowed': getTalentStatus(selectedTalent) !== 'available' || (player.skillPoints || 0) < selectedTalent.cost,
+                        'bg-green-100 text-green-800 border border-green-200 cursor-default shadow-none': getTalentStatus(selectedTalent) === 'unlocked'
+                     }"
+                   >
+                      <span v-if="getTalentStatus(selectedTalent) === 'unlocked'">已掌握奥义</span>
+                      <span v-else-if="getTalentStatus(selectedTalent) === 'locked'">前置未解锁</span>
+                      <span v-else-if="(player.skillPoints || 0) < selectedTalent.cost">点数不足</span>
+                      <span v-else>学习天赋</span>
+                   </button>
+                </div>
+                <div v-else class="flex flex-col items-center justify-center h-full text-izakaya-wood/30 text-center">
+                   <GitBranch class="w-12 h-12 mb-2 opacity-50"/>
+                   <p class="text-sm">选择一个天赋节点<br>查看详情</p>
+                </div>
+             </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Player Config Modal -->
+    <PlayerConfigModal :is-open="showPlayerConfig" @close="showPlayerConfig = false" />
   </div>
 </template>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.talent-node.is-unlocked {
+  color: #16a34a; /* green-600 */
+}
+
+.talent-node.is-available {
+  color: #4b5563; /* gray-600 */
+}
+
+.talent-node.is-locked {
+  color: #9ca3af; /* gray-400 */
+}
+
+.talent-node.is-selected .node-bg {
+  opacity: 0.2;
+  transform: rotate(45deg) scale(1.05);
+  border-color: currentColor;
+  box-shadow: 0 0 15px currentColor;
+}
+
+.talent-node:hover .node-bg {
+  opacity: 0.15;
+  transform: rotate(45deg) scale(1);
+}
+
+.talent-node.is-unlocked .node-bg {
+  background-color: #dcfce7; /* green-100 */
+  border-color: #22c55e; /* green-500 */
+  opacity: 0.8;
+}
+
+.talent-node.is-available .node-bg {
+  background-color: white;
+  border-color: #d1d5db; /* gray-300 */
+  opacity: 0.9;
+}
+
+.talent-node.is-locked .node-bg {
+  background-color: #f3f4f6; /* gray-100 */
+  border-color: #e5e7eb; /* gray-200 */
+  opacity: 0.5;
+  filter: grayscale(1);
+}
+
+.node-bg {
+  @apply border-2;
+  transition: transform 0.3s, opacity 0.3s, border-color 0.3s, box-shadow 0.3s;
+  backface-visibility: hidden;
+}
+</style>

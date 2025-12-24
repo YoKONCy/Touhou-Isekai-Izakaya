@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { usePromptStore, type PromptBlock } from '@/stores/prompt';
-import { useGameStore } from '@/stores/game';
 import draggable from 'vuedraggable';
 import { GripVertical, Eye, EyeOff, Edit, X, Save, RotateCcw, Play, Bug } from 'lucide-vue-next';
 import PromptDebugger from './PromptDebugger.vue';
@@ -16,7 +15,6 @@ const emit = defineEmits<{
 }>();
 
 const promptStore = usePromptStore();
-const gameStore = useGameStore();
 const { confirm } = useConfirm();
 const isDebuggerOpen = ref(false);
 const isDebugMode = ref(false); // Controls drag-and-drop and other debug features
@@ -30,46 +28,6 @@ function handleEdit(block: PromptBlock) {
   editingBlock.value = block;
   editContent.value = block.content || '';
   editMetadata.value = block.metadata ? { ...block.metadata } : {};
-
-  // Sync user_persona with game state
-  if (block.id === 'user_persona') {
-    const player = gameStore.state.player;
-    
-    // Always sync display name metadata
-    if (player.name) {
-      editMetadata.value.playerName = player.name;
-    }
-
-    // Sync content if it seems outdated or default
-    const currentContent = editContent.value || '';
-    const nameMatch = currentContent.match(/User Persona: (.*?)\n/);
-    const currentNameInContent = nameMatch ? nameMatch[1]?.trim() || '' : '';
-    
-    // Check if the current content is the "wrong" raw JSON dump
-    const rawJsonContent = `玩家信息：\n姓名：${player.name}\n描述：${player.persona}`;
-    const isRawJsonDump = currentContent.trim() === rawJsonContent.trim();
-
-    // If it's the default "小明", or if the name doesn't match the current player, or if it's empty, OR if it's the raw JSON dump
-    if (currentNameInContent === '小明' || 
-        (currentNameInContent && currentNameInContent !== player.name) || 
-        !currentContent.trim() ||
-        isRawJsonDump) {
-      
-      let textPersona = player.persona;
-      try {
-        const jsonObj = JSON.parse(player.persona);
-        if (jsonObj["详细人设"]) {
-           textPersona = jsonObj["详细人设"];
-        } else if (jsonObj["补充设定"]) {
-           textPersona = jsonObj["补充设定"];
-        }
-      } catch (e) {
-        // Not JSON, use as is
-      }
-      
-      editContent.value = `玩家信息：\n姓名：${player.name}\n描述：${textPersona}`;
-    }
-  }
 }
 
 function handleSaveContent() {
@@ -231,16 +189,6 @@ const dragOptions = computed(() => ({
             </div>
             <div class="flex-1 p-4 overflow-hidden flex flex-col">
               <!-- Special UI for User Persona Metadata -->
-              <!-- <div v-if="editingBlock.id === 'user_persona'" class="mb-4 space-y-2 border-b border-izakaya-wood/10 pb-4">
-                 <label class="block text-xs font-bold text-izakaya-wood/60 uppercase tracking-wide">玩家显示名称</label>
-                 <input 
-                   v-model="editMetadata.playerName" 
-                   type="text" 
-                   class="w-full bg-white border border-izakaya-wood/20 rounded p-2 text-sm text-izakaya-wood focus:ring-1 focus:ring-touhou-red/30 focus:border-touhou-red/50 outline-none transition-all placeholder:text-izakaya-wood/20"
-                   placeholder="例如：博丽灵梦"
-                 />
-                 <p class="text-[10px] text-izakaya-wood/40 font-serif">此名称用于界面显示，Prompt 内容请在下方编辑。</p>
-              </div> -->
 
               <textarea 
                 v-model="editContent" 

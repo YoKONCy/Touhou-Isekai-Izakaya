@@ -7,6 +7,7 @@ import { audioManager } from '@/services/audio';
 
 const props = defineProps<{
   isOpen: boolean;
+  initialSectionId?: string;
 }>();
 
 const emit = defineEmits<{
@@ -29,14 +30,17 @@ const filteredSections = computed(() => {
   );
 });
 
-// Watch open state to reset scroll or selection if needed
+// Sync activeSectionId with prop when modal opens
 watch(() => props.isOpen, (val) => {
   if (val) {
     audioManager.playWindowOpen();
+    if (props.initialSectionId) {
+      activeSectionId.value = props.initialSectionId;
+    }
   } else {
     audioManager.playWindowClose();
   }
-});
+}, { immediate: true });
 
 function handleSectionClick(id: string) {
   activeSectionId.value = id;

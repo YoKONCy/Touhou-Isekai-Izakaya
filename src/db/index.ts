@@ -66,6 +66,7 @@ export interface GameSettings {
   llmConfigs?: Record<string, any>;
   enableMemoryRefinement?: boolean; // Toggle for LLM-based memory refinement
   enableManagementSystem?: boolean; // Toggle for Izakaya Management System
+  useDefaultTilemap?: boolean; // Debug: Use hardcoded map instead of LLM generated one
   theme: 'light' | 'dark' | 'eye-protection';
   currentSaveSlotId?: number; // Active slot
   

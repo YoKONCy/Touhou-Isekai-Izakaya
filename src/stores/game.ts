@@ -62,7 +62,8 @@ const PLAYER_FIELD_MAPPING: Record<string, string> = {
 const VALID_PLAYER_FIELDS = new Set([
   'name', 'hp', 'max_hp', 'mp', 'max_mp', 'money', 'power', 'reputation',
   'identity', 'persona', 'clothing', 'location', 'residence', 'time', 'date',
-  'authorities', 'items', 'spell_cards', 'combatLevel', 'combatExp'
+  'authorities', 'items', 'spell_cards', 'combatLevel', 'combatExp', 'skillPoints', 'unlockedTalents',
+  'avatarUrl', 'referenceImageUrl'
 ]);
 
 export const useGameStore = defineStore('game', () => {
@@ -71,6 +72,11 @@ export const useGameStore = defineStore('game', () => {
 
   function updateState(newState: Partial<GameState>) {
     state.value = _.merge({}, state.value, newState);
+  }
+
+  function setPlayerAvatar(avatarUrl: string, referenceImageUrl: string) {
+    state.value.player.avatarUrl = avatarUrl;
+    state.value.player.referenceImageUrl = referenceImageUrl;
   }
 
   function setQuickReplies(replies: string[]) {
@@ -231,6 +237,21 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
+  function unlockTalent(talentId: string, cost: number) {
+    if (!state.value.player.unlockedTalents) {
+      state.value.player.unlockedTalents = [];
+    }
+    
+    if (state.value.player.unlockedTalents.includes(talentId)) return;
+    
+    if ((state.value.player.skillPoints || 0) >= cost) {
+      state.value.player.skillPoints -= cost;
+      state.value.player.unlockedTalents.push(talentId);
+      return true;
+    }
+    return false;
+  }
+
   function setState(newState: GameState) {
     // Use merge to ensure newState overwrites INITIAL_GAME_STATE
     // console.log('[GameStore] Restoring state. NPCs count:', Object.keys(newState.npcs || {}).length, 'Current Scene:', newState.system?.current_scene_npcs);
@@ -316,7 +337,7 @@ export const useGameStore = defineStore('game', () => {
   // Helper actions to modify specific parts
   function updatePlayer(playerUpdate: Partial<GameState['player']>) {
     // Validate numeric fields to prevent NaN/invalid values
-    const NUMERIC_FIELDS = ['hp', 'max_hp', 'mp', 'max_mp', 'money', 'combatLevel', 'combatExp', 'reputation'];
+    const NUMERIC_FIELDS = ['hp', 'max_hp', 'mp', 'max_mp', 'money', 'combatLevel', 'combatExp', 'reputation', 'skillPoints'];
     
     for (const key of NUMERIC_FIELDS) {
         // Check if key is present in the update object
@@ -362,7 +383,7 @@ export const useGameStore = defineStore('game', () => {
           let newVal = currentVal;
 
           // Strict Numeric Handling
-          const STRICT_NUMERIC_FIELDS = new Set(['hp', 'max_hp', 'mp', 'max_mp', 'money', 'combatLevel', 'combatExp', 'reputation']);
+          const STRICT_NUMERIC_FIELDS = new Set(['hp', 'max_hp', 'mp', 'max_mp', 'money', 'combatLevel', 'combatExp', 'reputation', 'skillPoints']);
           
           if (STRICT_NUMERIC_FIELDS.has(targetField)) {
              const val = Number(action.value);
@@ -389,6 +410,7 @@ export const useGameStore = defineStore('game', () => {
               // Ensure initialization
               if (state.value.player.combatLevel === undefined) state.value.player.combatLevel = 1;
               if (state.value.player.combatExp === undefined) state.value.player.combatExp = 0;
+              if (state.value.player.skillPoints === undefined) state.value.player.skillPoints = 0;
               
               const MAX_LEVEL = 100;
               const EXP_PER_LEVEL = 1000;
@@ -404,6 +426,8 @@ export const useGameStore = defineStore('game', () => {
               while (totalExp >= EXP_PER_LEVEL && currentLevel < MAX_LEVEL) {
                   totalExp -= EXP_PER_LEVEL;
                   currentLevel++;
+                  // Gain 1 Skill Point per Level
+                  state.value.player.skillPoints++;
               }
               
               // Cap at Max Level
@@ -612,7 +636,9 @@ export const useGameStore = defineStore('game', () => {
                            type: preset.type || 'attack',
                            effects: preset.effects,
                            isUltimate: preset.isUltimate || false,
-                           hitRate: preset.hitRate // Optional preset hitRate
+                           hitRate: preset.hitRate, // Optional preset hitRate
+                           level: 1,
+                           experience: 0
                         };
                      } else {
                         // Fallback for string only (Minimal info)
@@ -624,7 +650,9 @@ export const useGameStore = defineStore('game', () => {
                            scope: 'single',
                            type: 'attack',
                            isUltimate: false,
-                           hitRate: 0.1
+                           hitRate: 0.1,
+                           level: 1,
+                           experience: 0
                         };
                      }
                   } else {
@@ -639,7 +667,9 @@ export const useGameStore = defineStore('game', () => {
                            name: val.name || preset.name,
                            description: val.description || preset.description,
                            isUltimate: val.isUltimate !== undefined ? val.isUltimate : (preset.isUltimate || false),
-                           hitRate: val.hitRate !== undefined ? val.hitRate : (preset.hitRate || 0.1)
+                           hitRate: val.hitRate !== undefined ? val.hitRate : (preset.hitRate || 0.1),
+                           level: val.level || 1,
+                           experience: val.experience || 0
                         } as SpellCard;
                         if ('id' in newCard) delete (newCard as any).id;
                      } else {
@@ -803,7 +833,9 @@ export const useGameStore = defineStore('game', () => {
     setPendingQuest,
     addQuest,
     updateQuestStatus,
+    unlockTalent,
     addPromise,
-    updatePromise
+    updatePromise,
+    setPlayerAvatar
   };
 });

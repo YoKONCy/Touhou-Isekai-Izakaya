@@ -1,5 +1,12 @@
 
 import { type Entity, type Position, TileType, TileTypeNames, type Customer, type Item, type Furniture } from '@/types/management';
+import { TextureManager } from '@/services/graphics/TextureManager';
+import floorTileImage from '@/assets/images/tilesets/地板.jpg';
+import wallTileImage from '@/assets/images/tilesets/墙体.jpg';
+import counterTileImage from '@/assets/images/tilesets/吧台.jpg';
+import propsTileImage from '@/assets/images/tilesets/装饰杂项.jpg';
+import chairTileImage from '@/assets/images/tilesets/椅子.jpg';
+import tableTileImage from '@/assets/images/tilesets/桌子.jpg';
 
 export class IzakayaScene {
   private canvas: HTMLCanvasElement;
@@ -11,6 +18,9 @@ export class IzakayaScene {
   private readonly GRID_SIZE = 48; // Pixels per grid cell
   private COLS = 20;
   private ROWS = 15;
+  
+  // Texture State
+  private texturesLoaded = false;
   
   // Map Data
   private map: TileType[][] = [];
@@ -59,6 +69,12 @@ export class IzakayaScene {
     this.canvas.width = this.COLS * this.GRID_SIZE;
     this.canvas.height = this.ROWS * this.GRID_SIZE;
 
+    // Disable image smoothing for crisp pixel art
+    this.ctx.imageSmoothingEnabled = false;
+    (this.ctx as any).webkitImageSmoothingEnabled = false;
+    (this.ctx as any).mozImageSmoothingEnabled = false;
+    (this.ctx as any).msImageSmoothingEnabled = false;
+
     // Initialize Input Listeners
     window.addEventListener('keydown', this.handleKeyDown);
     window.addEventListener('keyup', this.handleKeyUp);
@@ -76,7 +92,38 @@ export class IzakayaScene {
       isMoving: false,
       moveSpeed: 0.15,
     });
+
+    // Load Textures
+    this.loadTextures();
   }
+
+    private async loadTextures() {
+        try {
+            // 设置 spacing 参数进行裁剪，适配 AI 生成的带间隙或无缝素材
+            // 地板 (2x2)
+            await TextureManager.getInstance().loadTileSet('floor_pack', floorTileImage, this.GRID_SIZE, 0, 0, 2, 2);
+            
+            // 墙体 (3x3) - innerBleed=2 消除绿边
+            await TextureManager.getInstance().loadTileSet('wall_pack', wallTileImage, this.GRID_SIZE, 0, 0, 3, 3, 2);
+            
+            // 吧台 (3x3) - innerBleed=2
+            await TextureManager.getInstance().loadTileSet('counter_pack', counterTileImage, this.GRID_SIZE, 0, 0, 3, 3, 2);
+            
+            // 椅子 (2x2) - innerBleed=2
+            await TextureManager.getInstance().loadTileSet('chair_pack', chairTileImage, this.GRID_SIZE, 0, 0, 2, 2, 2);
+            
+            // 桌子 (2x2) - innerBleed=2
+            await TextureManager.getInstance().loadTileSet('table_pack', tableTileImage, this.GRID_SIZE, 0, 0, 2, 2, 2);
+            
+            // 装饰杂项 (3x4) - innerBleed=2
+            await TextureManager.getInstance().loadTileSet('props_pack', propsTileImage, this.GRID_SIZE, 0, 0, 3, 4, 2);
+
+            this.texturesLoaded = true;
+            console.log('[IzakayaScene] Textures loaded.');
+        } catch (e) {
+            console.error('[IzakayaScene] Failed to load textures', e);
+        }
+    }
 
   /* parseFloors and switchFloor removed */
 
@@ -92,7 +139,7 @@ export class IzakayaScene {
         '.': TileType.FLOOR,
         ',': TileType.KITCHEN,
         'C': TileType.COUNTER,
-        'T': TileType.COUNTER, // Table uses counter texture for now, need distinction if possible
+        'T': TileType.FLOOR, // Table will be an Entity, floor underneath
         'h': TileType.CHAIR,
         'S': TileType.SERVING_TABLE,
         'O': TileType.COOKING_POT,
@@ -144,6 +191,35 @@ export class IzakayaScene {
             if (char === 'E') {
                 exits.push({ x, y });
             }
+            
+            // Spawn Table Entity from 'T'
+            if (char === 'T') {
+                // Determine orientation based on context (default Horizontal 2x1)
+                // If there are chairs above/below (y-1 or y+1), it suggests Horizontal (Long edge top/bottom)
+                // If there are chairs left/right (x-1 or x+1), it suggests Vertical (Long edge left/right)
+                
+                // Let's use a simple heuristic: Default Horizontal.
+                // Or check the DEFAULT_MAP_DATA layout.
+                // In DEFAULT_MAP_DATA, T is at (x,y), h is at (x,y+1). This fits Horizontal Table (chairs on long side).
+                
+                const fType = 'table';
+                const width = 2; // Horizontal default
+                const height = 1;
+                
+                furniture.push({
+                    id: `furniture_${x}_${y}_${Date.now()}_${Math.random()}`,
+                    type: 'furniture',
+                    furnitureType: fType,
+                    x, y,
+                    pixelX: x * this.GRID_SIZE,
+                    pixelY: y * this.GRID_SIZE,
+                    width,
+                    height,
+                    direction: 'down',
+                    isMoving: false,
+                    moveSpeed: 0
+                });
+            }
 
             // --- Entity Spawning for Multi-tile Furniture ---
             if (['b', 's', 'l', 'k', 't', 'w', 'm'].includes(char)) {
@@ -189,6 +265,7 @@ export class IzakayaScene {
     const map: TileType[][] = [];
     const chairs: Position[] = [];
     const exits: Position[] = [];
+    const furniture: Furniture[] = [];
     
     for (let y = 0; y < this.ROWS; y++) {
       const row: TileType[] = [];
@@ -219,6 +296,25 @@ export class IzakayaScene {
         }
     }
 
+    // Add Furniture Entities (Demonstrating the new 4x3 Props)
+    const addProp = (x: number, y: number, type: Furniture['furnitureType']) => {
+        furniture.push({
+            id: `prop_${x}_${y}`,
+            type: 'furniture',
+            furnitureType: type,
+            x, y,
+            pixelX: x * this.GRID_SIZE,
+            pixelY: y * this.GRID_SIZE,
+            direction: 'down',
+            isMoving: false,
+            moveSpeed: 0
+        });
+    };
+
+    addProp(2, 2, 'stove'); // Row 1, Col 2 in props
+    addProp(8, 4, 'sink');  // Row 1, Col 1 in props
+    addProp(1, 1, 'lamp');  // Row 2, Col 1 in props
+
     // Add Bowl Stack
     map[4]![8] = TileType.BOWL_STACK;
 
@@ -242,16 +338,54 @@ export class IzakayaScene {
     }
     
     // Add some Tables
-    const addTable = (cx: number, cy: number) => {
-         if (cx >= 0 && cx < this.COLS && cy >= 0 && cy < this.ROWS) map[cy]![cx] = TileType.COUNTER;
-         if (cx-1 >= 0) { map[cy]![cx-1] = TileType.CHAIR; chairs.push({x: cx-1, y: cy}); }
-         if (cx+1 < this.COLS) { map[cy]![cx+1] = TileType.CHAIR; chairs.push({x: cx+1, y: cy}); }
+    const addTable = (cx: number, cy: number, orientation: 'h' | 'v' = 'h') => {
+         const width = orientation === 'h' ? 2 : 1;
+         const height = orientation === 'v' ? 2 : 1;
+         
+         furniture.push({
+             id: `table_${cx}_${cy}_${Date.now()}_${Math.random()}`,
+             type: 'furniture',
+             furnitureType: 'table',
+             x: cx,
+             y: cy,
+             pixelX: cx * this.GRID_SIZE,
+             pixelY: cy * this.GRID_SIZE,
+             width,
+             height,
+             direction: 'down',
+             isMoving: false,
+             moveSpeed: 0
+         });
+
+         if (orientation === 'v') {
+             // 1x2 Vertical Table (Anchor at top)
+             if (cy + 1 < this.ROWS) {
+                 // Chairs (Left/Right of top part)
+                 if (cx-1 >= 0) { map[cy]![cx-1] = TileType.CHAIR; chairs.push({x: cx-1, y: cy}); }
+                 if (cx+1 < this.COLS) { map[cy]![cx+1] = TileType.CHAIR; chairs.push({x: cx+1, y: cy}); }
+                 
+                 // Chairs (Left/Right of bottom part)
+                 if (cx-1 >= 0) { map[cy+1]![cx-1] = TileType.CHAIR; chairs.push({x: cx-1, y: cy+1}); }
+                 if (cx+1 < this.COLS) { map[cy+1]![cx+1] = TileType.CHAIR; chairs.push({x: cx+1, y: cy+1}); }
+             }
+         } else {
+             // 2x1 Horizontal Table (Anchor at left)
+             if (cx + 1 < this.COLS) {
+                 // Chairs (Top/Bottom of left part)
+                 if (cy-1 >= 0) { map[cy-1]![cx] = TileType.CHAIR; chairs.push({x: cx, y: cy-1}); }
+                 if (cy+1 < this.ROWS) { map[cy+1]![cx] = TileType.CHAIR; chairs.push({x: cx, y: cy+1}); }
+                 
+                 // Chairs (Top/Bottom of right part)
+                 if (cy-1 >= 0) { map[cy-1]![cx+1] = TileType.CHAIR; chairs.push({x: cx+1, y: cy-1}); }
+                 if (cy+1 < this.ROWS) { map[cy+1]![cx+1] = TileType.CHAIR; chairs.push({x: cx+1, y: cy+1}); }
+             }
+         }
     };
 
-    addTable(4, 8);
-    addTable(14, 8);
-    addTable(4, 11);
-    addTable(14, 11);
+    addTable(4, 8, 'v');
+    addTable(14, 8, 'v');
+    addTable(4, 11, 'h');
+    addTable(14, 11, 'h');
 
     // Add Exit (Bottom)
     map[this.ROWS - 1]![10] = TileType.EXIT;
@@ -264,6 +398,7 @@ export class IzakayaScene {
     this.map = map;
     this.chairs = chairs;
     this.exits = exits;
+    furniture.forEach(f => this.addEntity(f));
   }
 
 
@@ -344,11 +479,13 @@ export class IzakayaScene {
      const tile = this.map[targetY]![targetX]!;
      
      // Check if there is an entity at target position
-     const targetEntity = this.entities.find(e => 
-        e.x === targetX && 
-        e.y === targetY && 
-        e.id !== player.id
-     );
+     const targetEntity = this.entities.find(e => {
+        const w = (e as any).width || 1;
+        const h = (e as any).height || 1;
+        return targetX >= e.x && targetX < e.x + w && 
+               targetY >= e.y && targetY < e.y + h && 
+               e.id !== player.id;
+     });
 
      const event = new CustomEvent('izakaya-interact', { 
          detail: { 
@@ -460,7 +597,19 @@ export class IzakayaScene {
       // But for physical collision, they are obstacles unless you are "sitting"
       // For simplicity, let's assume all chairs are passable for now, 
       // or check if it's the target chair.
-      return tile === TileType.FLOOR || tile === TileType.KITCHEN || tile === TileType.EXIT || tile === TileType.CHAIR || tile === TileType.SOFA;
+      if (tile === TileType.FLOOR || tile === TileType.KITCHEN || tile === TileType.EXIT || tile === TileType.CHAIR || tile === TileType.SOFA) {
+          // Check for solid furniture entities
+          const blocker = this.entities.find(e => {
+              if (e.type !== 'furniture') return false;
+              const f = e as Furniture;
+              if (f.furnitureType === 'sofa') return false; // Sofa is passable
+              const w = f.width || 1;
+              const h = f.height || 1;
+              return x >= f.x && x < f.x + w && y >= f.y && y < f.y + h;
+          });
+          return !blocker;
+      }
+      return false;
   }
 
   // A simplified check for player collision vs walls/furniture
@@ -494,10 +643,12 @@ export class IzakayaScene {
         if (this.isWalkable(targetX, targetY)) {
 
            // Also check if entity is there (e.g. customer) on the current floor
-           const blocker = this.entities.find(e => 
-               e.x === targetX && 
-               e.y === targetY
-           );
+           const blocker = this.entities.find(e => {
+               const w = (e as any).width || 1;
+               const h = (e as any).height || 1;
+               return targetX >= e.x && targetX < e.x + w &&
+                      targetY >= e.y && targetY < e.y + h;
+           });
            
            // Allow walking through certain furniture (Sofa)
            let isBlocked = !!blocker;
@@ -848,6 +999,31 @@ export class IzakayaScene {
   private drawFurniture(f: Furniture) {
       const px = f.pixelX;
       const py = f.pixelY;
+      const tm = TextureManager.getInstance();
+
+      // 尝试使用 props_pack 绘制
+      let sliceIndex = -1;
+      // 4x3 Grid (12 items) mapping:
+      // Row 1: Sink(0), Stove(1), BowlStack(2), Spices(3)
+      // Row 2: Lamp(4), Cat(5), Plant(6), Box/Bookshelf(7)
+      // Row 3: Barrel(8), Scroll(9), Screen(10), Cushion(11)
+      switch(f.furnitureType) {
+          case 'sink': sliceIndex = 0; break;
+          case 'stove': sliceIndex = 1; break;
+          case 'lamp': sliceIndex = 4; break;
+          case 'bookshelf': sliceIndex = 7; break;
+          case 'prep_table': sliceIndex = 11; break; // Kitchen prep table
+          // Add more mappings as needed
+      }
+
+      if (sliceIndex !== -1) {
+          const slice = tm.getSlice('props_pack', sliceIndex);
+          if (slice) {
+              this.ctx.drawImage(slice, px, py);
+              return;
+          }
+      }
+
       const w = (f.width || 1) * this.GRID_SIZE;
       const h = (f.height || 1) * this.GRID_SIZE;
 
@@ -980,6 +1156,57 @@ export class IzakayaScene {
               this.ctx.lineTo(px + 15, py + this.GRID_SIZE - 14);
               this.ctx.fill();
               break;
+
+          case 'table':
+              // Table Entity Rendering using table_pack
+              // Width/Height determines orientation
+              // Horizontal (2x1) -> Use Row 1 (Index 2 or 3)
+              // Vertical (1x2) -> Use Row 0 (Index 0 or 1)
+              
+              const tm = TextureManager.getInstance();
+              let tIdx = 0;
+              
+              if (w > h) {
+                  // Horizontal
+                  // Use Index 2 (Standard) or 3 (Variant)
+                  tIdx = 2; 
+                  // Could use random variant based on ID or Position
+                  if ((f.x + f.y) % 2 !== 0) tIdx = 3;
+              } else {
+                  // Vertical
+                  // Use Index 0 (Standard) or 1 (Variant)
+                  tIdx = 0;
+                  if ((f.x + f.y) % 2 !== 0) tIdx = 1;
+              }
+
+              const tSprite = tm.getSlice('table_pack', tIdx);
+              if (tSprite) {
+                  // Draw the single sprite by splitting it into two halves (natural tiling)
+                  // For horizontal (2x1), draw left half in first tile, right half in second tile
+                  // For vertical (1x2), draw top half in first tile, bottom half in second tile
+                  
+                  const halfW = tSprite.width / 2;
+                  const halfH = tSprite.height / 2;
+                  
+                  if (w > h) {
+                      // Horizontal (2x1)
+                      // Left half
+                      this.ctx.drawImage(tSprite, 0, 0, halfW, tSprite.height, px, py, this.GRID_SIZE, this.GRID_SIZE);
+                      // Right half
+                      this.ctx.drawImage(tSprite, halfW, 0, halfW, tSprite.height, px + this.GRID_SIZE, py, this.GRID_SIZE, this.GRID_SIZE);
+                  } else {
+                      // Vertical (1x2)
+                      // Top half
+                      this.ctx.drawImage(tSprite, 0, 0, tSprite.width, halfH, px, py, this.GRID_SIZE, this.GRID_SIZE);
+                      // Bottom half
+                      this.ctx.drawImage(tSprite, 0, halfH, tSprite.width, halfH, px, py + this.GRID_SIZE, this.GRID_SIZE, this.GRID_SIZE);
+                  }
+              } else {
+                  // Fallback
+                  this.ctx.fillStyle = '#795548';
+                  this.ctx.fillRect(px, py, w, h);
+              }
+              break;
               
           default:
               // Fallback
@@ -988,9 +1215,331 @@ export class IzakayaScene {
       }
   }
 
-  private drawTile(x: number, y: number, tile: TileType) {
+  private getVariant(x: number, y: number, count: number): number {
+      const n = (x * 37 + y * 17) ^ (x * y);
+      return Math.abs(n) % count;
+  }
+
+  private isWall(x: number, y: number): boolean {
+      if (!this.isValid(x, y)) return false;
+      const t = this.map[y]![x];
+      return t === TileType.WALL || t === TileType.WALL_WITH_PAINTING || t === TileType.WINDOW || t === TileType.MIRROR;
+  }
+
+  private getWallSliceIndex(x: number, y: number): number {
+      const hasTop = this.isWall(x, y - 1);
+      const hasBottom = this.isWall(x, y + 1);
+      const hasLeft = this.isWall(x - 1, y);
+      const hasRight = this.isWall(x + 1, y);
+
+      let row = 1; // Default to Middle Body
+      
+      if (!hasTop && !hasBottom) {
+          // 水平墙体段：判断它是顶墙还是底墙
+          // 如果上方是地板或室内区域，说明这段墙是空间的下边界
+          const isFloorAbove = this.isValid(x, y - 1) && !this.isWall(x, y - 1);
+          row = isFloorAbove ? 2 : 0;
+      } else if (!hasTop) {
+          row = 0; // Top Cap
+      } else if (!hasBottom) {
+          row = 2; // Base
+      }
+
+      let col = 1; // Default to Center
+      
+      if (!hasLeft && !hasRight) {
+          // 垂直墙体段：判断它是左墙还是右墙
+          // 如果左侧是地板或室内区域，说明这段墙是空间的右边界
+          const isFloorToLeft = this.isValid(x - 1, y) && !this.isWall(x - 1, y);
+          col = isFloorToLeft ? 2 : 0;
+      } else if (!hasLeft) {
+          col = 0;
+      } else if (!hasRight) {
+          col = 2;
+      }
+
+      return row * 3 + col;
+  }
+
+  private isCounter(x: number, y: number): boolean {
+      if (!this.isValid(x, y)) return false;
+      const t = this.map[y]![x];
+      // Treat Counter and Table as same connecting material
+      if (t === TileType.COUNTER || t === TileType.BOWL_STACK || t === TileType.SERVING_TABLE) return true;
+      
+      // Also check for furniture entities (like the new multi-tile tables)
+      const entityAt = this.entities.find(e => {
+          if (e.type !== 'furniture') return false;
+          const f = e as Furniture;
+          const w = f.width || 1;
+          const h = f.height || 1;
+          return x >= f.x && x < f.x + w && y >= f.y && y < f.y + h;
+      });
+      return !!entityAt;
+  }
+
+  private getChairSliceIndex(x: number, y: number): number {
+      // 简单的朝向判断：椅子通常朝向桌子
+      // Chair Pack Layout:
+      // (0,0) Down/Back (Index 0)
+      // (0,1) Up/Front (Index 1)
+      // (1,0) Left (Index 2)
+      // (1,1) Right (Index 3)
+      
+      // If table is above (y-1), chair should face Up (Index 1)
+      if (this.isCounter(x, y - 1)) return 1;
+      // If table is below (y+1), chair should face Down (Index 0)
+      if (this.isCounter(x, y + 1)) return 0;
+      // If table is left (x-1), chair should face Left (Index 2)
+      if (this.isCounter(x - 1, y)) return 2;
+      // If table is right (x+1), chair should face Right (Index 3)
+      if (this.isCounter(x + 1, y)) return 3;
+      
+      return 0; // Default Down
+  }
+
+  private getCounterSliceIndex(x: number, y: number): number {
+      const hasTop = this.isCounter(x, y - 1);
+      const hasBottom = this.isCounter(x, y + 1);
+      const hasLeft = this.isCounter(x - 1, y);
+      const hasRight = this.isCounter(x + 1, y);
+
+      let row = 1; 
+      // 修正：如果下方是大厅（没有吧台），应该显示瓦片图的底排（正面）
+      if (!hasBottom) row = 2;
+      else if (!hasTop) row = 0;
+
+      let col = 1;
+      if (!hasLeft && !hasRight) col = 1; // 单个吧台默认使用中间列
+      else if (!hasLeft) col = 0;
+      else if (!hasRight) col = 2;
+
+      return row * 3 + col;
+  }
+
+  private drawWallBackground(x: number, y: number) {
       const px = x * this.GRID_SIZE;
       const py = y * this.GRID_SIZE;
+      const tm = TextureManager.getInstance();
+      
+      const sliceIndex = this.getWallSliceIndex(x, y);
+      const slice = tm.getSlice('wall_pack', sliceIndex);
+      
+      if (slice) {
+          this.ctx.drawImage(slice, px, py);
+      } else {
+          // Fallback if slice not found (shouldn't happen if loaded)
+          this.ctx.fillStyle = '#5d4037';
+          this.ctx.fillRect(px, py, this.GRID_SIZE, this.GRID_SIZE);
+      }
+  }
+
+  private drawPaintingOverlay(x: number, y: number) {
+      const px = x * this.GRID_SIZE;
+      const py = y * this.GRID_SIZE;
+      const faceY = py + this.GRID_SIZE / 3;
+      const faceHeight = (this.GRID_SIZE / 3) * 2;
+      
+      // Frame
+      this.ctx.fillStyle = '#ffb300'; // Gold frame
+      this.ctx.fillRect(px + 10, faceY + 5, this.GRID_SIZE - 20, faceHeight - 15);
+      
+      // Canvas/Image
+      this.ctx.fillStyle = '#0277bd'; // Blue painting
+      this.ctx.fillRect(px + 12, faceY + 7, this.GRID_SIZE - 24, faceHeight - 19);
+      
+      // Detail
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.beginPath();
+      this.ctx.arc(px + this.GRID_SIZE/2, faceY + faceHeight/2, 3, 0, Math.PI * 2);
+      this.ctx.fill();
+  }
+
+  private drawMirrorOverlay(x: number, y: number) {
+      const px = x * this.GRID_SIZE;
+      const py = y * this.GRID_SIZE;
+      const faceY = py + this.GRID_SIZE / 3;
+      const faceHeight = (this.GRID_SIZE / 3) * 2;
+      
+      // Frame
+      this.ctx.fillStyle = '#bdbdbd'; // Silver frame
+      this.ctx.fillRect(px + 10, faceY + 5, this.GRID_SIZE - 20, faceHeight - 10);
+      
+      // Mirror Glass
+      this.ctx.fillStyle = '#e3f2fd'; // Light Blue-ish White
+      this.ctx.fillRect(px + 12, faceY + 7, this.GRID_SIZE - 24, faceHeight - 14);
+      
+      // Reflection Lines
+      this.ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      this.ctx.lineWidth = 1;
+      this.ctx.beginPath();
+      this.ctx.moveTo(px + 15, faceY + faceHeight - 10);
+      this.ctx.lineTo(px + 25, faceY + 10);
+      this.ctx.stroke();
+  }
+
+  private drawWindowOverlay(x: number, y: number) {
+      const px = x * this.GRID_SIZE;
+      const py = y * this.GRID_SIZE;
+      const mapHeight = this.map.length;
+      const mapWidth = this.map[0]?.length || 0;
+      const faceY = py + this.GRID_SIZE / 3;
+      const faceHeight = (this.GRID_SIZE / 3) * 2;
+      
+      // Check connections
+      const hasWindowAbove = y > 0 && this.map[y-1] && this.map[y-1]![x] === TileType.WINDOW;
+      const hasWindowBelow = y < mapHeight - 1 && this.map[y+1] && this.map[y+1]![x] === TileType.WINDOW;
+      const hasWindowLeft = x > 0 && this.map[y]![x-1] === TileType.WINDOW;
+      const hasWindowRight = x < mapWidth - 1 && this.map[y]![x+1] === TileType.WINDOW;
+
+      // Determine Orientation
+      let isVertical = false;
+      if (hasWindowAbove || hasWindowBelow) isVertical = true;
+      if (hasWindowLeft || hasWindowRight) isVertical = false;
+      
+      if (isVertical) {
+          // --- Vertical Window Style ---
+          this.ctx.fillStyle = '#795548'; 
+          this.ctx.fillRect(px + 4, faceY + 4, 6, faceHeight - 8);
+          this.ctx.fillRect(px + this.GRID_SIZE - 10, faceY + 4, 6, faceHeight - 8);
+          
+          if (!hasWindowAbove) {
+               this.ctx.fillRect(px + 4, faceY + 4, this.GRID_SIZE - 8, 6);
+               this.ctx.beginPath();
+               this.ctx.arc(px + this.GRID_SIZE/2, faceY + 10, this.GRID_SIZE/2 - 6, Math.PI, 0);
+               this.ctx.fill();
+          }
+          
+          if (!hasWindowBelow) {
+               this.ctx.fillRect(px + 4, faceY + faceHeight - 10, this.GRID_SIZE - 8, 6);
+          }
+
+          this.ctx.fillStyle = '#5c6bc0'; 
+          this.ctx.fillRect(px + 10, faceY + 10, this.GRID_SIZE - 20, faceHeight - 20);
+
+          this.ctx.fillStyle = '#795548';
+          this.ctx.fillRect(px + this.GRID_SIZE/2 - 1, faceY + 4, 2, faceHeight - 8);
+          
+      } else {
+          // --- Horizontal Window Style ---
+          this.ctx.fillStyle = '#3e2723';
+          this.ctx.fillRect(px + 8, faceY + 4, 4, faceHeight - 8);
+          this.ctx.fillRect(px + this.GRID_SIZE - 12, faceY + 4, 4, faceHeight - 8);
+          
+          if (!hasWindowAbove) {
+               this.ctx.fillRect(px + 8, faceY + 4, this.GRID_SIZE - 16, 4);
+          }
+          
+          if (!hasWindowBelow) {
+               this.ctx.fillRect(px + 8, faceY + faceHeight - 8, this.GRID_SIZE - 16, 4);
+          }
+
+          this.ctx.fillStyle = '#81d4fa'; 
+          this.ctx.fillRect(px + 12, faceY + 4, this.GRID_SIZE - 24, faceHeight - 8);
+
+          this.ctx.fillStyle = '#3e2723';
+          this.ctx.fillRect(px + this.GRID_SIZE/2 - 1, faceY + 4, 2, faceHeight - 8);
+          this.ctx.fillRect(px + 12, faceY + faceHeight/2 - 1, this.GRID_SIZE - 24, 2);
+
+          this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+          this.ctx.beginPath();
+          this.ctx.moveTo(px + 14, faceY + faceHeight - 8);
+          this.ctx.lineTo(px + 20, faceY + 8);
+          this.ctx.lineTo(px + 26, faceY + 8);
+          this.ctx.lineTo(px + 20, faceY + faceHeight - 8);
+          this.ctx.fill();
+      }
+  }
+
+    private drawTile(x: number, y: number, tile: TileType) {
+        const px = x * this.GRID_SIZE;
+        const py = y * this.GRID_SIZE;
+        const tm = TextureManager.getInstance();
+
+        if (!this.texturesLoaded) {
+            this.drawTileFallback(x, y, tile);
+            return;
+        }
+
+        // --- Layer 0: Floor (Base) ---
+        let floorSliceIndex = this.getVariant(x, y, 4);
+        const floorSlice = tm.getSlice('floor_pack', floorSliceIndex);
+        if (floorSlice) {
+            this.ctx.drawImage(floorSlice, px, py);
+        } else {
+            this.ctx.fillStyle = '#3e2723';
+            this.ctx.fillRect(px, py, this.GRID_SIZE, this.GRID_SIZE);
+        }
+
+        // --- Layer 1: Object/Wall ---
+        switch(tile) {
+            case TileType.FLOOR:
+            case TileType.KITCHEN:
+            case TileType.EXIT:
+                // Floor already drawn
+                break;
+            case TileType.WALL:
+                this.drawWallBackground(x, y);
+                break;
+            case TileType.WALL_WITH_PAINTING:
+                this.drawWallBackground(x, y);
+                this.drawPaintingOverlay(x, y);
+                break;
+            case TileType.WINDOW:
+                this.drawWallBackground(x, y);
+                this.drawWindowOverlay(x, y);
+                break;
+            case TileType.MIRROR:
+                this.drawWallBackground(x, y);
+                this.drawMirrorOverlay(x, y);
+                break;
+            case TileType.COUNTER:
+            case TileType.BOWL_STACK:
+                const cSliceIndex = this.getCounterSliceIndex(x, y);
+                const cSlice = tm.getSlice('counter_pack', cSliceIndex);
+                if (cSlice) {
+                    this.ctx.drawImage(cSlice, px, py);
+                }
+                if (tile === TileType.BOWL_STACK) {
+                    // Use Props Pack Index 2 (Bowl Stack)
+                    const bowlSlice = tm.getSlice('props_pack', 2);
+                    if (bowlSlice) this.ctx.drawImage(bowlSlice, px, py);
+                    else this.drawTileFallback(x, y, tile);
+                }
+                break;
+            
+            case TileType.SERVING_TABLE:
+                 // Kitchen prep table/shelf (1x1 tile)
+                 const prepSlice = tm.getSlice('props_pack', 11);
+                 if (prepSlice) this.ctx.drawImage(prepSlice, px, py);
+                 else this.drawTileFallback(x, y, tile);
+                 break;
+
+            case TileType.CHAIR:
+                const chairIndex = this.getChairSliceIndex(x, y);
+                const chairSlice = tm.getSlice('chair_pack', chairIndex);
+                if (chairSlice) this.ctx.drawImage(chairSlice, px, py);
+                else this.drawTileFallback(x, y, tile);
+                break;
+            
+            case TileType.COOKING_POT:
+                // Map to Stove (Index 1) in props_pack
+                const stoveSlice = tm.getSlice('props_pack', 1);
+                if (stoveSlice) this.ctx.drawImage(stoveSlice, px, py);
+                else this.drawTileFallback(x, y, tile);
+                break;
+
+            default:
+                // 其他类型（如 SERVING_TABLE, COOKING_POT 等）暂时使用 fallback
+                this.drawTileFallback(x, y, tile);
+                break;
+        }
+    }
+
+  private drawTileFallback(x: number, y: number, tile: TileType) {
+      const px = x * this.GRID_SIZE;
+      const py = y * this.GRID_SIZE;
+      const tm = TextureManager.getInstance();
       
       switch(tile) {
           case TileType.FLOOR:
@@ -1049,138 +1598,54 @@ export class IzakayaScene {
 
               // Draw Painting if applicable
               if (tile === TileType.WALL_WITH_PAINTING) {
-                  const faceY = py + this.GRID_SIZE / 3;
-                  const faceHeight = (this.GRID_SIZE / 3) * 2;
-                  
-                  // Frame
-                  this.ctx.fillStyle = '#ffb300'; // Gold frame
-                  this.ctx.fillRect(px + 10, faceY + 5, this.GRID_SIZE - 20, faceHeight - 15);
-                  
-                  // Canvas/Image
-                  this.ctx.fillStyle = '#0277bd'; // Blue painting (e.g., The Great Wave)
-                  this.ctx.fillRect(px + 12, faceY + 7, this.GRID_SIZE - 24, faceHeight - 19);
-                  
-                  // Detail
-                  this.ctx.fillStyle = '#ffffff';
-                  this.ctx.beginPath();
-                  this.ctx.arc(px + this.GRID_SIZE/2, faceY + faceHeight/2, 3, 0, Math.PI * 2);
-                  this.ctx.fill();
+                  this.drawPaintingOverlay(x, y);
               }
 
               // Draw Mirror if applicable
               if (tile === TileType.MIRROR) {
-                  const faceY = py + this.GRID_SIZE / 3;
-                  const faceHeight = (this.GRID_SIZE / 3) * 2;
-                  
-                  // Frame
-                  this.ctx.fillStyle = '#bdbdbd'; // Silver frame
-                  this.ctx.fillRect(px + 10, faceY + 5, this.GRID_SIZE - 20, faceHeight - 10);
-                  
-                  // Mirror Glass
-                  this.ctx.fillStyle = '#e3f2fd'; // Light Blue-ish White
-                  this.ctx.fillRect(px + 12, faceY + 7, this.GRID_SIZE - 24, faceHeight - 14);
-                  
-                  // Reflection Lines
-                  this.ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-                  this.ctx.lineWidth = 1;
-                  this.ctx.beginPath();
-                  this.ctx.moveTo(px + 15, faceY + faceHeight - 10);
-                  this.ctx.lineTo(px + 25, faceY + 10);
-                  this.ctx.stroke();
+                  this.drawMirrorOverlay(x, y);
               }
 
               // Draw Window if applicable
               if (tile === TileType.WINDOW) {
-                  const faceY = py + this.GRID_SIZE / 3;
-                  const faceHeight = (this.GRID_SIZE / 3) * 2;
-                  
-                  // Check connections
-                  const hasWindowAbove = y > 0 && this.map[y-1] && this.map[y-1]![x] === TileType.WINDOW;
-                  const hasWindowBelow = y < mapHeight - 1 && this.map[y+1] && this.map[y+1]![x] === TileType.WINDOW;
-                  const hasWindowLeft = x > 0 && this.map[y]![x-1] === TileType.WINDOW;
-                  const hasWindowRight = x < mapWidth - 1 && this.map[y]![x+1] === TileType.WINDOW;
-
-                  // Determine Orientation
-                  // Default to horizontal if isolated or horizontal neighbors
-                  let isVertical = false;
-                  if (hasWindowAbove || hasWindowBelow) isVertical = true;
-                  if (hasWindowLeft || hasWindowRight) isVertical = false;
-                  
-                  if (isVertical) {
-                      // --- Vertical Window Style (New Material) ---
-                      // Frame (Lighter/Different Wood)
-                      this.ctx.fillStyle = '#795548'; // Lighter Brown
-                      
-                      // Left/Right Pillars (Thicker for vertical look)
-                      this.ctx.fillRect(px + 4, faceY + 4, 6, faceHeight - 8);
-                      this.ctx.fillRect(px + this.GRID_SIZE - 10, faceY + 4, 6, faceHeight - 8);
-                      
-                      // Top Bar (Only if start)
-                      if (!hasWindowAbove) {
-                           this.ctx.fillRect(px + 4, faceY + 4, this.GRID_SIZE - 8, 6);
-                           // Arch detail?
-                           this.ctx.beginPath();
-                           this.ctx.arc(px + this.GRID_SIZE/2, faceY + 10, this.GRID_SIZE/2 - 6, Math.PI, 0);
-                           this.ctx.fill();
-                      }
-                      
-                      // Bottom Bar (Only if end)
-                      if (!hasWindowBelow) {
-                           this.ctx.fillRect(px + 4, faceY + faceHeight - 10, this.GRID_SIZE - 8, 6);
-                      }
-
-                      // Glass (Darker Blue/Purple tint for variety)
-                      this.ctx.fillStyle = '#5c6bc0'; 
-                      this.ctx.fillRect(px + 10, faceY + 10, this.GRID_SIZE - 20, faceHeight - 20);
-
-                      // Vertical Bar (Single thin line)
-                      this.ctx.fillStyle = '#795548';
-                      this.ctx.fillRect(px + this.GRID_SIZE/2 - 1, faceY + 4, 2, faceHeight - 8);
-                      
-                  } else {
-                      // --- Horizontal Window Style (Original) ---
-                      // Window Frame (Dark Wood)
-                      this.ctx.fillStyle = '#3e2723';
-                      
-                      // Left/Right Pillars
-                      this.ctx.fillRect(px + 8, faceY + 4, 4, faceHeight - 8);
-                      this.ctx.fillRect(px + this.GRID_SIZE - 12, faceY + 4, 4, faceHeight - 8);
-                      
-                      // Top Bar
-                      if (!hasWindowAbove) {
-                           this.ctx.fillRect(px + 8, faceY + 4, this.GRID_SIZE - 16, 4);
-                      }
-                      
-                      // Bottom Bar
-                      if (!hasWindowBelow) {
-                           this.ctx.fillRect(px + 8, faceY + faceHeight - 8, this.GRID_SIZE - 16, 4);
-                      }
-
-                      // Glass (Light Blue/Cyan)
-                      this.ctx.fillStyle = '#81d4fa'; 
-                      this.ctx.fillRect(px + 12, faceY + 4, this.GRID_SIZE - 24, faceHeight - 8);
-
-                      // Window Bars
-                      this.ctx.fillStyle = '#3e2723';
-                      this.ctx.fillRect(px + this.GRID_SIZE/2 - 1, faceY + 4, 2, faceHeight - 8);
-                      this.ctx.fillRect(px + 12, faceY + faceHeight/2 - 1, this.GRID_SIZE - 24, 2);
-
-                      // Reflection
-                      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-                      this.ctx.beginPath();
-                      this.ctx.moveTo(px + 14, faceY + faceHeight - 8);
-                      this.ctx.lineTo(px + 20, faceY + 8);
-                      this.ctx.lineTo(px + 26, faceY + 8);
-                      this.ctx.lineTo(px + 20, faceY + faceHeight - 8);
-                      this.ctx.fill();
-                  }
+                  this.drawWindowOverlay(x, y);
               }
               break;
           case TileType.COUNTER:
-              this.ctx.fillStyle = '#8d6e63'; // Counter Wood
-              this.ctx.fillRect(px, py, this.GRID_SIZE, this.GRID_SIZE);
-              this.ctx.fillStyle = 'rgba(255,255,255,0.1)';
-              this.ctx.fillRect(px, py, this.GRID_SIZE, 5);
+          case TileType.BOWL_STACK:
+              // Use new Counter Pack
+              const cSliceIndex = this.getCounterSliceIndex(x, y);
+              const cSlice = tm.getSlice('counter_pack', cSliceIndex);
+              if (cSlice) {
+                  this.ctx.drawImage(cSlice, px, py);
+              } else {
+                  // Fallback
+                  this.ctx.fillStyle = '#8d6e63'; // Counter Wood
+                  this.ctx.fillRect(px, py, this.GRID_SIZE, this.GRID_SIZE);
+                  this.ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                  this.ctx.fillRect(px, py, this.GRID_SIZE, 5);
+              }
+              
+              if (tile === TileType.COUNTER) {
+                  break;
+              }
+              // If it's BOWL_STACK, continue to draw bowls
+              this.ctx.fillStyle = '#FF9800'; // Orange bowl
+              this.ctx.beginPath();
+              this.ctx.arc(px + this.GRID_SIZE/2, py + this.GRID_SIZE/2 + 5, 10, 0, Math.PI, false);
+              this.ctx.fill();
+              this.ctx.strokeStyle = '#FFF';
+              this.ctx.lineWidth = 2;
+              this.ctx.stroke();
+              
+              this.ctx.beginPath();
+              this.ctx.arc(px + this.GRID_SIZE/2, py + this.GRID_SIZE/2, 10, 0, Math.PI, false);
+              this.ctx.fill();
+              this.ctx.stroke();
+              
+              this.ctx.fillStyle = 'white';
+              this.ctx.font = '10px Arial';
+              this.ctx.fillText('BOWLS', px + 5, py + 15);
               break;
           case TileType.CHAIR:
               this.ctx.fillStyle = '#3e2723'; // Floor BG first
@@ -1202,27 +1667,6 @@ export class IzakayaScene {
               this.ctx.fillStyle = 'white';
               this.ctx.font = '10px Arial';
               this.ctx.fillText('EXIT', px + 10, py + 25);
-              break;
-          case TileType.BOWL_STACK:
-              this.ctx.fillStyle = '#795548'; // Counter base
-              this.ctx.fillRect(px, py, this.GRID_SIZE, this.GRID_SIZE);
-              // Draw stack of bowls
-              this.ctx.fillStyle = '#FF9800'; // Orange bowl
-              this.ctx.beginPath();
-              this.ctx.arc(px + this.GRID_SIZE/2, py + this.GRID_SIZE/2 + 5, 10, 0, Math.PI, false);
-              this.ctx.fill();
-              this.ctx.strokeStyle = '#FFF';
-              this.ctx.lineWidth = 2;
-              this.ctx.stroke();
-              
-              this.ctx.beginPath();
-              this.ctx.arc(px + this.GRID_SIZE/2, py + this.GRID_SIZE/2, 10, 0, Math.PI, false);
-              this.ctx.fill();
-              this.ctx.stroke();
-              
-              this.ctx.fillStyle = 'white';
-              this.ctx.font = '10px Arial';
-              this.ctx.fillText('BOWLS', px + 5, py + 15);
               break;
           case TileType.SERVING_TABLE:
               this.ctx.fillStyle = '#8d6e63'; // Brown Table
@@ -1354,11 +1798,36 @@ export class IzakayaScene {
       }
   }
 
-  private drawEntity(entity: Entity) {
-      const px = entity.pixelX;
-      const py = entity.pixelY;
-      
-      this.ctx.save();
+    private drawEntity(entity: Entity) {
+        const px = entity.pixelX;
+        const py = entity.pixelY;
+        const tm = TextureManager.getInstance();
+
+        if (entity.type === 'furniture') {
+            const f = entity as Furniture;
+            let sliceIndex = -1;
+            let pack = 'props_pack';
+
+            switch(f.furnitureType) {
+                case 'sink': sliceIndex = 0; break; 
+                case 'stove': sliceIndex = 1; break;
+                case 'toilet': sliceIndex = 9; break; // 示例索引
+                case 'lamp': sliceIndex = 4; break;
+                case 'bookshelf': sliceIndex = 7; break;
+                // 桌子和椅子已经在 drawTile 中处理了（作为 TileType）
+                // 如果是作为实体存在的家具，也可以在这里映射
+            }
+
+            const slice = sliceIndex !== -1 ? tm.getSlice(pack, sliceIndex) : null;
+            if (slice) {
+                this.ctx.drawImage(slice, px, py);
+            } else {
+                this.drawFurniture(f);
+            }
+            return;
+        }
+        
+        this.ctx.save();
       
       // Shadow
       this.ctx.fillStyle = 'rgba(0,0,0,0.3)';
@@ -1369,9 +1838,6 @@ export class IzakayaScene {
       // Body
       if (entity.type === 'player') {
           this.ctx.fillStyle = '#FF5252'; // Player Red
-      } else if (entity.type === 'furniture') {
-          this.drawFurniture(entity as Furniture);
-          return; // Furniture has its own drawing logic
       } else {
           // Customer colors based on state?
           const customer = entity as Customer;
