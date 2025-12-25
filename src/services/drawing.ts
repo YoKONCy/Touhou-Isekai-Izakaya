@@ -256,14 +256,23 @@ ${storyText}
           model: body.model
       };
 
-      const response = await fetch(baseUrl, {
-          method: 'POST',
-          headers: {
-              'Authorization': `Bearer ${config.apiKey}`,
-              'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(requestBody)
-      });
+      let response;
+      try {
+          response = await fetch(baseUrl, {
+              method: 'POST',
+              headers: {
+                  'Authorization': `Bearer ${config.apiKey}`,
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(requestBody)
+          });
+      } catch (e: any) {
+          // Detect CORS/Network error
+          if (e.name === 'TypeError' && e.message === 'Failed to fetch') {
+              throw new Error("网络请求失败 (可能是 CORS 跨域问题)。如果您在浏览器中直接连接 NovelAI 官方接口，请务必使用 CORS 代理或反向代理地址。");
+          }
+          throw e;
+      }
 
       if (!response.ok) {
           const errText = await response.text();
@@ -339,14 +348,23 @@ ${storyText}
     };
 
     try {
-        const response = await fetch(baseUrl, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${config.apiKey}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(testBody)
-        });
+        let response;
+        try {
+            response = await fetch(baseUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${config.apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(testBody)
+            });
+        } catch (e: any) {
+            // Detect CORS/Network error
+            if (e.name === 'TypeError' && e.message === 'Failed to fetch') {
+                throw new Error("连接失败：检测到跨域限制 (CORS)。请使用代理服务器或反向代理。");
+            }
+            throw e;
+        }
 
         if (response.status === 401) throw new Error("API Key 无效 (401)");
         if (response.status === 404) throw new Error("接口地址或模型 ID 错误 (404)");

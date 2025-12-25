@@ -631,6 +631,9 @@ function handleVolumeChangeTest() {
                       :placeholder="settingsStore.drawingConfig.providerType === 'novelai' ? 'e.g. https://api.novelai.net/ai/generate-image' : 'e.g. https://api.openai.com/v1'"
                       class="w-full px-3 py-2 bg-white/60 border border-izakaya-wood/20 rounded-md shadow-sm focus:outline-none focus:border-touhou-red/50 focus:ring-1 focus:ring-touhou-red/20 transition-all font-mono text-sm text-izakaya-wood placeholder:text-izakaya-wood/30"
                     >
+                    <p v-if="settingsStore.drawingConfig.providerType === 'novelai'" class="text-[10px] text-touhou-red/70 mt-1">
+                      ⚠️ 浏览器直接访问官方接口会触发 CORS 错误，建议使用反向代理。
+                    </p>
                   </div>
                   
                   <div class="space-y-1">
