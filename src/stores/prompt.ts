@@ -1015,7 +1015,42 @@ export const usePromptStore = defineStore('prompt', () => {
       save();
     }
   }
-  
+
+  function updateOptionContent(blockId: string, optionId: string, content: string) {
+    const block = blocks.value.find(b => b.id === blockId);
+    if (block && block.options) {
+      const option = block.options.find(o => o.id === optionId);
+      if (option) {
+        option.content = content;
+        save();
+      }
+    }
+  }
+
+  function addOption(blockId: string, name: string, content: string) {
+    const block = blocks.value.find(b => b.id === blockId);
+    if (block && block.options) {
+      const id = `custom_${Date.now()}`;
+      block.options.push({ id, name, content });
+      block.selectedOptionId = id;
+      save();
+    }
+  }
+
+  function deleteOption(blockId: string, optionId: string) {
+    const block = blocks.value.find(b => b.id === blockId);
+    if (block && block.options) {
+      const index = block.options.findIndex(o => o.id === optionId);
+      if (index !== -1) {
+        block.options.splice(index, 1);
+        if (block.selectedOptionId === optionId) {
+          block.selectedOptionId = block.options[0]?.id;
+        }
+        save();
+      }
+    }
+  }
+
   function updateBlockOption(id: string, optionId: string) {
     const block = blocks.value.find(b => b.id === id);
     if (block && block.options) {
@@ -1044,6 +1079,9 @@ export const usePromptStore = defineStore('prompt', () => {
     blocks,
     save,
     updateBlockContent,
+    updateOptionContent,
+    addOption,
+    deleteOption,
     updateBlockOption,
     toggleBlock,
     resetToDefault

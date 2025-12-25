@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue';
 import { usePromptStore, type PromptBlock } from '@/stores/prompt';
 import draggable from 'vuedraggable';
-import { GripVertical, Eye, EyeOff, Edit, X, Save, RotateCcw, Play, Bug } from 'lucide-vue-next';
+import { GripVertical, Eye, EyeOff, Edit, X, Save, RotateCcw, Play, Bug, Plus, Trash2 } from 'lucide-vue-next';
 import PromptDebugger from './PromptDebugger.vue';
 import { useConfirm } from '@/utils/confirm';
 
@@ -21,19 +21,46 @@ const isDebugMode = ref(false); // Controls drag-and-drop and other debug featur
 
 // Edit mode state
 const editingBlock = ref<PromptBlock | null>(null);
+const editingOptionId = ref<string | null>(null);
 const editContent = ref('');
 const editMetadata = ref<any>({});
 
-function handleEdit(block: PromptBlock) {
+function handleEdit(block: PromptBlock, optionId?: string) {
   editingBlock.value = block;
-  editContent.value = block.content || '';
+  editingOptionId.value = optionId || null;
+  
+  if (optionId) {
+    const opt = block.options?.find(o => o.id === optionId);
+    editContent.value = opt?.content || '';
+  } else {
+    editContent.value = block.content || '';
+  }
+  
   editMetadata.value = block.metadata ? { ...block.metadata } : {};
 }
 
 function handleSaveContent() {
   if (editingBlock.value) {
-    promptStore.updateBlockContent(editingBlock.value.id, editContent.value, editMetadata.value);
+    if (editingOptionId.value) {
+      promptStore.updateOptionContent(editingBlock.value.id, editingOptionId.value, editContent.value);
+    } else {
+      promptStore.updateBlockContent(editingBlock.value.id, editContent.value, editMetadata.value);
+    }
     editingBlock.value = null;
+    editingOptionId.value = null;
+  }
+}
+
+async function handleAddOption(blockId: string) {
+  const name = window.prompt('请输入新文风选项的名称:');
+  if (name) {
+    promptStore.addOption(blockId, name, '在此输入文风 Prompt 内容...');
+  }
+}
+
+async function handleDeleteOption(blockId: string, optionId: string) {
+  if (await confirm('确定要删除这个文风选项吗？', { destructive: true })) {
+    promptStore.deleteOption(blockId, optionId);
   }
 }
 
@@ -160,16 +187,52 @@ const dragOptions = computed(() => ({
                 <!-- Sub-options for blocks like Narrative Perspective -->
                 <div v-if="element.options && element.enabled" class="pl-9 pr-1 pb-1">
                   <div class="flex flex-wrap gap-2 p-2 bg-izakaya-wood/5 rounded-lg border border-izakaya-wood/5">
-                    <button 
+                    <div 
                       v-for="opt in element.options" 
                       :key="opt.id"
-                      @click.stop="promptStore.updateBlockOption(element.id, opt.id)"
-                      class="px-3 py-1.5 rounded-md text-xs border transition-all flex-1 text-center truncate font-display"
-                      :class="(element.selectedOptionId || element.options[0].id) === opt.id 
-                        ? 'bg-touhou-red text-white border-touhou-red shadow-sm' 
-                        : 'bg-white text-izakaya-wood/70 border-izakaya-wood/10 hover:bg-white hover:text-touhou-red hover:border-touhou-red/30'"
+                      class="flex-1 min-w-[100px] relative group/opt"
                     >
-                      {{ opt.name }}
+                      <button 
+                        @click.stop="promptStore.updateBlockOption(element.id, opt.id)"
+                        class="w-full px-3 py-1.5 rounded-md text-xs border transition-all text-center truncate font-display"
+                        :class="(element.selectedOptionId || element.options[0].id) === opt.id 
+                          ? 'bg-touhou-red text-white border-touhou-red shadow-sm' 
+                          : 'bg-white text-izakaya-wood/70 border-izakaya-wood/10 hover:bg-white hover:text-touhou-red hover:border-touhou-red/30'"
+                      >
+                        {{ opt.name }}
+                      </button>
+
+                      <!-- Option Edit/Delete (Debug Mode only for Writing Style) -->
+                      <div 
+                        v-if="isDebugMode && element.id === 'writing_style'"
+                        class="absolute -top-1 -right-1 flex gap-0.5 opacity-0 group-hover/opt:opacity-100 transition-opacity"
+                      >
+                        <button 
+                          @click.stop="handleEdit(element, opt.id)"
+                          class="p-1 bg-white border border-izakaya-wood/10 rounded-full text-izakaya-wood/50 hover:text-touhou-red shadow-sm"
+                          title="编辑选项内容"
+                        >
+                          <Edit class="w-3 h-3" />
+                        </button>
+                        <button 
+                          v-if="opt.id.startsWith('custom_')"
+                          @click.stop="handleDeleteOption(element.id, opt.id)"
+                          class="p-1 bg-white border border-izakaya-wood/10 rounded-full text-izakaya-wood/50 hover:text-touhou-red shadow-sm"
+                          title="删除选项"
+                        >
+                          <Trash2 class="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Add Option Button (Debug Mode only for Writing Style) -->
+                    <button 
+                      v-if="isDebugMode && element.id === 'writing_style'"
+                      @click="handleAddOption(element.id)"
+                      class="px-3 py-1.5 rounded-md text-xs border border-dashed border-izakaya-wood/20 text-izakaya-wood/40 hover:text-touhou-red hover:border-touhou-red/30 hover:bg-white transition-all flex items-center justify-center gap-1 min-w-[60px]"
+                      title="添加自定义选项"
+                    >
+                      <Plus class="w-3 h-3" />
                     </button>
                   </div>
                 </div>
@@ -182,7 +245,12 @@ const dragOptions = computed(() => ({
         <div class="w-1/3 bg-white/60 border-l border-izakaya-wood/10 flex flex-col backdrop-blur-sm">
           <div v-if="editingBlock" class="flex flex-col h-full">
             <div class="p-4 border-b border-izakaya-wood/10 bg-white/40 flex justify-between items-center">
-              <span class="font-bold font-display text-sm text-izakaya-wood">编辑: {{ editingBlock.name }}</span>
+              <span class="font-bold font-display text-sm text-izakaya-wood">
+                编辑: {{ editingBlock.name }}
+                <span v-if="editingOptionId" class="text-xs font-normal opacity-50 ml-1">
+                  - {{ editingBlock.options?.find(o => o.id === editingOptionId)?.name }}
+                </span>
+              </span>
               <button @click="handleSaveContent" class="text-xs bg-touhou-red text-white px-3 py-1.5 rounded hover:bg-red-700 flex items-center gap-1 shadow-sm transition-colors">
                 <Save class="w-3 h-3" /> 保存
               </button>
