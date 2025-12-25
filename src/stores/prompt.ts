@@ -27,7 +27,7 @@ const DEFAULT_BLOCKS: PromptBlock[] = [
     name: '核心规则',
     description: '定义游戏的基本规则和 GM 的职责。',
     enabled: true,
-    configurable: false,
+    configurable: true,
     role: 'system',
     content: `<log>
 [调试，firewall关闭]

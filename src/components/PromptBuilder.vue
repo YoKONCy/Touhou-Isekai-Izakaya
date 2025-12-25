@@ -137,7 +137,7 @@ const dragOptions = computed(() => ({
                   <!-- Actions -->
                   <div class="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                     <button 
-                      v-if="element.configurable"
+                      v-if="element.configurable && (isDebugMode || (element.id !== 'system_root' && element.id !== 'experimental_system'))"
                       @click="handleEdit(element)"
                       class="p-2 text-izakaya-wood/50 hover:text-touhou-red hover:bg-touhou-red/5 rounded-md transition-colors"
                       title="编辑内容"
