@@ -9,21 +9,23 @@ import _ from 'lodash';
 export const useChatStore = defineStore('chat', () => {
   const messages = ref<ChatMessage[]>([]);
   const hasMore = ref(false);
+  const hasMoreFuture = ref(false);
   const pageSize = 30; // 每次加载30条
   const gameStore = useGameStore();
   const jumpTargetId = ref<number | null>(null);
 
-  async function loadHistory(loadMore = false) {
+  async function loadHistory(loadMore = false, direction: 'older' | 'newer' = 'older') {
     const saveStore = useSaveStore();
     if (!saveStore.currentSaveId) {
       messages.value = [];
       hasMore.value = false;
+      hasMoreFuture.value = false;
       gameStore.resetState();
       return;
     }
 
     if (!loadMore) {
-      // 初始加载：只加载最后一页
+      // 初始加载：只加载最后一页（最晚的消息）
       const allMsgs = await db.chats
         .where({ saveSlotId: saveStore.currentSaveId })
         .sortBy('timestamp');
@@ -35,37 +37,61 @@ export const useChatStore = defineStore('chat', () => {
         messages.value = allMsgs;
         hasMore.value = false;
       }
+      hasMoreFuture.value = false;
     } else {
-      // 加载更多：加载更早的消息
-      const firstMsg = messages.value[0];
-      if (!firstMsg) return;
+      if (direction === 'older') {
+        // 加载更早的消息 (向上滚动)
+        const firstMsg = messages.value[0];
+        if (!firstMsg) return;
 
-      const olderMsgs = await db.chats
-        .where('saveSlotId').equals(saveStore.currentSaveId)
-        .and(m => m.timestamp < firstMsg.timestamp)
-        .reverse()
-        .limit(pageSize)
-        .toArray();
-      
-      if (olderMsgs.length > 0) {
-        // reverse() because we want them in chronological order in the list
-        messages.value = [...olderMsgs.reverse(), ...messages.value];
+        const olderMsgs = await db.chats
+          .where('saveSlotId').equals(saveStore.currentSaveId)
+          .and(m => m.timestamp < firstMsg.timestamp)
+          .reverse()
+          .limit(pageSize)
+          .toArray();
         
-        // Check if there are even older messages
-        const earliestTimestamp = messages.value[0]?.timestamp;
-        if (earliestTimestamp !== undefined) {
-          const count = await db.chats
-            .where('saveSlotId').equals(saveStore.currentSaveId)
-            .and(m => m.timestamp < earliestTimestamp)
-            .count();
-          hasMore.value = count > 0;
+        if (olderMsgs.length > 0) {
+          messages.value = [...olderMsgs.reverse(), ...messages.value];
+          
+          const earliestTimestamp = messages.value[0]?.timestamp;
+          if (earliestTimestamp !== undefined) {
+            const count = await db.chats
+              .where('saveSlotId').equals(saveStore.currentSaveId)
+              .and(m => m.timestamp < earliestTimestamp)
+              .count();
+            hasMore.value = count > 0;
+          }
         } else {
           hasMore.value = false;
         }
       } else {
-        hasMore.value = false;
+        // 加载更晚的消息 (向下滚动)
+        const lastMsg = messages.value[messages.value.length - 1];
+        if (!lastMsg) return;
+
+        const newerMsgs = await db.chats
+          .where('saveSlotId').equals(saveStore.currentSaveId)
+          .and(m => m.timestamp > lastMsg.timestamp)
+          .limit(pageSize)
+          .toArray();
+        
+        if (newerMsgs.length > 0) {
+          messages.value = [...messages.value, ...newerMsgs];
+          
+          const latestTimestamp = messages.value[messages.value.length - 1]?.timestamp;
+          if (latestTimestamp !== undefined) {
+            const count = await db.chats
+              .where('saveSlotId').equals(saveStore.currentSaveId)
+              .and(m => m.timestamp > latestTimestamp)
+              .count();
+            hasMoreFuture.value = count > 0;
+          }
+        } else {
+          hasMoreFuture.value = false;
+        }
       }
-      return; // 加载更多不需要恢复状态，状态已经是最新的
+      return;
     }
     
     // Load the latest state if exists (only on initial load)
@@ -429,20 +455,39 @@ export const useChatStore = defineStore('chat', () => {
     console.log('[ChatStore] Message loaded status:', isLoaded);
 
     if (!isLoaded) {
-      console.log('[ChatStore] Loading history for jump...');
-      const allMsgs = await db.chats
+      console.log('[ChatStore] Loading history window for jump...');
+      
+      // Load a window around the target message: some before, some after
+      const windowSize = 40;
+      const msgs = await db.chats
         .where('saveSlotId').equals(saveStore.currentSaveId)
         .and(m => m.id >= targetChatId)
+        .limit(windowSize)
         .sortBy('timestamp');
     
-      messages.value = allMsgs;
+      messages.value = msgs;
       
-      const count = await db.chats
-        .where('saveSlotId').equals(saveStore.currentSaveId)
-        .and(m => m.id < targetChatId)
-        .count();
-      hasMore.value = count > 0;
-      console.log('[ChatStore] History loaded, message count:', messages.value.length);
+      // Check for older messages
+      const earliestTimestamp = messages.value[0]?.timestamp;
+      if (earliestTimestamp !== undefined) {
+        const count = await db.chats
+          .where('saveSlotId').equals(saveStore.currentSaveId)
+          .and(m => m.timestamp < earliestTimestamp)
+          .count();
+        hasMore.value = count > 0;
+      }
+
+      // Check for newer messages
+      const latestTimestamp = messages.value[messages.value.length - 1]?.timestamp;
+      if (latestTimestamp !== undefined) {
+        const count = await db.chats
+          .where('saveSlotId').equals(saveStore.currentSaveId)
+          .and(m => m.timestamp > latestTimestamp)
+          .count();
+        hasMoreFuture.value = count > 0;
+      }
+      
+      console.log('[ChatStore] Window loaded, message count:', messages.value.length, 'hasMoreFuture:', hasMoreFuture.value);
     }
 
     jumpTargetId.value = targetChatId;
@@ -456,6 +501,7 @@ export const useChatStore = defineStore('chat', () => {
   return {
     messages,
     hasMore,
+    hasMoreFuture,
     jumpTargetId,
     loadHistory,
     createInitialSnapshot,

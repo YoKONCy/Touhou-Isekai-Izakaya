@@ -66,6 +66,7 @@ const isCharEditorOpen = ref(false);
 const isSaveManagerOpen = ref(false);
 const isPromptBuilderOpen = ref(false);
 const isLoadingMore = ref(false);
+const isLoadingFuture = ref(false);
 const isMemoryPanelOpen = ref(false);
 const isHelpOpen = ref(false);
 const helpInitialSectionId = ref<string | undefined>(undefined);
@@ -191,7 +192,7 @@ async function handleLoadMore() {
   const oldScrollHeight = container?.scrollHeight || 0;
   
   try {
-    await chatStore.loadHistory(true);
+    await chatStore.loadHistory(true, 'older');
     
     // Wait for DOM update
     await nextTick();
@@ -206,6 +207,30 @@ async function handleLoadMore() {
   } finally {
     isLoadingMore.value = false;
   }
+}
+
+async function handleLoadFuture() {
+  if (isLoadingFuture.value || !chatStore.hasMoreFuture) return;
+  
+  isLoadingFuture.value = true;
+  
+  try {
+    await chatStore.loadHistory(true, 'newer');
+  } catch (e) {
+    console.error('Failed to load future history:', e);
+  } finally {
+    isLoadingFuture.value = false;
+  }
+}
+
+async function handleJumpToPresent() {
+  audioManager.playSoftClick();
+  await chatStore.loadHistory(false);
+  nextTick(() => {
+    if (chatContainer.value) {
+      chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
+    }
+  });
 }
 
 async function handleSend() {
@@ -454,6 +479,25 @@ function handleHelpAction(action: string) {
             <p class="text-sm">点一杯茶，开始你的幻想乡物语吧。</p>
           </div>
           <ChatBubble v-for="msg in chatStore.messages" :key="msg.id" :message="msg" :data-message-id="msg.id" />
+          
+          <!-- Load Future Button -->
+          <div v-if="chatStore.hasMoreFuture" class="flex flex-col items-center gap-3 py-4 border-t border-izakaya-wood/5 mt-4">
+            <button 
+              @click="handleLoadFuture" 
+              class="px-6 py-2 bg-touhou-red/5 hover:bg-touhou-red/10 text-touhou-red text-sm rounded-full transition-all flex items-center gap-2 border border-touhou-red/20 shadow-sm"
+              :disabled="isLoadingFuture"
+            >
+              <Loader2 v-if="isLoadingFuture" class="w-4 h-4 animate-spin" />
+              <History v-else class="w-4 h-4 rotate-180" />
+              {{ isLoadingFuture ? '加载中...' : '加载后续对话' }}
+            </button>
+            <button 
+              @click="handleJumpToPresent" 
+              class="text-xs text-izakaya-wood/40 hover:text-touhou-red transition-colors flex items-center gap-1"
+            >
+              直接回到现在 <RefreshCw class="w-3 h-3" />
+            </button>
+          </div>
           
           <!-- Loading Indicator / Stream Buffer -->
           <div v-if="gameLoop.isProcessing.value" class="flex gap-4 mb-6 px-4 group/message">
