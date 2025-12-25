@@ -277,6 +277,17 @@ const LOGIC_SYSTEM_PROMPT = `
 
 export class LogicService {
   
+  /**
+   * Remove large or unnecessary data from player object before sending to LLM
+   */
+  public sanitizePlayer(player: any) {
+    if (!player) return player;
+    const sanitized = { ...player };
+    delete sanitized.avatarUrl;
+    delete sanitized.referenceImageUrl;
+    return sanitized;
+  }
+
   async processLogic(
     userContent: string, 
     storyContent: string, 
@@ -377,7 +388,7 @@ export class LogicService {
       { role: 'system', content: finalSystemPrompt },
       { role: 'user', content: JSON.stringify({
           current_state: {
-             player: gameState.player,
+             player: this.sanitizePlayer(gameState.player),
              // Filter NPCs: Send those in current_scene_npcs AND those mentioned in the story
              scene_npcs: relevantNpcs
           },

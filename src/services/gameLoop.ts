@@ -468,7 +468,7 @@ class GameLoopService {
       // Capture Input for Debug
       const logicInputSnapshot = JSON.stringify({
          current_state: {
-             player: gameStore.state.player,
+             player: logicService.sanitizePlayer(gameStore.state.player),
              scene_npcs: gameStore.state.system.current_scene_npcs.map((id: string) => gameStore.state.npcs[id] || { id, name: id })
          },
          user_action: userContent,
