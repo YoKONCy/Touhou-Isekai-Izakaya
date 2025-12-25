@@ -7,6 +7,7 @@ import { useSaveStore } from '@/stores/save';
 import StatusCard from '@/components/StatusCard.vue';
 import ChatBubble from '@/components/ChatBubble.vue';
 import MapPlaceholder from '@/components/MapPlaceholder.vue';
+import MapPanel from '@/components/MapPanel.vue';
 import CharacterList from '@/components/CharacterList.vue';
 import SettingsModal from '@/components/SettingsModal.vue';
 import CharacterEditor from '@/components/CharacterEditor.vue';
@@ -68,6 +69,7 @@ const isPromptBuilderOpen = ref(false);
 const isLoadingMore = ref(false);
 const isLoadingFuture = ref(false);
 const isMemoryPanelOpen = ref(false);
+const isMapOpen = ref(false);
 const isHelpOpen = ref(false);
 const helpInitialSectionId = ref<string | undefined>(undefined);
 
@@ -439,6 +441,7 @@ function handleHelpAction(action: string) {
     <HelpModal :is-open="isHelpOpen" :initial-section-id="helpInitialSectionId" @close="isHelpOpen = false" @action="handleHelpAction" />
     <SummaryModal :is-open="isSummaryModalOpen" @close="isSummaryModalOpen = false" :turn-count="summaryTurnCount" />
     <PromptBuilder :is-open="isPromptBuilderOpen" @close="isPromptBuilderOpen = false" />
+    <MapPanel :is-open="isMapOpen" @close="isMapOpen = false" />
     <ConfirmDialog />
     <CombatOverlay :visible="userOpenCombat" @close="userOpenCombat = false" />
     <IzakayaGame v-if="gameStore.state.system.management?.isActive" @close="handleManagementClose" />
@@ -708,7 +711,7 @@ function handleHelpAction(action: string) {
 
       <!-- Right Sidebar (Auxiliary) -->
       <aside class="w-80 bg-izakaya-paper/60 backdrop-blur-md border-l border-izakaya-wood/10 p-4 overflow-y-auto hidden lg:flex flex-col gap-4 shadow-[-2px_0_10px_rgba(0,0,0,0.02)]">
-        <MapPlaceholder />
+        <MapPlaceholder @click="isMapOpen = true; audioManager.playPageFlip()" />
         <CharacterList />
       </aside>
       

@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { Map, Cloud } from 'lucide-vue-next';
+
+defineEmits(['click']);
 </script>
 
 <template>
-  <div class="bg-izakaya-paper/60 backdrop-blur-md rounded-xl h-64 flex flex-col items-center justify-center text-izakaya-wood/60 border border-izakaya-wood/20 relative overflow-hidden group shadow-sm hover:shadow-md transition-all duration-500">
+  <div 
+    @click="$emit('click')"
+    class="bg-izakaya-paper/60 backdrop-blur-md rounded-xl h-64 flex flex-col items-center justify-center text-izakaya-wood/60 border border-izakaya-wood/20 relative overflow-hidden group shadow-sm hover:shadow-md transition-all duration-500 cursor-pointer"
+  >
     <!-- 装饰性背景: 纸张纹理 -->
     <div class="absolute inset-0 pointer-events-none opacity-10 bg-texture-rice-paper"></div>
     <!-- 装饰性背景: 云纹/地图纹理 -->
@@ -30,7 +35,7 @@ import { Map, Cloud } from 'lucide-vue-next';
       </h3>
       <div class="flex items-center gap-2 mt-2">
          <span class="h-px w-8 bg-izakaya-wood/20"></span>
-         <span class="text-xs font-serif italic opacity-60">绘制中...</span>
+         <span class="text-xs font-serif italic opacity-60">点击查看全图</span>
          <span class="h-px w-8 bg-izakaya-wood/20"></span>
       </div>
     </div>

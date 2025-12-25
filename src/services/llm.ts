@@ -13,6 +13,8 @@ export interface CompletionOptions {
   modelType?: 'chat' | 'logic' | 'memory' | 'misc' | 'drawing';
   temperature?: number;
   max_tokens?: number;
+  stream?: boolean;
+  onStream?: (token: string) => void;
 }
 
 export async function generateCompletion(options: CompletionOptions): Promise<string> {
@@ -70,13 +72,18 @@ export async function generateCompletion(options: CompletionOptions): Promise<st
       frequency_penalty: config.frequency_penalty,
       presence_penalty: config.presence_penalty,
       max_tokens: options.max_tokens,
-      stream: config.stream ?? false,
+      stream: options.stream ?? config.stream ?? false,
     } as any);
 
     let content = '';
-    if (config.stream) {
+    const shouldStream = options.stream ?? config.stream;
+    if (shouldStream) {
       for await (const chunk of (response as any)) {
-        content += chunk.choices[0]?.delta?.content || '';
+        const token = chunk.choices[0]?.delta?.content || '';
+        content += token;
+        if (options.onStream) {
+          options.onStream(token);
+        }
       }
     } else {
       content = (response as any).choices[0]?.message?.content || '';
