@@ -476,6 +476,12 @@ export const useGameStore = defineStore('game', () => {
              }
           }
 
+          // Implicitly add to current scene if updated via UPDATE_NPC
+          if (!state.value.system.current_scene_npcs.includes(npcId)) {
+             console.log(`[GameStore] Implicitly adding NPC ${npcId} to current scene via UPDATE_NPC`);
+             state.value.system.current_scene_npcs.push(npcId);
+          }
+
           const npc = state.value.npcs[npcId];
           if (!npc) return;
           

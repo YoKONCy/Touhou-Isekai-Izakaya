@@ -126,6 +126,11 @@ const LOGIC_SYSTEM_PROMPT = `
 
 7. **金钱 (Money)**:
    - 直接根据剧情中提及的金额进行加减。
+   - **参考标准**:
+     - 幻想乡平均时薪: ~200円
+     - 金价: ~10000円/克
+     - 纸钞已普及（河童印刷技术），购买力参考现代日元但在低技术背景下有所调整。
+   - 请在涉及交易、打赏、赔偿时参考此物价水平，避免数额过大导致经济系统崩溃。
 
 8. **上限值 (Max HP/MP)**:
    - 仅在特殊事件（如升级、奇遇）中变化。
@@ -337,18 +342,21 @@ export class LogicService {
   async processLogic(
     userContent: string, 
     storyContent: string, 
-    gameState: any
+    gameState: any,
+    signal?: AbortSignal
   ): Promise<LogicResult> {
     const maxRetries = 3;
     let lastError: any = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      if (signal?.aborted) throw new Error('Operation aborted by user');
       try {
-        return await this._executeLogicRequest(userContent, storyContent, gameState);
+        return await this._executeLogicRequest(userContent, storyContent, gameState, signal);
       } catch (e: any) {
         lastError = e;
-        console.warn(`Logic attempt ${attempt} failed:`, e.message);
-        
+        if (e.message === 'Operation aborted by user' || e.name === 'AbortError') throw e;
+        console.warn(`Logic process attempt ${attempt} failed:`, e);
+      }
         if (attempt < maxRetries) {
           // Wait before retry: 1s, 2s, 3s...
           const delay = attempt * 1000;
@@ -356,7 +364,6 @@ export class LogicService {
           toastStore.addToast(`逻辑模型处理重试中 (${attempt}/${maxRetries})...`, 'warning', 2000);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
-      }
     }
 
     // If we reach here, all retries failed
@@ -389,7 +396,8 @@ export class LogicService {
   private async _executeLogicRequest(
     userContent: string, 
     storyContent: string, 
-    gameState: any
+    gameState: any,
+    signal?: AbortSignal
   ): Promise<LogicResult> {
     
     const settingsStore = useSettingsStore();
@@ -555,7 +563,7 @@ export class LogicService {
         messages: messages as any,
         temperature: 0.1, // Low temp for logic
         response_format: { type: "json_object" } // Force JSON if supported
-      });
+      }, { signal });
 
       let content = response.choices[0]?.message?.content;
       if (!content) throw new Error('Empty response from Logic LLM');
@@ -663,7 +671,8 @@ export class LogicService {
    * Generates a narrative description of the combat process based on logs.
    * This uses the Misc Model (LLM4) but with a specific "Narrator" persona.
    */
-  async generateCombatNarrative(combatSummary: string, combatants: Combatant[] = [], contextText: string = ''): Promise<string> {
+  async generateCombatNarrative(combatSummary: string, combatants: Combatant[] = [], contextText: string = '', signal?: AbortSignal): Promise<string> {
+    if (signal?.aborted) return `(战斗已取消)\n${combatSummary}`;
     const charStore = useCharacterStore();
     const gameStore = useGameStore();
     try {
@@ -732,7 +741,8 @@ export class LogicService {
         systemPrompt,
         messages: [{ role: 'user', content: combatSummary }],
         temperature: 0.7, // Higher creativity for narration
-        max_tokens: 3000
+        max_tokens: 3000,
+        signal
       });
       
       return content.trim();

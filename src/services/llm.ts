@@ -15,6 +15,7 @@ export interface CompletionOptions {
   max_tokens?: number;
   stream?: boolean;
   onStream?: (token: string) => void;
+  signal?: AbortSignal;
 }
 
 export async function generateCompletion(options: CompletionOptions): Promise<string> {
@@ -73,12 +74,13 @@ export async function generateCompletion(options: CompletionOptions): Promise<st
       presence_penalty: config.presence_penalty,
       max_tokens: options.max_tokens,
       stream: options.stream ?? config.stream ?? false,
-    } as any);
+    } as any, { signal: options.signal });
 
     let content = '';
     const shouldStream = options.stream ?? config.stream;
     if (shouldStream) {
       for await (const chunk of (response as any)) {
+        if (options.signal?.aborted) throw new Error('Operation aborted by user');
         const token = chunk.choices[0]?.delta?.content || '';
         content += token;
         if (options.onStream) {

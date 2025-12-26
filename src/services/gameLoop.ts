@@ -445,7 +445,15 @@ class GameLoopService {
       this.isBackgroundProcessing.value = true; // But block new messages
 
       // 4. Background Processing: LLM #2 & LLM #3 (Non-blocking)
-      this.processBackgroundTasks(userContent, finalStory, currentSaveSlotId, assistantMsgId);
+      // CRITICAL: Only proceed if we have a valid story and not aborted
+      if (!this.abortController?.signal.aborted && finalStory.trim()) {
+        this.processBackgroundTasks(userContent, finalStory, currentSaveSlotId, assistantMsgId, this.abortController?.signal);
+      } else {
+        console.log('[GameLoop] Skipping background processing: aborted or empty story.');
+        this.currentStage.value = 'idle';
+        this.isBackgroundProcessing.value = false;
+        this.isProcessing.value = false;
+      }
     } catch (e: any) {
       console.error('Game Loop Error:', e);
       
@@ -471,7 +479,8 @@ class GameLoopService {
     userContent: string, 
     finalStory: string, 
     currentSaveSlotId: number,
-    assistantMsgId?: number
+    assistantMsgId?: number,
+    signal?: AbortSignal
   ) {
     try {
       const gameStore = useGameStore();
@@ -492,7 +501,8 @@ class GameLoopService {
       const logicResult = await logicService.processLogic(
         userContent, 
         finalStory, // Use cleaned story
-        gameStore.state
+        gameStore.state,
+        signal
       );
 
       // Clear Minigame Result after it has been sent to logic model
@@ -593,7 +603,8 @@ class GameLoopService {
              const npc = gameStore.state.npcs[id];
              return npc ? npc.name : id;
           })
-        }
+        },
+        signal
       ).catch(err => console.error('Memory Extraction Failed:', err));
 
     } catch (error) {

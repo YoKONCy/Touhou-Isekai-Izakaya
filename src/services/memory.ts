@@ -103,8 +103,10 @@ export class MemoryService {
     userParam: { name: string; input: string },
     aiResponse: string,
     actions: any[],
-    context?: { date: string; time: string; location: string; characters: string[] }
+    context?: { date: string; time: string; location: string; characters: string[] },
+    signal?: AbortSignal
   ) {
+    if (signal?.aborted) return;
     // 1. Save "Hard" Memories (Variable Changes) based on Actions
     // These are objective facts derived from the Logic System's output.
     // [Optimization] Only record critical management-related changes (Money & Items) as hard memories.
@@ -206,7 +208,8 @@ ${JSON.stringify(actions)}
         systemPrompt: EXTRACTION_SYSTEM_PROMPT,
         messages: [{ role: 'user', content: prompt }],
         jsonMode: true,
-        modelType: 'memory'
+        modelType: 'memory',
+        signal
       });
 
       const cleanedResponse = this.cleanJsonString(response || '{}');
