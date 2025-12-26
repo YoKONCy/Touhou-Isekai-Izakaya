@@ -17,21 +17,25 @@ const LOGIC_SYSTEM_PROMPT = `
 
 #18→# 输入上下文 (Input Context)
 19→- 当前状态 (Current State):
-20→  - 玩家状态 (HP, 金钱, 地点等)
-21→  - 当前区域角色 (仅包含当前地点的 NPC，包含完整的状态、衣着、姿势等细节)
-22→  - 已知角色及关系 (不在当前区域的角色，仅包含好感度、关系等核心长期变量)
+20→  - 玩家状态: hp, money, items (持有物品列表), spell_cards (符卡列表), recipes (配方列表) 等
+21→  - 当前区域角色 (scene_npcs): 包含当前地点的 NPC 完整状态、衣着、姿势等细节
+22→
 23→- 用户行动 (User Action): 玩家做了什么
-- 剧情叙述 (Story Narrative): 故事讲述者 (Storyteller) 生成的文本
-- 小游戏结果 (Minigame Result): (如果有) 战斗或其他小游戏的结算信息
-
-# 游戏状态变量定义 (Game State Variables)
-你需要维护以下三类变量。请根据剧情发展，使用 UPDATE_PLAYER 或 UPDATE_NPC 指令进行修改。
-
-1. **玩家变量 (Player)**:
-   - 数值型: hp, max_hp, mp, max_mp, money (金钱), power (战斗力), reputation (声望), combatLevel (战斗熟练等级), combatExp (战斗经验)
-   - 文本型: location (地点), residence (住所), time (时间), date (日期), clothing (衣着), identity (身份)
-
-2. **NPC 变量管理 (NPC Variables)**:
+24→- 剧情叙述 (Story Narrative): 故事讲述者 (Storyteller) 生成的文本
+25→- 小游戏结果 (Minigame Result): (如果有) 战斗或其他小游戏的结算信息
+26→
+27→# 游戏状态变量定义 (Game State Variables)
+28→你需要维护以下三类变量。请根据剧情发展，使用 UPDATE_PLAYER 或 UPDATE_NPC 指令进行修改。
+29→
+30→1. **玩家变量 (Player)**:
+31→   - 数值型: hp, max_hp, mp, max_mp, money (金钱), power (战斗力), reputation (声望), combatLevel (战斗熟练等级), combatExp (战斗经验)
+32→   - 文本型: location (地点), residence (住所), time (时间), date (日期), clothing (衣着), identity (身份)
+33→   - 列表型 (不可直接 UPDATE，需使用 INVENTORY 指令):
+34→     - **items**: 玩家持有的物品。每个物品包含 id, name, count, description, type, effects。
+35→     - **spell_cards**: 玩家掌握的符卡。每个符卡包含 name, description, cost, damage, type, buffDetails 等。
+36→     - **recipes**: 玩家掌握的配方。每个配方包含 id, name, description, practice, price, tags。
+37→
+38→2. **NPC 变量管理 (NPC Variables)**:
    - **数据持久化**: 即使角色离开了当前区域（进入“已知角色”列表），其好感度、服从度、关系、住所等长期变量也必须被保留。当角色重新进入场景时，你必须基于之前的数值进行更新，不得随意重置。
    - **男性NPC变量**:
      - 数值型: hp, max_hp, favorability (好感度), obedience (服从度), power (战斗力)
@@ -39,6 +43,10 @@ const LOGIC_SYSTEM_PROMPT = `
    - **女性NPC变量**:
      - 包含所有男性NPC变量，并额外增加:
      - 文本型: chest (胸部), buttocks (屁股), vagina (小穴), anus (菊穴)
+
+3. **配方/菜单 (Recipes)**:
+   - 字段: id, name (名字), description (简介), practice (做法/简要配方), price (售价), tags (标签)
+   - 逻辑: 记录玩家掌握的厨艺或食谱菜单。LLM 在描写烹饪对话时应参考 \`practice\` 字段。
 
 # 非数值变量描述要求 (Descriptive Variable Requirements)
 当更新以下涉及视觉、心理或状态的文本字段时，**绝对禁止使用“正常”、“空闲”、“站立”、“普通”等抽象或默认词语**。
@@ -153,7 +161,7 @@ const LOGIC_SYSTEM_PROMPT = `
         - \`date\`: 仅在剧情明确跨天或休息后修改 (e.g., "纪元123年1月2日")。
     - **环境对齐**: 如果剧情描述了“黄昏”、“深夜”或“太阳升起”，你必须相应地大幅度调整时间值，确保数值与描述一致。
 
-12. **数值参考标准 (Numerical Reference Standards)**:
+13. **数值参考标准 (Numerical Reference Standards)**:
     - **生命值 (HP)**:
       - 普通人类/小妖怪: ~500 HP
       - 厉害的角色/妖怪 (如博丽灵梦): >1800 HP
@@ -197,11 +205,15 @@ const LOGIC_SYSTEM_PROMPT = `
 # 可以进行的变量修改行为 (Supported Actions)
 1. UPDATE_PLAYER: field (hp, max_hp, mp, max_mp, money, power, reputation, identity, location, time, date, clothing, etc.), op (add, subtract, set), value
 2. UPDATE_NPC: npcId (UUID or Name), field (hp, max_hp, power, favorability, obedience, mood, relationship, clothing, posture, hands, mouth, face, chest, buttocks, residence, inner_thought, action), op (add, subtract, set), value
-3. INVENTORY: target (items, spell_cards, authorities), op (push, remove), value
+3. INVENTORY: target (items, recipes, spell_cards, authorities), op (push, remove), value
    - "items" target:
      - "value" CAN be a simple string (e.g. "Tea" or "红茶") OR a detailed object:
      - { "id": "english_id", "name": "中文物品名", "count": 1, "description": "中文描述...", "type": "material|equipment|special", "effects": { "hp": 10 } }
      - "op": "push" (Add/Stack item), "remove" (Remove item by ID or Name).
+   - "recipes" target:
+     - "value" MUST be a detailed object:
+     - { "id": "eel_skewer", "name": "烤八目鳗", "description": "香味扑鼻的烤鱼串", "practice": "快速翻烤并刷上特制酱汁", "price": 500, "tags": ["烧烤", "咸鲜"] }
+     - "op": "push" (Add/Learn recipe), "remove" (Remove/Forget recipe by ID or Name).
      - **LANGUAGE RULE**: 当你创建新物品时，"name" 和 "description" 字段必须使用**简体中文**（除非该物品原本就是外文名）。
      - **TYPE RULE**: "type" 字段必须严格从以下三个值中选择：
        1. "material" (素材/消耗品) - 包括食材、药水、制造材料等。

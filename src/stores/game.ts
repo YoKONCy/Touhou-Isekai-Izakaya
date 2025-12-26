@@ -63,7 +63,7 @@ const PLAYER_FIELD_MAPPING: Record<string, string> = {
 const VALID_PLAYER_FIELDS = new Set([
   'name', 'hp', 'max_hp', 'mp', 'max_mp', 'money', 'power', 'reputation',
   'identity', 'persona', 'clothing', 'location', 'residence', 'time', 'date',
-  'authorities', 'items', 'spell_cards', 'combatLevel', 'combatExp', 'skillPoints', 'unlockedTalents',
+  'authorities', 'items', 'recipes', 'spell_cards', 'combatLevel', 'combatExp', 'skillPoints', 'unlockedTalents',
   'avatarUrl', 'referenceImageUrl', 'storySummary'
 ]);
 
@@ -701,6 +701,49 @@ export const useGameStore = defineStore('game', () => {
                if (idx > -1) {
                   spellCards.splice(idx, 1);
                }
+            }
+
+          } else if (action.target === 'recipes') {
+            if (!state.value.player.recipes) state.value.player.recipes = [];
+            const recipes = state.value.player.recipes;
+
+            if (action.op === 'add' || action.op === 'push') {
+              const values = Array.isArray(action.value) ? action.value : [action.value];
+              for (const val of values) {
+                let newRecipe: any;
+                if (typeof val === 'string') {
+                  newRecipe = {
+                    id: val,
+                    name: val,
+                    description: '暂无描述',
+                    practice: '暂无做法',
+                    price: 0,
+                    tags: []
+                  };
+                } else {
+                  newRecipe = {
+                    id: val.id || val.name || 'unknown',
+                    name: val.name || val.id || 'Unknown Recipe',
+                    description: val.description || '暂无描述',
+                    practice: val.practice || '暂无做法',
+                    price: Number(val.price) || 0,
+                    tags: Array.isArray(val.tags) ? val.tags : []
+                  };
+                }
+                // Avoid duplicates
+                if (!recipes.find(r => r.id === newRecipe.id || r.name === newRecipe.name)) {
+                  recipes.push(newRecipe);
+                }
+              }
+            }
+
+            if (action.op === 'remove') {
+              const val = action.value;
+              const idToCheck = typeof val === 'string' ? val : (val.id || val.name);
+              const idx = recipes.findIndex(r => r.id === idToCheck || r.name === idToCheck);
+              if (idx > -1) {
+                recipes.splice(idx, 1);
+              }
             }
 
           } else {

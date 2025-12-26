@@ -4,7 +4,7 @@ import { computed, ref } from 'vue';
 import { 
   Coins, Heart, MapPin, Clock, Zap, Star, User, Shield, Package, Sparkles, X, 
   GitBranch, Lock, Check, Sword, Activity, Wind, Target, Brain, 
-  Flame, Droplets, Sun, Moon, Search, HelpCircle, Camera, Home
+  Flame, Droplets, Sun, Moon, Search, HelpCircle, Camera, Home, Utensils
 } from 'lucide-vue-next';
 import { audioManager } from '@/services/audio';
 import { TALENTS } from '@/data/talents';
@@ -34,6 +34,7 @@ defineExpose({
   handleOpenItems,
   handleOpenTalentTree,
   handleOpenSpells,
+  handleOpenRecipes,
   handleOpenFacility
 });
 
@@ -232,10 +233,12 @@ const reputationLabel = computed(() => {
 // Modals
 const showItemsModal = ref(false);
 const showSpellsModal = ref(false);
+const showRecipesModal = ref(false);
 const showTalentTreeModal = ref(false);
 const showFacilityModal = ref(false);
 const selectedItem = ref<any>(null);
 const selectedSpell = ref<any>(null);
+const selectedRecipe = ref<any>(null);
 
 function handleOpenItems() {
   showItemsModal.value = true;
@@ -244,6 +247,11 @@ function handleOpenItems() {
 
 function handleOpenSpells() {
   showSpellsModal.value = true;
+  audioManager.playPageFlip();
+}
+
+function handleOpenRecipes() {
+  showRecipesModal.value = true;
   audioManager.playPageFlip();
 }
 
@@ -267,6 +275,11 @@ function handleSelectSpell(spell: any) {
   audioManager.playSoftClick();
 }
 
+function handleSelectRecipe(recipe: any) {
+  selectedRecipe.value = recipe;
+  audioManager.playSoftClick();
+}
+
 function handleCloseItems() {
   showItemsModal.value = false;
   selectedItem.value = null;
@@ -276,6 +289,12 @@ function handleCloseItems() {
 function handleCloseSpells() {
   showSpellsModal.value = false;
   selectedSpell.value = null;
+  audioManager.playSoftClick();
+}
+
+function handleCloseRecipes() {
+  showRecipesModal.value = false;
+  selectedRecipe.value = null;
   audioManager.playSoftClick();
 }
 
@@ -296,6 +315,11 @@ function handleBackToItems() {
 
 function handleBackToSpells() {
   selectedSpell.value = null;
+  audioManager.playPageFlip();
+}
+
+function handleBackToRecipes() {
+  selectedRecipe.value = null;
   audioManager.playPageFlip();
 }
 
@@ -492,23 +516,32 @@ function formatBuffEffect(effect: any) {
 
     <!-- Interactive Collections -->
     <div class="space-y-2 pt-1 relative z-10">
-      <div class="grid grid-cols-2 gap-2">
+      <div class="grid grid-cols-3 gap-2">
         <button 
           @click="handleOpenItems"
-          class="flex flex-col items-center justify-center p-2.5 bg-white/40 hover:bg-white/80 hover:shadow-md rounded-xl transition-all duration-300 border border-izakaya-wood/5 hover:border-touhou-red/30 group hover:-translate-y-1"
+          class="flex flex-col items-center justify-center p-2 bg-white/40 hover:bg-white/80 hover:shadow-md rounded-lg transition-all duration-300 border border-izakaya-wood/5 hover:border-touhou-red/30 group hover:-translate-y-1 h-16"
         >
-          <Package class="w-5 h-5 text-izakaya-wood/60 group-hover:text-touhou-red mb-1 transition-colors" />
-          <span class="text-xs font-medium text-izakaya-wood group-hover:text-touhou-red font-display">物品栏</span>
-          <span class="text-[10px] text-izakaya-wood/50">{{ player.items?.length || 0 }}</span>
+          <Package class="w-4 h-4 text-izakaya-wood/60 group-hover:text-touhou-red mb-1 transition-colors" />
+          <span class="text-[10px] font-bold text-izakaya-wood group-hover:text-touhou-red font-display">物品</span>
+          <span class="text-[9px] text-izakaya-wood/50">{{ player.items?.length || 0 }}</span>
         </button>
 
         <button 
           @click="handleOpenSpells"
-          class="flex flex-col items-center justify-center p-2.5 bg-white/40 hover:bg-white/80 hover:shadow-md rounded-xl transition-all duration-300 border border-izakaya-wood/5 hover:border-marisa-gold/50 group hover:-translate-y-1"
+          class="flex flex-col items-center justify-center p-2 bg-white/40 hover:bg-white/80 hover:shadow-md rounded-lg transition-all duration-300 border border-izakaya-wood/5 hover:border-marisa-gold/50 group hover:-translate-y-1 h-16"
         >
-          <Sparkles class="w-5 h-5 text-izakaya-wood/60 group-hover:text-marisa-gold mb-1 transition-colors" />
-          <span class="text-xs font-medium text-izakaya-wood group-hover:text-marisa-gold-dim font-display">符卡技能</span>
-          <span class="text-[10px] text-izakaya-wood/50">{{ player.spell_cards?.length || 0 }}</span>
+          <Sparkles class="w-4 h-4 text-izakaya-wood/60 group-hover:text-marisa-gold mb-1 transition-colors" />
+          <span class="text-[10px] font-bold text-izakaya-wood group-hover:text-marisa-gold-dim font-display">符卡</span>
+          <span class="text-[9px] text-izakaya-wood/50">{{ player.spell_cards?.length || 0 }}</span>
+        </button>
+
+        <button 
+          @click="handleOpenRecipes"
+          class="flex flex-col items-center justify-center p-2 bg-white/40 hover:bg-white/80 hover:shadow-md rounded-lg transition-all duration-300 border border-izakaya-wood/5 hover:border-orange-400/50 group hover:-translate-y-1 h-16"
+        >
+          <Utensils class="w-4 h-4 text-izakaya-wood/60 group-hover:text-orange-500 mb-1 transition-colors" />
+          <span class="text-[10px] font-bold text-izakaya-wood group-hover:text-orange-600 font-display">菜单</span>
+          <span class="text-[9px] text-izakaya-wood/50">{{ player.recipes?.length || 0 }}</span>
         </button>
       </div>
 
@@ -728,6 +761,82 @@ function formatBuffEffect(effect: any) {
                           </div>
                        </div>
                     </div>
+                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Recipe Modal -->
+    <Teleport to="body">
+      <div v-if="showRecipesModal" class="fixed inset-0 z-[100] flex items-center justify-center bg-izakaya-wood/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div class="bg-izakaya-paper w-full max-w-md rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[70vh] border-2 border-orange-400/30 relative">
+          <!-- Texture -->
+          <div class="absolute inset-0 pointer-events-none opacity-10 bg-texture-stardust"></div>
+          
+          <div class="p-4 border-b border-izakaya-wood/10 flex justify-between items-center bg-orange-500/5 relative z-10">
+            <h3 class="font-bold flex items-center gap-2 font-display text-izakaya-wood text-lg"><Utensils class="w-5 h-5 text-orange-500"/> 食谱菜单</h3>
+            <button @click="handleCloseRecipes" class="text-izakaya-wood/50 hover:text-touhou-red transition-colors bg-white/50 rounded-full p-1 hover:bg-white"><X class="w-5 h-5"/></button>
+          </div>
+          <div class="p-4 overflow-y-auto min-h-[300px] bg-white/30 relative z-10 custom-scrollbar">
+            <!-- List View -->
+            <div v-if="!selectedRecipe" class="grid grid-cols-1 gap-2">
+              <div v-if="!player.recipes || player.recipes.length === 0" class="text-center text-izakaya-wood/50 py-8">尚未学会任何菜品</div>
+              <div 
+                v-else 
+                v-for="(recipe, idx) in player.recipes" 
+                :key="idx" 
+                @click="handleSelectRecipe(recipe)"
+                class="cursor-pointer p-3 bg-white/60 border border-izakaya-wood/10 rounded flex items-center gap-3 hover:bg-white/90 hover:border-orange-400/30 hover:shadow-md transition-all group"
+              >
+                <div class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-xs shrink-0 border border-orange-200 group-hover:scale-110 transition-transform">
+                   食
+                </div>
+                <div class="flex-1">
+                   <div class="font-bold text-izakaya-wood font-display text-sm group-hover:text-orange-600 transition-colors">{{ typeof recipe === 'object' ? recipe.name : recipe }}</div>
+                   <div class="flex gap-1 mt-1" v-if="typeof recipe === 'object'">
+                      <span v-for="tag in recipe.tags" :key="tag" class="text-[9px] px-1.5 py-0.5 bg-orange-50 text-orange-600 rounded-full border border-orange-100">
+                        {{ tag }}
+                      </span>
+                   </div>
+                </div>
+                <div class="text-xs font-mono text-orange-700 font-bold" v-if="typeof recipe === 'object'">
+                   {{ recipe.price }}<span class="text-[10px] ml-0.5">円</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Detail View -->
+            <div v-else class="flex flex-col h-full animate-in slide-in-from-right-4 fade-in duration-200">
+              <button @click="handleBackToRecipes" class="self-start mb-4 flex items-center gap-1 text-sm text-izakaya-wood/60 hover:text-orange-600 transition-colors">
+                &larr; 返回列表
+              </button>
+              
+              <div class="flex flex-col items-center p-6 bg-white/60 rounded-xl border border-izakaya-wood/10 shadow-sm relative overflow-hidden">
+                 <div class="absolute inset-0 bg-orange-400/5 pointer-events-none"></div>
+                 <div class="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 text-orange-600 text-xl font-bold shadow-sm border border-orange-200 relative z-10">
+                   食
+                 </div>
+                 <h4 class="text-xl font-bold mb-1 font-display text-izakaya-wood relative z-10">{{ selectedRecipe.name }}</h4>
+                 <div class="flex gap-2 mb-4 relative z-10">
+                    <span v-for="tag in selectedRecipe.tags" :key="tag" class="text-xs px-2 py-1 bg-orange-50 text-orange-600 rounded-full border border-orange-100">
+                      {{ tag }}
+                    </span>
+                    <span class="text-xs px-2 py-1 bg-izakaya-wood/5 text-izakaya-wood/60 rounded border border-izakaya-wood/10">
+                      售价: {{ selectedRecipe.price }}円
+                    </span>
+                 </div>
+                 
+                 <div class="w-full text-left bg-white/80 p-4 rounded-lg border border-izakaya-wood/10 mb-4 relative z-10">
+                    <h5 class="text-xs font-bold text-izakaya-wood/60 uppercase tracking-wider mb-2">菜品简介</h5>
+                    <p class="text-sm text-izakaya-wood leading-relaxed whitespace-pre-wrap">{{ selectedRecipe.description || '暂无描述' }}</p>
+                 </div>
+
+                 <div class="w-full text-left bg-orange-50/50 p-4 rounded-lg border border-orange-100 mb-4 relative z-10">
+                    <h5 class="text-xs font-bold text-orange-800/60 uppercase tracking-wider mb-2">制作配方/心得</h5>
+                    <p class="text-sm text-orange-900 leading-relaxed italic whitespace-pre-wrap">{{ selectedRecipe.practice || '暂无详细做法' }}</p>
                  </div>
               </div>
             </div>

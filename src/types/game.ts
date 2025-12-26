@@ -10,6 +10,15 @@ export interface Item {
   effects?: Record<string, any>; // Optional effects
 }
 
+export interface Recipe {
+  id: string;
+  name: string;
+  description: string;
+  practice: string; // 简要配方/做法
+  price: number;
+  tags: string[];   // ['甜品', '素食'] 等
+}
+
 export interface PlayerStatus {
   name: string;
   // Stats (Flattened)
@@ -44,6 +53,7 @@ export interface PlayerStatus {
   // Collections
   authorities: string[];
   items: Item[];
+  recipes: Recipe[];
   spell_cards: SpellCard[];
 }
 
@@ -171,6 +181,7 @@ export const INITIAL_GAME_STATE: GameState = {
     unlockedTalents: [],
     authorities: [],
     items: [],
+    recipes: [],
     spell_cards: [],
     avatarUrl: '',
     referenceImageUrl: '',
@@ -198,20 +209,24 @@ export const INITIAL_GAME_STATE: GameState = {
 export type ActionOperation = 'add' | 'subtract' | 'set' | 'push' | 'remove' | 'add_chars' | 'remove_chars';
 
 export interface GameAction {
-  type: 'UPDATE_PLAYER' | 'UPDATE_NPC' | 'INVENTORY' | 'SCENE';
+  type: 'UPDATE_PLAYER' | 'UPDATE_NPC' | 'INVENTORY' | 'SCENE' | 'MINIGAME';
   // Target fields
   target?: string; // For INVENTORY: 'items' | 'spell_cards' | 'authorities'
   npcId?: string;  // For UPDATE_NPC
   field?: string;  // Field to update (e.g., 'hp', 'money', 'mood')
   
-  // Operation
-  op: ActionOperation;
-  value: any;
+  // Operation (Optional for SCENE)
+  op?: ActionOperation;
+  value?: any;
   
   // Scene specific
   location?: string;
   add_chars?: (string | any)[];
   remove_chars?: string[];
+
+  // Minigame specific
+  trigger?: boolean;
+  difficulty?: string;
 }
 
 export interface LogicResult {
