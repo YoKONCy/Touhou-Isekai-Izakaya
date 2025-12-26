@@ -43,10 +43,14 @@ export class PromptService {
       
       // If has options, use the selected one
       if (block && block.options && block.options.length > 0) {
-        const selectedId = block.selectedOptionId || block.options[0].id;
-        const selectedOption = block.options.find(o => o.id === selectedId);
-        if (selectedOption) {
-          finalContent = selectedOption.content;
+        const options = block.options;
+        const selectedId = block.selectedOptionId || options[0]?.id;
+        
+        if (selectedId) {
+          const selectedOption = options.find(o => o.id === selectedId);
+          if (selectedOption) {
+            finalContent = selectedOption.content;
+          }
         }
       }
 
