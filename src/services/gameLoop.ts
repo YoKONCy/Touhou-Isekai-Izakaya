@@ -535,7 +535,16 @@ class GameLoopService {
 
       // Apply Actions
       if (logicResult.actions && logicResult.actions.length > 0) {
-         for (const action of logicResult.actions) {
+         // Sort actions: Put SCENE actions at the end.
+         // This ensures that if a character is implicitly added by an UPDATE_NPC action
+         // but explicitly removed by a SCENE action in the same turn, the removal wins.
+         const sortedActions = [...logicResult.actions].sort((a, b) => {
+            if (a.type === 'SCENE' && b.type !== 'SCENE') return 1;
+            if (a.type !== 'SCENE' && b.type === 'SCENE') return -1;
+            return 0;
+         });
+
+         for (const action of sortedActions) {
             gameStore.applyAction(action);
          }
       }

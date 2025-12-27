@@ -477,6 +477,8 @@ export const useGameStore = defineStore('game', () => {
           }
 
           // Implicitly add to current scene if updated via UPDATE_NPC
+          // Note: This provides a safety net if the model forgets to send a SCENE add_chars.
+          // In gameLoop.ts, we ensure SCENE actions (removals) run LAST to override this if needed.
           if (!state.value.system.current_scene_npcs.includes(npcId)) {
              console.log(`[GameStore] Implicitly adding NPC ${npcId} to current scene via UPDATE_NPC`);
              state.value.system.current_scene_npcs.push(npcId);

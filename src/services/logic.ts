@@ -37,6 +37,10 @@ const LOGIC_SYSTEM_PROMPT = `
 37→
 38→2. **NPC 变量管理 (NPC Variables)**:
    - **数据持久化**: 即使角色离开了当前区域（进入“已知角色”列表），其好感度、服从度、关系、住所等长期变量也必须被保留。当角色重新进入场景时，你必须基于之前的数值进行更新，不得随意重置。
+   - **登场与离场 (Scene Management)**: 
+     - **严禁仅使用 UPDATE_NPC 来管理角色的出现**。
+     - 如果角色出现在剧情中，你**必须**使用 \`SCENE\` 指令的 \`add_chars\` 将其加入。
+     - 如果角色离开了剧情（即使只是暂时离开去拿个东西），你**必须**使用 \`SCENE\` 指令的 \`remove_chars\` 将其移除。
    - **男性NPC变量**:
      - 数值型: hp, max_hp, favorability (好感度), obedience (服从度), power (战斗力)
      - 文本型: mood (心情), clothing (衣着), posture (姿势), face (表情), mouth (嘴巴), hands (双手), action (行为), inner_thought (心理), relationship (关系), residence (住所)
@@ -275,9 +279,11 @@ const LOGIC_SYSTEM_PROMPT = `
        - "buffDetails": MUST follow the same structure as defined in combat system for buffs/shields.
 
 4. SCENE: location (new location name), add_chars (list of npc objects), remove_chars (list of npcIds)
-   - 重要: 如果剧情中出现了新角色，或者玩家进入了新地点导致新角色在场，必须使用 "add_chars" 将其加入场景。
-   - 重要: 如果角色离开了当前场景，必须使用 "remove_chars" 将其移除。
-   - Example: { "type": "SCENE", "add_chars": [{ "id": "reimu", "name": "Reimu" }] }
+   - **重要 (场景变动)**: 
+     - 如果玩家**移动到了新地点**，必须更新 "location"。
+     - 如果**新角色出现了**，必须使用 "add_chars" 将其加入。
+     - 如果**角色离开了当前场景**（例如：道别离开、瞬间移动消失、战斗后撤退），你**必须**使用 "remove_chars" 将其从当前场景移除。
+   - Example: { "type": "SCENE", "remove_chars": ["reimu"] }
    - DO NOT use "op" or "value" for SCENE actions. Use top-level fields "location", "add_chars", "remove_chars".
 5. MINIGAME: trigger (boolean), type (string, e.g. "cooking"), difficulty (string)
 
@@ -305,6 +311,7 @@ const LOGIC_SYSTEM_PROMPT = `
 1. **剧情解析**: 实际上发生了什么？(例如：玩家送了礼物，或者被攻击了)
 2. **变量识别与时间推演**: 
    - 哪些变量受到影响？(例如：好感度应上升，HP应下降)。
+   - **场景与角色存续检查**: 剧情中是否有人**进场**或**离场**？如果有人离开了（如：走开了、消失了），必须规划 SCENE 指令的 remove_chars。
    - **时间推演**: 根据剧情内容，估算流逝了多少分钟。即使是简单的对话，也必须推进 1~3 分钟。若发生了位移或长时间活动，应推进更多。
    - **特别注意**: 检查是否需要更新衣着(clothing)、姿势(posture)或关系(relationship)描述。
 3. **物品/符卡检测**: 
