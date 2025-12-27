@@ -115,6 +115,42 @@ function handleMouseLeave() {
   }
 }
 
+// Touch event handlers for mobile support
+function handleTouchStart(e: TouchEvent) {
+  const container = treeContainer.value;
+  if (!container || !e.touches[0]) return;
+  isDragging.value = true;
+  hasMoved.value = false;
+  const touch = e.touches[0];
+  startX.value = touch.pageX - container.offsetLeft;
+  startY.value = touch.pageY - container.offsetTop;
+  scrollLeft.value = container.scrollLeft;
+  scrollTop.value = container.scrollTop;
+}
+
+function handleTouchMove(e: TouchEvent) {
+  const container = treeContainer.value;
+  if (!isDragging.value || !container || !e.touches[0]) return;
+  e.preventDefault();
+  const touch = e.touches[0];
+  const x = touch.pageX - container.offsetLeft;
+  const y = touch.pageY - container.offsetTop;
+
+  const walkX = (x - startX.value) * 1.5;
+  const walkY = (y - startY.value) * 1.5;
+
+  if (Math.abs(walkX) > 5 || Math.abs(walkY) > 5) {
+    hasMoved.value = true;
+  }
+
+  container.scrollLeft = scrollLeft.value - walkX;
+  container.scrollTop = scrollTop.value - walkY;
+}
+
+function handleTouchEnd() {
+  isDragging.value = false;
+}
+
 const combatTalents = computed(() => {
   return Object.values(TALENTS).filter(t => t.category === 'combat');
 });
@@ -900,13 +936,17 @@ function formatBuffEffect(effect: any) {
              </div>
 
              <!-- Tree View (Left/Center) -->
-             <div 
+             <div
                ref="treeContainer"
-               class="flex-1 overflow-auto custom-scrollbar relative p-8 bg-izakaya-paper/50 cursor-grab active:cursor-grabbing select-none group"
+               class="flex-1 overflow-auto custom-scrollbar relative p-8 bg-izakaya-paper/50 cursor-grab active:cursor-grabbing select-none group touch-none"
                @mousedown="handleMouseDown"
                @mousemove="handleMouseMove"
                @mouseup="handleMouseUp"
                @mouseleave="handleMouseLeave"
+               @touchstart.passive="handleTouchStart"
+               @touchmove="handleTouchMove"
+               @touchend="handleTouchEnd"
+               @touchcancel="handleTouchEnd"
                @wheel.prevent="handleWheel"
              >
                 <!-- Scaling Wrapper: 

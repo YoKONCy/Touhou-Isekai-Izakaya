@@ -97,7 +97,7 @@ function getAvatarImage(name: string) {
       <Users class="w-4 h-4 text-touhou-red" />
       当前区域角色
     </h3>
-    <div class="space-y-2 overflow-y-auto flex-1 relative z-10 custom-scrollbar pr-1">
+    <div class="space-y-2 overflow-y-auto flex-1 relative z-10 custom-scrollbar pr-1 overscroll-contain" style="-webkit-overflow-scrolling: touch;">
       
       <div v-if="currentSceneNPCs.length === 0" class="text-center text-sm text-izakaya-wood/40 py-4 font-serif">
         这里似乎只有你一个人...
@@ -172,7 +172,7 @@ function getAvatarImage(name: string) {
             <button @click="handleCloseModal" class="text-izakaya-wood/50 hover:text-touhou-red transition-colors"><X class="w-5 h-5"/></button>
           </div>
           
-          <div class="flex-1 overflow-y-auto p-6 space-y-6 relative z-10 custom-scrollbar">
+          <div class="flex-1 overflow-y-auto p-6 space-y-6 relative z-10 custom-scrollbar overscroll-contain" style="-webkit-overflow-scrolling: touch;">
               <div class="flex justify-center">
                    <div class="w-24 h-24 rounded-full shadow-[0_0_15px_rgba(0,0,0,0.1)] border-4 border-white/50 overflow-hidden bg-white/10">
                       <img 

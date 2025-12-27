@@ -125,32 +125,37 @@ const parsedContent = computed(() => {
         </div>
 
         <!-- Body -->
-        <div class="relative z-10 flex flex-1 min-h-0">
-          
-          <!-- Sidebar (TOC) -->
-          <div class="w-64 bg-white/50 border-r border-izakaya-wood/10 flex flex-col">
-            <!-- Search (Optional, for future) -->
-            <!-- <div class="p-3 border-b border-izakaya-wood/5">
-              <div class="relative">
-                <Search class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-izakaya-wood/40" />
-                <input 
-                  v-model="searchQuery"
-                  type="text" 
-                  placeholder="搜索主题..."
-                  class="w-full pl-9 pr-3 py-1.5 text-sm bg-white border border-izakaya-wood/10 rounded-md focus:outline-none focus:border-touhou-red/50 transition-colors"
-                />
-              </div>
-            </div> -->
+        <div class="relative z-10 flex flex-col md:flex-row flex-1 min-h-0">
 
-            <div class="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+          <!-- Sidebar (TOC) - Desktop: left sidebar, Mobile: top tabs -->
+          <div class="md:w-64 bg-white/50 border-b md:border-b-0 md:border-r border-izakaya-wood/10 flex flex-col flex-shrink-0">
+            <!-- Mobile: Horizontal scrollable tabs -->
+            <div class="md:hidden overflow-x-auto p-2 flex gap-2" style="-webkit-overflow-scrolling: touch;">
+              <button
+                v-for="section in filteredSections"
+                :key="section.id"
+                @click="handleSectionClick(section.id)"
+                class="flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap"
+                :class="[
+                  activeSectionId === section.id
+                    ? 'bg-touhou-red text-white shadow-md'
+                    : 'bg-izakaya-wood/5 text-izakaya-wood/70'
+                ]"
+              >
+                {{ section.title }}
+              </button>
+            </div>
+
+            <!-- Desktop: Vertical list -->
+            <div class="hidden md:block flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
               <button
                 v-for="section in filteredSections"
                 :key="section.id"
                 @click="handleSectionClick(section.id)"
                 class="w-full text-left px-4 py-3 rounded-lg text-sm font-bold transition-all flex items-center justify-between group"
                 :class="[
-                  activeSectionId === section.id 
-                    ? 'bg-touhou-red text-white shadow-md' 
+                  activeSectionId === section.id
+                    ? 'bg-touhou-red text-white shadow-md'
                     : 'text-izakaya-wood/70 hover:bg-izakaya-wood/5 hover:text-izakaya-wood'
                 ]"
               >
@@ -161,7 +166,7 @@ const parsedContent = computed(() => {
           </div>
 
           <!-- Content Area -->
-          <div class="flex-1 overflow-y-auto bg-white/80 p-8 custom-scrollbar relative">
+          <div class="flex-1 overflow-y-auto bg-white/80 p-4 md:p-8 custom-scrollbar relative" style="-webkit-overflow-scrolling: touch;">
              <div class="max-w-3xl mx-auto prose prose-stone prose-headings:font-display prose-headings:text-izakaya-wood prose-a:text-touhou-red prose-a:no-underline prose-a:font-bold prose-a:border-b-2 prose-a:border-touhou-red/20 hover:prose-a:border-touhou-red hover:prose-a:bg-touhou-red/5 prose-a:transition-all prose-a:px-1 prose-a:rounded-sm prose-img:rounded-xl prose-strong:text-touhou-red/80">
                 <!-- Render Content -->
                 <div v-html="parsedContent" @click="handleContentClick"></div>

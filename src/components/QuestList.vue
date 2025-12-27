@@ -45,7 +45,7 @@
     </div>
 
     <!-- Content Area -->
-    <div class="flex-1 overflow-y-auto min-h-0 space-y-2 p-2 custom-scrollbar relative z-10">
+    <div class="flex-1 overflow-y-auto min-h-0 space-y-2 p-2 custom-scrollbar relative z-10 overscroll-contain" style="-webkit-overflow-scrolling: touch;">
       
       <!-- QUESTS VIEW -->
       <template v-if="viewMode === 'quests'">

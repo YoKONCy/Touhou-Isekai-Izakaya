@@ -34,6 +34,7 @@ export class IzakayaScene {
 
   // Input State
   private keysPressed: Set<string> = new Set();
+  private virtualInput: { x: number; y: number } = { x: 0, y: 0 };
   
   // Game Loop State
   private lastTime = 0;
@@ -534,9 +535,21 @@ export class IzakayaScene {
            customer.state = 'waiting_food';
            customer.order = this.generateRandomOrder();
            console.log(`Order taken from ${customer.name}: ${customer.order.dishName}`);
-           
+
            this.dispatchOrderEvent('add', customer);
       }
+  }
+
+  // Virtual joystick input methods for mobile support
+  public setVirtualInput(x: number, y: number) {
+    this.virtualInput = { x, y };
+  }
+
+  public triggerInteraction() {
+    const player = this.entities.find(e => e.type === 'player');
+    if (player && !player.isMoving) {
+      this.checkInteraction(player);
+    }
   }
 
   private generateRandomOrder() {
@@ -625,12 +638,27 @@ export class IzakayaScene {
     if (!player.isMoving) {
       let dx = 0;
       let dy = 0;
-      
+
+      // Check keyboard input first
       if (this.keysPressed.has('w') || this.keysPressed.has('ArrowUp')) dy = -1;
       else if (this.keysPressed.has('s') || this.keysPressed.has('ArrowDown')) dy = 1;
       else if (this.keysPressed.has('a') || this.keysPressed.has('ArrowLeft')) dx = -1;
       else if (this.keysPressed.has('d') || this.keysPressed.has('ArrowRight')) dx = 1;
-      
+
+      // If no keyboard input, check virtual joystick input (mobile)
+      if (dx === 0 && dy === 0 && (this.virtualInput.x !== 0 || this.virtualInput.y !== 0)) {
+        const threshold = 0.3;
+        if (Math.abs(this.virtualInput.x) > Math.abs(this.virtualInput.y)) {
+          // Horizontal movement dominant
+          if (this.virtualInput.x > threshold) dx = 1;
+          else if (this.virtualInput.x < -threshold) dx = -1;
+        } else {
+          // Vertical movement dominant
+          if (this.virtualInput.y > threshold) dy = 1;
+          else if (this.virtualInput.y < -threshold) dy = -1;
+        }
+      }
+
         if (dx !== 0 || dy !== 0) {
         const targetX = player.x + dx;
         const targetY = player.y + dy;

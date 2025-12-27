@@ -393,6 +393,33 @@ function onDrag(e: MouseEvent) {
 function stopDrag() {
   isDragging.value = false;
 }
+
+// Touch event handlers for mobile
+const touchId = ref<number | null>(null);
+
+function handleTouchStart(e: TouchEvent) {
+  const touch = e.touches[0];
+  if (!touch) return;
+  touchId.value = touch.identifier;
+  isDragging.value = true;
+  startPos.value = { x: touch.clientX - position.value.x, y: touch.clientY - position.value.y };
+}
+
+function handleTouchMove(e: TouchEvent) {
+  if (!isDragging.value || touchId.value === null) return;
+  const touch = Array.from(e.touches).find(t => t.identifier === touchId.value);
+  if (!touch) return;
+  e.preventDefault();
+  position.value = {
+    x: touch.clientX - startPos.value.x,
+    y: touch.clientY - startPos.value.y
+  };
+}
+
+function handleTouchEnd() {
+  touchId.value = null;
+  isDragging.value = false;
+}
 </script>
 
 <template>
@@ -401,63 +428,75 @@ function stopDrag() {
       <!-- Backdrop -->
       <div class="absolute inset-0 bg-izakaya-wood/80 backdrop-blur-sm" @click="handleClose"></div>
       
-      <!-- Content Container (Frameless 21:9 Window) -->
-      <div class="relative w-full max-w-[90vw] bg-stone-950 rounded-lg shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 mx-auto aspect-[21/9] border border-white/10">
-        
+      <!-- Content Container (fullscreen with padding) -->
+      <div class="relative w-full h-full max-w-[95vw] max-h-[90vh] bg-stone-950 rounded-lg shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-white/10">
+
         <!-- Map Viewer (Full Surface) -->
-        <div 
-          class="relative w-full h-full overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing"
+        <div
+          class="relative w-full h-full overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing touch-none"
           @mousedown="startDrag"
           @mousemove="onDrag"
           @mouseup="stopDrag"
           @mouseleave="stopDrag"
+          @touchstart.passive="handleTouchStart"
+          @touchmove="handleTouchMove"
+          @touchend="handleTouchEnd"
         >
-          <div 
-            class="transition-transform duration-200 ease-out flex items-center justify-center w-full h-full"
-            :style="{ 
+          <div
+            class="transition-transform duration-200 ease-out"
+            :style="{
               transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`
             }"
           >
-            <img 
-              src="@/assets/images/map/幻想乡地图.jpg" 
-              alt="幻想乡地图" 
-              class="max-w-none pointer-events-none select-none object-cover w-full h-full"
-            />
+            <!-- Image container with relative positioning for markers -->
+            <div class="relative">
+              <img
+                src="@/assets/images/map/幻想乡地图.jpg"
+                alt="幻想乡地图"
+                class="block pointer-events-none select-none max-w-none h-[90vh]"
+              />
 
-            <!-- Location Markers (Markers are part of the zoomed/panned content) -->
-            <div 
-              v-for="loc in locations" 
-              :key="loc.id"
-              class="absolute group/marker cursor-pointer"
-              :style="{ 
-                left: `${loc.x}%`, 
-                top: `${loc.y}%`,
-                transform: `translate(-50%, -50%) scale(${1 / Math.sqrt(zoom)})` 
-              }"
-              @click.stop="handleLocationClick(loc)"
-            >
-              <!-- Ripple Effect -->
-              <div class="absolute inset-0 w-10 h-10 -m-5 border-2 border-white/30 rounded-full animate-ripple"></div>
-              <div class="absolute inset-0 w-10 h-10 -m-5 border border-white/20 rounded-full animate-ripple" style="animation-delay: 1.5s"></div>
-              
-              <!-- Marker Icon (Spirit Orb Style) -->
-              <div class="relative w-5 h-5 bg-white/20 backdrop-blur-[2px] border border-white/40 rounded-full shadow-[0_0_15px_rgba(255,255,255,0.3)] transition-all duration-300 group-hover/marker:scale-125 group-hover/marker:bg-white/40 group-hover/marker:border-white/60 flex items-center justify-center overflow-hidden">
-                <!-- Inner Core -->
-                <div class="w-2 h-2 bg-white/60 rounded-full animate-pulse shadow-[0_0_8px_white]"></div>
-                <!-- Shimmer Effect -->
-                <div class="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent -translate-x-full group-hover/marker:translate-x-full transition-transform duration-1000"></div>
-              </div>
-              
-              <!-- Label -->
-              <div class="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-0.5 bg-black/60 backdrop-blur-sm rounded text-[10px] text-white whitespace-nowrap opacity-0 group-hover/marker:opacity-100 transition-opacity pointer-events-none">
-                {{ loc.name }}
+              <!-- Location Markers (positioned relative to image) -->
+              <div
+                v-for="loc in locations"
+                :key="loc.id"
+                class="absolute group/marker cursor-pointer"
+                :style="{
+                  left: `${loc.x}%`,
+                  top: `${loc.y}%`,
+                  transform: `translate(-50%, -50%) scale(${1 / Math.sqrt(zoom)})`
+                }"
+                @click.stop="handleLocationClick(loc)"
+              >
+                <!-- Ripple Effect -->
+                <div class="absolute inset-0 w-10 h-10 -m-5 border-2 border-white/30 rounded-full animate-ripple"></div>
+                <div class="absolute inset-0 w-10 h-10 -m-5 border border-white/20 rounded-full animate-ripple" style="animation-delay: 1.5s"></div>
+
+                <!-- Marker Icon (Spirit Orb Style) -->
+                <div class="relative w-5 h-5 bg-white/20 backdrop-blur-[2px] border border-white/40 rounded-full shadow-[0_0_15px_rgba(255,255,255,0.3)] transition-all duration-300 group-hover/marker:scale-125 group-hover/marker:bg-white/40 group-hover/marker:border-white/60 flex items-center justify-center overflow-hidden">
+                  <!-- Inner Core -->
+                  <div class="w-2 h-2 bg-white/60 rounded-full animate-pulse shadow-[0_0_8px_white]"></div>
+                  <!-- Shimmer Effect -->
+                  <div class="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent -translate-x-full group-hover/marker:translate-x-full transition-transform duration-1000"></div>
+                </div>
+
+                <!-- Label -->
+                <div class="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-0.5 bg-black/60 backdrop-blur-sm rounded text-[10px] text-white whitespace-nowrap opacity-0 group-hover/marker:opacity-100 transition-opacity pointer-events-none">
+                  {{ loc.name }}
+                </div>
               </div>
             </div>
           </div>
 
           <!-- Location Detail Card (Overlay on the whole container) -->
           <Transition name="slide-fade">
-            <div v-if="selectedLocation" class="absolute right-6 top-24 bottom-24 w-80 z-30 pointer-events-auto">
+            <div
+              v-if="selectedLocation"
+              class="absolute right-2 md:right-6 top-16 md:top-24 bottom-16 md:bottom-24 left-2 md:left-auto w-auto md:w-80 z-30 pointer-events-auto"
+              @touchstart.stop
+              @touchmove.stop
+              @mousedown.stop
+            >
               <div class="h-full bg-izakaya-paper/95 backdrop-blur-xl rounded-2xl shadow-2xl border-2 border-izakaya-wood/20 overflow-hidden flex flex-col relative">
                 <!-- Card Texture -->
                 <div class="absolute inset-0 pointer-events-none opacity-20 bg-texture-rice-paper mix-blend-multiply"></div>
@@ -474,7 +513,7 @@ function stopDrag() {
                 </button>
 
                 <!-- Card Content -->
-                <div class="relative z-0 pt-14 px-6 pb-6 flex-1 overflow-y-auto custom-scrollbar space-y-6">
+                <div class="relative z-0 pt-14 px-6 pb-6 flex-1 overflow-y-auto custom-scrollbar space-y-6 overscroll-contain" style="-webkit-overflow-scrolling: touch;">
                   <!-- Main Location Content -->
                   <div v-if="!selectedSubLocationName" class="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                     <!-- Header -->

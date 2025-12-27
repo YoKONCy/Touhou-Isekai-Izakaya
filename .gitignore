@@ -24,4 +24,8 @@ dist-ssr
 *.sw?
 
 # Project specific documentation to ignore
+.git-credentials
 
+
+CLAUDE.md
+GEMINI.md

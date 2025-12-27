@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useCharacterStore } from '@/stores/character';
 import { type CharacterCard } from '@/db';
-import { Folder, FileText, Plus, Trash2, Save, X, Edit2, Lock } from 'lucide-vue-next';
+import { Folder, FileText, Plus, Trash2, Save, X, Edit2, Lock, ArrowLeft } from 'lucide-vue-next';
 import { useConfirm } from '@/utils/confirm';
 
 const props = defineProps<{
@@ -24,6 +24,7 @@ const { confirm } = useConfirm();
 const selectedCategory = ref<string>('全部');
 const selectedCharId = ref<string | null>(null);
 const isEditing = ref(false);
+const mobileShowEditor = ref(false); // Mobile: show editor panel
 
 // Form data
 const formData = ref<Partial<CharacterCard>>({
@@ -69,6 +70,7 @@ function handleSelectChar(char: CharacterCard) {
   selectedCharId.value = char.uuid;
   formData.value = { ...char };
   isEditing.value = true;
+  mobileShowEditor.value = true; // Mobile: show editor
 }
 
 function handleNewChar() {
@@ -84,6 +86,11 @@ function handleNewChar() {
     initialMaxHp: 100
   };
   isEditing.value = true;
+  mobileShowEditor.value = true; // Mobile: show editor
+}
+
+function handleMobileBack() {
+  mobileShowEditor.value = false;
 }
 
 async function handleSave() {
@@ -158,12 +165,15 @@ function removeTag(index: number) {
       </div>
 
       <div class="relative z-10 flex-1 flex overflow-hidden">
-        
-        <!-- Left: Category & List -->
-        <div class="w-72 border-r border-izakaya-wood/10 flex flex-col bg-stone-100/80 dark:bg-stone-800/80 backdrop-blur-sm">
-          
+
+        <!-- Left: Category & List (Desktop always visible, Mobile hidden when editing) -->
+        <div
+          class="w-full md:w-72 border-r border-izakaya-wood/10 flex flex-col bg-stone-100/80 dark:bg-stone-800/80 backdrop-blur-sm"
+          :class="{ 'hidden md:flex': mobileShowEditor }"
+        >
+
           <!-- Categories -->
-          <div class="p-3 border-b border-izakaya-wood/10 overflow-x-auto flex gap-2 custom-scrollbar">
+          <div class="p-3 border-b border-izakaya-wood/10 overflow-x-auto flex gap-2 custom-scrollbar" style="-webkit-overflow-scrolling: touch;">
             <button 
               v-for="cat in categories" 
               :key="cat"
@@ -227,14 +237,24 @@ function removeTag(index: number) {
           </div>
         </div>
 
-        <!-- Right: Editor -->
-        <div class="flex-1 flex flex-col bg-white/60 dark:bg-stone-900/60 backdrop-blur-sm">
+        <!-- Right: Editor (Desktop always visible, Mobile slide in) -->
+        <div
+          class="flex-1 flex flex-col bg-white/60 dark:bg-stone-900/60 backdrop-blur-sm"
+          :class="{ 'hidden md:flex': !mobileShowEditor, 'absolute inset-0 md:relative md:inset-auto z-30 bg-stone-50 dark:bg-stone-900': mobileShowEditor }"
+        >
           <div v-if="isEditing" class="flex-1 flex flex-col h-full">
             <!-- Toolbar -->
-            <div class="h-16 border-b border-izakaya-wood/10 flex items-center justify-between px-6 bg-stone-50/80 dark:bg-stone-800/80">
-              <span class="text-sm text-izakaya-wood/70 dark:text-stone-400 font-serif flex items-center gap-2">
-                <Edit2 class="w-4 h-4" />
-                正在编辑: <span class="font-bold text-izakaya-wood dark:text-stone-200">{{ formData.name }}</span>
+            <div class="h-14 md:h-16 border-b border-izakaya-wood/10 flex items-center justify-between px-4 md:px-6 bg-stone-50/80 dark:bg-stone-800/80">
+              <!-- Mobile back button -->
+              <button
+                @click="handleMobileBack"
+                class="md:hidden p-2 -ml-2 hover:bg-stone-200 dark:hover:bg-stone-700 rounded-lg transition-colors"
+              >
+                <ArrowLeft class="w-5 h-5 text-izakaya-wood dark:text-stone-300" />
+              </button>
+              <span class="text-sm text-izakaya-wood/70 dark:text-stone-400 font-serif flex items-center gap-2 flex-1 md:flex-initial truncate">
+                <Edit2 class="w-4 h-4 hidden md:block" />
+                <span class="truncate">正在编辑: <span class="font-bold text-izakaya-wood dark:text-stone-200">{{ formData.name }}</span></span>
               </span>
               <div class="flex items-center gap-3">
                 <button 
@@ -258,7 +278,7 @@ function removeTag(index: number) {
             </div>
 
             <!-- Form -->
-            <div class="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar relative">
+            <div class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 md:space-y-8 custom-scrollbar relative" style="-webkit-overflow-scrolling: touch;">
               
               <!-- Locked Alert -->
               <div v-if="isTypeDisabled" class="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-300">
@@ -296,7 +316,7 @@ function removeTag(index: number) {
                  </div>
               </div>
 
-              <div class="grid grid-cols-3 gap-6">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
                 <div>
                   <label class="block text-sm font-bold text-izakaya-wood dark:text-stone-300 mb-2">条目名称</label>
                   <input v-model="formData.name" :disabled="isTypeDisabled" type="text" autofocus class="w-full border-izakaya-wood/20 rounded-lg shadow-sm focus:ring-touhou-red focus:border-touhou-red dark:bg-stone-800 dark:border-stone-700 dark:text-stone-100 text-stone-900 bg-white/80 transition-all disabled:opacity-50 disabled:cursor-not-allowed" placeholder="例如：博丽神社">
@@ -304,11 +324,11 @@ function removeTag(index: number) {
                 <div>
                   <label class="block text-sm font-bold text-izakaya-wood dark:text-stone-300 mb-2">分类 (文件夹)</label>
                   <div class="relative">
-                    <input 
-                      v-model="formData.category" 
+                    <input
+                      v-model="formData.category"
                       :disabled="isTypeDisabled"
-                      type="text" 
-                      list="category-list" 
+                      type="text"
+                      list="category-list"
                       class="w-full border-izakaya-wood/20 rounded-lg shadow-sm focus:ring-touhou-red focus:border-touhou-red dark:bg-stone-800 dark:border-stone-700 dark:text-stone-100 text-stone-900 bg-white/80 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       placeholder="选择或输入新分类..."
                     >
@@ -317,7 +337,7 @@ function removeTag(index: number) {
                     </datalist>
                   </div>
                 </div>
-                
+
                 <!-- Character Specific: Gender -->
                 <div v-if="formData.type === 'character' || !formData.type">
                   <label class="block text-sm font-bold text-izakaya-wood dark:text-stone-300 mb-2">性别</label>
@@ -330,12 +350,12 @@ function removeTag(index: number) {
               </div>
 
               <!-- Character Initial Stats -->
-              <div v-if="formData.type === 'character' || !formData.type" class="p-5 bg-stone-100/80 dark:bg-stone-800/50 rounded-xl border border-izakaya-wood/10 space-y-4">
+              <div v-if="formData.type === 'character' || !formData.type" class="p-4 md:p-5 bg-stone-100/80 dark:bg-stone-800/50 rounded-xl border border-izakaya-wood/10 space-y-4">
                  <h3 class="text-sm font-bold text-izakaya-wood dark:text-stone-200 flex items-center gap-2">
                     <span class="w-1 h-4 bg-touhou-red rounded-full"></span>
                     初始变量配置 (初始化时写入)
                  </h3>
-                 <div class="grid grid-cols-2 gap-6">
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                     <div>
                        <label class="block text-xs font-bold text-izakaya-wood/60 dark:text-stone-400 mb-1.5">UUID (对应 npcId)</label>
                        <div class="flex gap-2">

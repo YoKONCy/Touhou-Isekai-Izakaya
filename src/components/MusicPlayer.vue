@@ -81,6 +81,33 @@ function stopDrag() {
   isDragging.value = false;
   window.removeEventListener('mousemove', onDrag);
   window.removeEventListener('mouseup', stopDrag);
+  window.removeEventListener('touchmove', onTouchDrag);
+  window.removeEventListener('touchend', stopDrag);
+}
+
+// Touch event handlers for mobile
+function startTouchDrag(e: TouchEvent) {
+  if (showSettings.value) return;
+  const touch = e.touches[0];
+  if (!touch) return;
+  isDragging.value = true;
+  dragOffset.value = {
+    x: touch.clientX - position.value.x,
+    y: touch.clientY - position.value.y
+  };
+  window.addEventListener('touchmove', onTouchDrag, { passive: false });
+  window.addEventListener('touchend', stopDrag);
+}
+
+function onTouchDrag(e: TouchEvent) {
+  if (!isDragging.value) return;
+  e.preventDefault();
+  const touch = e.touches[0];
+  if (!touch) return;
+  position.value = {
+    x: touch.clientX - dragOffset.value.x,
+    y: touch.clientY - dragOffset.value.y
+  };
 }
 
 onUnmounted(() => {
@@ -257,15 +284,17 @@ function toggleExpand() {
       <div class="absolute inset-0 bg-texture-rice-paper opacity-50 pointer-events-none"></div>
       
       <!-- Drag Handle & Header -->
-      <div 
+      <div
         @mousedown="startDrag"
+        @touchstart="startTouchDrag"
         class="flex items-center justify-between cursor-move hover:bg-izakaya-wood/5 transition-colors z-20"
         :class="isExpanded ? 'w-full h-8 px-2 border-b border-izakaya-wood/10' : 'absolute left-0 top-0 bottom-0 w-4 justify-center'"
       >
         <GripHorizontal class="w-3 h-3 text-izakaya-wood/30" />
-        <button 
-          v-if="isExpanded" 
-          @click.stop="toggleExpand" 
+        <button
+          v-if="isExpanded"
+          @click.stop="toggleExpand"
+          @touchend.stop.prevent="toggleExpand"
           class="p-1 hover:bg-izakaya-wood/10 rounded-full transition-colors group"
           title="收回播放器"
         >

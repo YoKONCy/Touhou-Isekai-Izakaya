@@ -318,12 +318,12 @@ function handleVolumeChangeTest() {
       <div class="flex-1 overflow-hidden flex flex-col md:flex-row relative z-10">
         
         <!-- Sidebar Tabs -->
-        <div class="w-full md:w-48 bg-izakaya-wood/5 p-2 space-y-1 border-b md:border-b-0 md:border-r border-izakaya-wood/10 overflow-x-auto md:overflow-visible flex md:block">
-          <button 
-            v-for="tab in tabs" 
+        <div class="w-full md:w-48 flex-shrink-0 bg-izakaya-wood/5 p-2 space-y-1 border-b md:border-b-0 md:border-r border-izakaya-wood/10 overflow-x-auto md:overflow-y-auto flex md:block" style="-webkit-overflow-scrolling: touch;">
+          <button
+            v-for="tab in tabs"
             :key="tab.id"
             @click="handleTabChange(tab.id)"
-            class="px-3 py-2 rounded-md text-sm font-medium w-full text-left whitespace-nowrap transition-all duration-200 font-display"
+            class="px-3 py-2 rounded-md text-sm font-medium md:w-full text-left whitespace-nowrap transition-all duration-200 font-display flex-shrink-0"
             :class="activeTab === tab.id 
               ? 'bg-white text-touhou-red shadow-sm translate-x-1' 
               : 'text-izakaya-wood/70 hover:bg-white/50 hover:text-izakaya-wood'"
@@ -333,7 +333,7 @@ function handleVolumeChangeTest() {
         </div>
 
         <!-- Panel Content -->
-        <div class="flex-1 p-6 overflow-y-auto custom-scrollbar">
+        <div class="flex-1 p-4 md:p-6 overflow-y-auto custom-scrollbar min-h-0" style="-webkit-overflow-scrolling: touch;">
           
           <!-- Global Settings -->
           <div v-show="activeTab === 'global'" class="space-y-6 animate-fade-in">

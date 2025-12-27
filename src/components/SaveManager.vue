@@ -245,7 +245,7 @@ function formatTime(timestamp: number) {
         </div>
 
         <!-- Content -->
-        <div class="relative z-10 p-6 overflow-y-auto flex-1 space-y-6 custom-scrollbar bg-stone-100/50 dark:bg-stone-800/50">
+        <div class="relative z-10 p-4 md:p-6 overflow-y-auto flex-1 space-y-6 custom-scrollbar bg-stone-100/50 dark:bg-stone-800/50 overscroll-contain" style="-webkit-overflow-scrolling: touch;">
           
           <!-- Create New -->
           <div v-if="!isCreating" class="flex justify-end gap-3">
@@ -292,10 +292,10 @@ function formatTime(timestamp: number) {
 
           <!-- Save List -->
           <div class="space-y-4">
-            <div 
-              v-for="save in saves" 
+            <div
+              v-for="save in saves"
               :key="save.id"
-              class="group relative flex items-center justify-between p-4 rounded-xl border-2 transition-all duration-300"
+              class="group relative flex flex-col md:flex-row md:items-center justify-between p-4 rounded-xl border-2 transition-all duration-300 gap-3"
               :class="[
                 save.id === currentSaveId 
                   ? 'border-touhou-red bg-red-50/80 dark:bg-red-900/20 shadow-md transform scale-[1.01]' 
@@ -303,7 +303,7 @@ function formatTime(timestamp: number) {
               ]"
             >
               <!-- Info -->
-              <div class="flex-1 min-w-0 mr-4">
+              <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-1.5">
                   <span v-if="save.id === currentSaveId" class="px-2 py-0.5 bg-touhou-red text-white text-[10px] rounded-full font-bold uppercase tracking-wider shadow-sm">Current</span>
                   
@@ -327,8 +327,8 @@ function formatTime(timestamp: number) {
                 </div>
               </div>
 
-              <!-- Actions -->
-              <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
+              <!-- Actions - always visible on mobile, hover on desktop -->
+              <div class="flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity focus-within:opacity-100 flex-shrink-0">
                 <button 
                   v-if="editingId !== save.id"
                   @click="handleExport(save)"

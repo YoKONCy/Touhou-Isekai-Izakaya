@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { promptService, type PromptContext } from '@/services/prompt';
 import { useSettingsStore } from '@/stores/settings';
 import { X, RefreshCw, Copy } from 'lucide-vue-next';
@@ -24,16 +24,22 @@ const maxTokens = computed(() => {
 
 async function loadPreview() {
   isLoading.value = true;
-  // Use a dummy user input for preview
-  context.value = await promptService.build('(预览: 玩家的当前输入)');
-  isLoading.value = false;
+  try {
+    // Use a dummy user input for preview
+    context.value = await promptService.build('(预览: 玩家的当前输入)');
+  } catch (e) {
+    console.error('[PromptDebugger] Failed to load preview:', e);
+  } finally {
+    isLoading.value = false;
+  }
 }
 
-onMounted(() => {
-  if (props.isOpen) {
+// Load preview when modal opens
+watch(() => props.isOpen, (val) => {
+  if (val) {
     loadPreview();
   }
-});
+}, { immediate: true });
 
 function copyToClipboard(text: string) {
   navigator.clipboard.writeText(text);

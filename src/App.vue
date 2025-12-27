@@ -31,6 +31,8 @@ import { useSmoothStream } from '@/composables/useSmoothStream';
 import SakuraBackground from '@/components/SakuraBackground.vue';
 import { audioManager } from '@/services/audio';
 import MusicPlayer from '@/components/MusicPlayer.vue';
+import MobileNav from '@/components/MobileNav.vue';
+import MobileDrawer from '@/components/MobileDrawer.vue';
 
 const chatStore = useChatStore();
 const settingsStore = useSettingsStore();
@@ -72,6 +74,10 @@ const isMemoryPanelOpen = ref(false);
 const isMapOpen = ref(false);
 const isHelpOpen = ref(false);
 const helpInitialSectionId = ref<string | undefined>(undefined);
+
+// Mobile navigation state
+const mobileActivePanel = ref<'chat' | 'status' | 'map' | 'characters' | 'quests'>('chat');
+const isMobileDrawerOpen = ref(false);
 
 const userOpenCombat = ref(false);
 const userOpenQuest = ref(false);
@@ -386,29 +392,44 @@ function handleHelpAction(action: string) {
       break;
   }
 }
+
+// Mobile panel switch handler
+function handleMobilePanelSwitch(panel: 'chat' | 'status' | 'map' | 'characters' | 'quests') {
+  mobileActivePanel.value = panel;
+  // If switching to map, open the map modal
+  if (panel === 'map') {
+    isMapOpen.value = true;
+    audioManager.playPageFlip();
+    // Reset to chat after opening map modal
+    setTimeout(() => {
+      mobileActivePanel.value = 'chat';
+    }, 100);
+  }
+}
 </script>
 
 <template>
-  <div class="h-screen flex flex-col overflow-hidden font-sans text-ink relative">
+  <div class="fixed inset-0 flex flex-col overflow-hidden font-sans text-ink bg-izakaya-paper">
     
     <SakuraBackground />
     <ToastContainer />
     <MusicPlayer />
 
     <!-- Top Bar: 居酒屋暖帘风格 -->
-    <header class="h-14 bg-white/90 backdrop-blur-md border-b-2 border-touhou-red/20 flex items-center justify-between px-6 shadow-sm z-20 flex-shrink-0 relative">
+    <header class="h-12 md:h-14 bg-white/90 backdrop-blur-md border-b-2 border-touhou-red/20 flex items-center justify-between px-3 md:px-6 shadow-sm z-20 flex-shrink-0 relative">
       <!-- 装饰性纹理叠加 -->
       <div class="absolute inset-0 pointer-events-none opacity-5 bg-texture-stardust"></div>
-      
-      <div class="font-display font-bold text-xl flex items-center gap-3 relative z-10 text-izakaya-wood">
-        <span class="text-2xl filter drop-shadow-sm">⛩️</span>
-        <div class="flex items-center gap-2">
-          <span class="tracking-widest font-serif-display text-2xl">东方异界食堂</span>
-          <span class="px-1.5 py-0.5 text-[10px] font-bold text-white bg-touhou-red rounded-sm uppercase tracking-wider shadow-sm transform translate-y-0.5">beta</span>
+
+      <div class="font-display font-bold text-xl flex items-center gap-2 md:gap-3 relative z-10 text-izakaya-wood">
+        <span class="text-xl md:text-2xl filter drop-shadow-sm">⛩️</span>
+        <div class="flex items-center gap-1 md:gap-2">
+          <span class="tracking-widest font-serif-display text-lg md:text-2xl">东方异界食堂</span>
+          <span class="px-1 md:px-1.5 py-0.5 text-[8px] md:text-[10px] font-bold text-white bg-touhou-red rounded-sm uppercase tracking-wider shadow-sm transform translate-y-0.5">beta</span>
         </div>
       </div>
-      
-      <div class="flex items-center gap-2 relative z-10">
+
+      <!-- Desktop navigation buttons -->
+      <div class="hidden md:flex items-center gap-2 relative z-10">
         <button 
           @click="isSaveManagerOpen = true; audioManager.playPageFlip()"
           class="btn-touhou-ghost flex items-center gap-2"
@@ -435,6 +456,17 @@ function handleHelpAction(action: string) {
           <SettingsIcon class="w-5 h-5" />
         </button>
       </div>
+
+      <!-- Mobile: Save button only (other options in drawer) -->
+      <div class="flex md:hidden items-center gap-1 relative z-10">
+        <button
+          @click="isSaveManagerOpen = true; audioManager.playPageFlip()"
+          class="btn-touhou-ghost p-2"
+          title="存档"
+        >
+          <Save class="w-5 h-5" />
+        </button>
+      </div>
     </header>
 
     <!-- Settings Modal -->
@@ -453,17 +485,49 @@ function handleHelpAction(action: string) {
 
     <!-- Main Content -->
     <div class="flex-1 flex overflow-hidden relative z-10">
-      
-      <!-- Left Sidebar (Status) -->
+
+      <!-- Left Sidebar (Status) - Desktop only -->
       <aside class="w-72 bg-izakaya-paper/60 backdrop-blur-md border-r border-izakaya-wood/10 p-4 hidden md:flex flex-col gap-4 h-full shadow-[2px_0_10px_rgba(0,0,0,0.02)] overflow-y-auto custom-scrollbar">
         <StatusCard ref="statusCardRef" class="flex-shrink-0" @open-help="handleOpenHelp" @open-summary="handleOpenSummary" />
         <QuestList class="flex-1 min-h-[300px]" />
       </aside>
 
-      <!-- Center (Chat) -->
-      <main class="flex-1 flex flex-col relative min-w-0">
-        <!-- Chat Area -->
-        <div ref="chatContainer" class="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth">
+      <!-- Mobile Panels Container -->
+      <div class="flex-1 flex flex-col relative min-w-0 md:hidden">
+        <!-- Mobile: Status Panel -->
+        <div
+          v-show="mobileActivePanel === 'status'"
+          class="absolute inset-0 overflow-y-auto p-4 space-y-4 pb-20 bg-izakaya-paper/40 overscroll-contain"
+          style="-webkit-overflow-scrolling: touch;"
+        >
+          <StatusCard ref="statusCardRef" @open-help="handleOpenHelp" @open-summary="handleOpenSummary" />
+        </div>
+
+        <!-- Mobile: Characters Panel -->
+        <div
+          v-show="mobileActivePanel === 'characters'"
+          class="absolute inset-0 overflow-y-auto p-4 pb-20 bg-izakaya-paper/40 overscroll-contain"
+          style="-webkit-overflow-scrolling: touch;"
+        >
+          <CharacterList />
+        </div>
+
+        <!-- Mobile: Quests Panel -->
+        <div
+          v-show="mobileActivePanel === 'quests'"
+          class="absolute inset-0 overflow-y-auto p-4 pb-20 bg-izakaya-paper/40 overscroll-contain"
+          style="-webkit-overflow-scrolling: touch;"
+        >
+          <QuestList />
+        </div>
+
+        <!-- Mobile: Chat Panel (default) -->
+        <div
+          v-show="mobileActivePanel === 'chat'"
+          class="absolute inset-0 flex flex-col overflow-hidden pb-[calc(4rem+env(safe-area-inset-bottom))]"
+        >
+          <!-- Chat Area -->
+          <div ref="chatContainer" class="flex-1 overflow-y-auto p-3 space-y-4 scroll-smooth overscroll-contain" style="-webkit-overflow-scrolling: touch;">
           <!-- New Player Guide -->
           <NewPlayerGuide @open-save-manager="isSaveManagerOpen = true" @open-help="isHelpOpen = true" />
 
@@ -565,7 +629,198 @@ function handleHelpAction(action: string) {
           </div>
         </div>
 
-        <!-- Input Area -->
+        <!-- Input Area (Mobile) -->
+          <div class="p-3 bg-izakaya-paper border-t-2 border-izakaya-wood/20 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] relative z-20 flex-shrink-0">
+            <!-- Texture -->
+            <div class="absolute inset-0 pointer-events-none opacity-40 bg-texture-rice-paper mix-blend-multiply"></div>
+
+            <div class="relative space-y-2">
+              <!-- Pending Triggers Notification -->
+              <div v-if="hasPendingTriggers" class="flex flex-wrap gap-2 mb-2 animate-fade-in">
+                <!-- Combat Trigger -->
+                <button
+                    v-if="gameStore.state.system.combat?.isPending"
+                    @click="userOpenCombat = true; audioManager.playChime()"
+                    class="group flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-touhou-red to-red-600 text-white rounded-lg shadow-lg text-sm"
+                >
+                    <span class="text-base animate-bounce">⚔️</span>
+                    <span class="font-display">进���战斗</span>
+                </button>
+
+                <!-- Quest Trigger -->
+                <button
+                    v-if="gameStore.state.system.pending_quest_trigger"
+                    @click="userOpenQuest = true; audioManager.playPageFlip()"
+                    class="group flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-izakaya-wood to-stone-700 text-white rounded-lg shadow-lg text-sm"
+                >
+                    <span class="text-base animate-pulse">📜</span>
+                    <span class="font-display">查看任务</span>
+                </button>
+              </div>
+
+              <!-- Quick Replies -->
+              <div v-if="gameStore.quickReplies.length > 0 && !gameLoop.isProcessing.value && !gameLoop.isBackgroundProcessing.value"
+                   class="flex flex-wrap gap-1.5 animate-fade-in-up">
+                <button
+                  v-for="(reply, idx) in gameStore.quickReplies"
+                  :key="idx"
+                  @click="handleQuickReply(reply)"
+                  class="px-3 py-1 bg-white/80 text-touhou-red font-display text-sm rounded-sm border border-touhou-red/20 truncate max-w-[45%]"
+                  :title="reply"
+                >
+                  {{ reply }}
+                </button>
+              </div>
+
+              <div class="flex items-end gap-2">
+                <!-- Textarea Wrapper -->
+                <div class="relative flex-1">
+                  <textarea
+                    v-model="userInput"
+                    @focus="isInputFocused = true"
+                    @blur="isInputFocused = false"
+                    :disabled="gameLoop.isProcessing.value || gameLoop.isBackgroundProcessing.value"
+                    :placeholder="gameLoop.isBackgroundProcessing.value ? '处理中...' : '输入行动...'"
+                    rows="1"
+                    class="w-full px-3 py-2 bg-white/80 border border-izakaya-wood/20 rounded-lg focus:outline-none focus:border-touhou-red/50 resize-none font-serif-display text-base"
+                  ></textarea>
+                </div>
+
+                <!-- Send Button -->
+                <button
+                  v-if="!gameLoop.isProcessing.value && !gameLoop.isBackgroundProcessing.value"
+                  @click="handleSend"
+                  class="p-2.5 bg-touhou-red text-white rounded-full shadow-md disabled:opacity-50"
+                  :disabled="!userInput.trim()"
+                >
+                  <Send class="w-5 h-5" />
+                </button>
+                <button
+                  v-else-if="gameLoop.isProcessing.value"
+                  @click="handleAbort"
+                  class="p-2.5 bg-touhou-red-dark text-white rounded-full shadow-md"
+                >
+                  <Square class="w-5 h-5" />
+                </button>
+                <button
+                  v-else
+                  disabled
+                  class="p-2.5 bg-blue-500 text-white rounded-full shadow-md opacity-75"
+                >
+                  <Brain class="w-5 h-5 animate-pulse" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Desktop: Center (Chat) -->
+      <main class="hidden md:flex flex-1 flex-col relative min-w-0">
+        <!-- Chat Area -->
+        <div ref="chatContainer" class="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth">
+          <!-- New Player Guide -->
+          <NewPlayerGuide @open-save-manager="isSaveManagerOpen = true" @open-help="isHelpOpen = true" />
+
+          <!-- Load More Button -->
+          <div v-if="chatStore.hasMore" class="flex justify-center py-2">
+            <button
+              @click="handleLoadMore"
+              class="px-4 py-2 bg-izakaya-wood/5 hover:bg-izakaya-wood/10 text-izakaya-wood/60 text-sm rounded-full transition-colors flex items-center gap-2 border border-izakaya-wood/10"
+              :disabled="isLoadingMore"
+            >
+              <Loader2 v-if="isLoadingMore" class="w-3 h-3 animate-spin" />
+              <History v-else class="w-3 h-3" />
+              {{ isLoadingMore ? '加载中...' : '加载更早的对话' }}
+            </button>
+          </div>
+
+          <div v-if="chatStore.messages.length === 0" class="text-center text-izakaya-wood/50 mt-20 flex flex-col items-center gap-4">
+            <div class="text-4xl opacity-50 filter drop-shadow-sm">🍵</div>
+            <p class="font-display text-lg">还没有任何对话...</p>
+            <p class="text-sm">点一杯茶，开始你的幻想乡物语吧。</p>
+          </div>
+          <ChatBubble v-for="msg in chatStore.messages" :key="msg.id" :message="msg" :data-message-id="msg.id" />
+
+          <!-- Load Future Button -->
+          <div v-if="chatStore.hasMoreFuture" class="flex flex-col items-center gap-3 py-4 border-t border-izakaya-wood/5 mt-4">
+            <button
+              @click="handleLoadFuture"
+              class="px-6 py-2 bg-touhou-red/5 hover:bg-touhou-red/10 text-touhou-red text-sm rounded-full transition-all flex items-center gap-2 border border-touhou-red/20 shadow-sm"
+              :disabled="isLoadingFuture"
+            >
+              <Loader2 v-if="isLoadingFuture" class="w-4 h-4 animate-spin" />
+              <History v-else class="w-4 h-4 rotate-180" />
+              {{ isLoadingFuture ? '加载中...' : '加载后续对话' }}
+            </button>
+            <button
+              @click="handleJumpToPresent"
+              class="text-xs text-izakaya-wood/40 hover:text-touhou-red transition-colors flex items-center gap-1"
+            >
+              直接回到现在 <RefreshCw class="w-3 h-3" />
+            </button>
+          </div>
+
+          <!-- Loading Indicator / Stream Buffer -->
+          <div v-if="gameLoop.isProcessing.value" class="flex gap-4 mb-6 px-4 group/message">
+             <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-md border-2 border-white/50 relative overflow-hidden bg-touhou-red text-white">
+                <Loader2 class="w-6 h-6 animate-spin relative z-10" />
+             </div>
+
+             <div class="relative max-w-[85%] flex flex-col items-start">
+               <div class="p-5 rounded-2xl shadow-sm leading-relaxed relative bg-izakaya-paper border border-touhou-red/10 text-izakaya-wood font-serif-display rounded-tl-sm shadow-paper-hover">
+                  <!-- Texture -->
+                  <div class="absolute inset-0 pointer-events-none opacity-10 bg-texture-rice-paper rounded-2xl"></div>
+
+                  <div class="relative z-10 min-w-[60px]">
+                       <div v-if="gameLoop.currentStage.value === 'preparing'" class="text-sm text-izakaya-wood/60 animate-pulse flex items-center gap-2">
+                         <Loader2 class="w-3 h-3 animate-spin" />
+                         <span>正在构建上下文...</span>
+                       </div>
+                       <div v-else-if="gameLoop.currentStage.value === 'generating_story'">
+                           <div v-if="smoothContent"
+                                class="prose prose-stone max-w-none dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-pre:my-2 break-words text-base typing-effect"
+                                v-html="parseMarkdown(smoothContent)">
+                           </div>
+                           <div v-else class="text-sm text-izakaya-wood/60 flex items-center gap-2">
+                             <span class="animate-bounce">✍️</span> 正在撰写物语...
+                           </div>
+                       </div>
+                       <div v-else-if="gameLoop.currentStage.value === 'background_processing'" class="text-sm text-blue-500 flex items-center gap-2">
+                          <Brain class="w-3 h-3 animate-pulse" />
+                          <span>正在处理游戏逻辑...</span>
+                       </div>
+                   </div>
+               </div>
+             </div>
+          </div>
+
+          <!-- Background Processing Indicator -->
+          <div v-if="gameLoop.isBackgroundProcessing.value" class="flex gap-4 mb-6 px-4 group/message">
+             <div class="flex-shrink-0 w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center animate-pulse border-2 border-blue-100 shadow-md">
+                <Brain class="w-6 h-6 animate-pulse" />
+             </div>
+
+             <div class="relative max-w-[85%] flex flex-col items-start">
+                <div class="p-5 rounded-2xl shadow-sm leading-relaxed relative bg-white/95 border border-blue-100 text-blue-800 rounded-tl-sm shadow-paper-hover">
+                   <div class="text-sm">
+                      <div class="flex items-center gap-2 font-bold mb-1">
+                         <Brain class="w-4 h-4 animate-pulse" />
+                         <span>正在后台处理游戏逻辑和记忆...</span>
+                      </div>
+                      <div class="text-xs text-blue-500 opacity-80">请稍等，处理完成后即可继续对话</div>
+                   </div>
+                </div>
+             </div>
+          </div>
+
+          <!-- Error Message -->
+          <div v-if="gameLoop.error.value" class="text-center p-2 text-sm text-red-600 bg-red-50 rounded border border-red-200 mx-4 shadow-sm">
+            错误: {{ gameLoop.error.value }}
+          </div>
+        </div>
+
+        <!-- Desktop Input Area -->
         <div class="p-6 bg-izakaya-paper border-t-4 border-izakaya-wood/20 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] relative z-20">
           <!-- Texture -->
           <div class="absolute inset-0 pointer-events-none opacity-40 bg-texture-rice-paper mix-blend-multiply"></div>
@@ -628,7 +883,7 @@ function handleHelpAction(action: string) {
                   :placeholder="gameLoop.isBackgroundProcessing.value ? '正在后台处理，请稍等...' : '在此书写你的行动...'"
                   class="absolute bottom-0 left-0 w-full rounded-none px-2 py-3 focus:outline-none resize-none transition-all duration-300 ease-out origin-bottom font-serif-display text-xl text-ink placeholder:text-ink-light/40 leading-relaxed"
                   :class="[
-                    (isInputFocused || userInput) ? 'h-40 bg-izakaya-paper shadow-[-4px_-4px_15px_rgba(0,0,0,0.1)] rounded-t-lg border-2 border-izakaya-wood/30 z-30' : 'h-14 bg-transparent border-b-2 border-izakaya-wood/30 z-10'
+                    (isInputFocused || userInput) ? 'h-40 bg-izakaya-paper shadow-[-4px_-4px_15px_rgba(0,0,0,0.1)] rounded-t-lg border-2 border-izakaya-wood/30 z-30' : 'h-14 bg-white/50 border-b-2 border-izakaya-wood/30 z-10'
                   ]"
                 ></textarea>
                 
@@ -713,14 +968,32 @@ function handleHelpAction(action: string) {
         </div>
       </main>
 
-      <!-- Right Sidebar (Auxiliary) -->
+      <!-- Right Sidebar (Auxiliary) - Desktop only -->
       <aside class="w-80 bg-izakaya-paper/60 backdrop-blur-md border-l border-izakaya-wood/10 p-4 overflow-y-auto hidden lg:flex flex-col gap-4 shadow-[-2px_0_10px_rgba(0,0,0,0.02)]">
         <MapPlaceholder @click="isMapOpen = true; audioManager.playPageFlip()" />
         <CharacterList />
       </aside>
-      
+
     </div>
 
-    <!-- Debug Trigger - Removed -->
+    <!-- Mobile Navigation -->
+    <MobileNav
+      :active-panel="mobileActivePanel"
+      @switch-panel="handleMobilePanelSwitch"
+      @open-drawer="isMobileDrawerOpen = true"
+    />
+
+    <!-- Mobile Drawer -->
+    <MobileDrawer
+      :is-open="isMobileDrawerOpen"
+      @close="isMobileDrawerOpen = false"
+      @open-settings="isSettingsOpen = true"
+      @open-save-manager="isSaveManagerOpen = true"
+      @open-char-editor="isCharEditorOpen = true"
+      @open-memory-panel="isMemoryPanelOpen = true"
+      @open-prompt-builder="isPromptBuilderOpen = true"
+      @open-help="isHelpOpen = true"
+      @open-map="isMapOpen = true"
+    />
   </div>
 </template>

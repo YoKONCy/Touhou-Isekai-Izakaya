@@ -306,7 +306,7 @@ async function handleCropConfirm() {
         </div>
 
         <!-- Content -->
-        <div class="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+        <div class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 custom-scrollbar overscroll-contain" style="-webkit-overflow-scrolling: touch;">
           
           <!-- Avatar Section -->
           <div class="flex flex-col sm:flex-row gap-6 items-start">
