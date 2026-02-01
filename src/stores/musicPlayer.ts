@@ -103,7 +103,7 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
     for (const path in modules) {
       const parts = path.split('/');
       const filename = parts[parts.length - 1] || 'unknown';
-      const title = filename.replace(/\.(mp3|ogg|wav)$/, '');
+      const title = filename.replace(/\.(mp3|ogg|wav)$/i, '');
       const folder = parts[parts.length - 2] || 'Unknown'; 
       
       tracks.push({
