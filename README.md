@@ -23,6 +23,22 @@
   <img src="https://img.shields.io/badge/Status-Beta-red?style=for-the-badge&logo=fire&logoColor=white&labelColor=000000" alt="Beta">
 </a>
 &nbsp;
+<a href="https://vuejs.org/">
+  <img src="https://img.shields.io/badge/Vue.js-3.5-4FC08D?style=for-the-badge&logo=vue.js&logoColor=white&labelColor=000000" alt="Vue">
+</a>
+&nbsp;
+<a href="https://www.typescriptlang.org/">
+  <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white&labelColor=000000" alt="TS">
+</a>
+&nbsp;
+<a href="https://webassembly.org/">
+  <img src="https://img.shields.io/badge/Wasm-SQLite-654FF0?style=for-the-badge&logo=webassembly&logoColor=white&labelColor=000000" alt="WASM">
+</a>
+&nbsp;
+<a href="https://capacitorjs.com/">
+  <img src="https://img.shields.io/badge/Capacitor-Android-119EFF?style=for-the-badge&logo=capacitor&logoColor=white&labelColor=000000" alt="Capacitor">
+</a>
+&nbsp;
 <a href="./LICENSE">
   <img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg?style=for-the-badge&logo=gnu&logoColor=white" alt="License">
 </a>
