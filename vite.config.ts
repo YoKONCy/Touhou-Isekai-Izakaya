@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: './',
+  base: '/',
   plugins: [
     vue(),
     tailwindcss(),
@@ -46,7 +46,7 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,svg,woff,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,svg,woff,woff2,wasm}'],
         maximumFileSizeToCacheInBytes: 50 * 1024 * 1024, // 50MB max to prevent build failures
         runtimeCaching: [
           {
@@ -98,5 +98,6 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ['@sqlite.org/sqlite-wasm']
-  }
+  },
+  assetsInclude: ['**/*.wasm']
 })

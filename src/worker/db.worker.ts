@@ -10,6 +10,12 @@ const error = (...args: any[]) => console.error('[DB Worker]', ...args);
 const initPromise = (sqlite3InitModule as any)({
   print: log,
   printErr: error,
+  locateFile: (path: string, prefix: string) => {
+    if (path.endsWith('.wasm')) {
+      return '/sqlite3/sqlite3.wasm';
+    }
+    return prefix + path;
+  }
 }).then((sqlite3: any) => {
   try {
     log('Running SQLite3 version', sqlite3.version.libVersion);
