@@ -159,7 +159,9 @@ export const CHARACTER_NAME_TO_ID_MAP: Record<string, string> = {
   '俊达萌': 'zundamon',
   '月永爱': 'ai',
   '菲娅': 'fia',
-  '雏森': 'hinamori'
+  '雏森': 'hinamori',
+  '上海': 'shanghai',
+  '蓬莱': 'penglai'
 };
 
 /**

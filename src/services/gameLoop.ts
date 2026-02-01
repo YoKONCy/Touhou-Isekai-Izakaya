@@ -1,6 +1,6 @@
 import { ref } from 'vue';
 import OpenAI from 'openai';
-import { db } from '@/db'; // Import db directly
+import { dbService } from '@/services/DatabaseService';
 import { useSettingsStore } from '@/stores/settings';
 import { useChatStore } from '@/stores/chat';
 import { useGameStore } from '@/stores/game';
@@ -375,19 +375,28 @@ class GameLoopService {
       }
 
       // F. Update Quest if needed
-      if (questUpdateData && questUpdateData.update && questUpdateData.quest_name) {
+      if (questUpdateData && (questUpdateData.update || questUpdateData.status || questUpdateData.log) && questUpdateData.quest_name) {
          const gameStore = useGameStore();
          // Find quest by name since LLM doesn't know IDs
          // We check for active quests that match the name
          const quest = gameStore.state.system.quests?.find(q => q.name === questUpdateData.quest_name && q.status === 'active');
          
          if (quest) {
-             gameStore.updateQuestStatus(quest.id, questUpdateData.status, questUpdateData.summary);
+             gameStore.updateQuestStatus(quest.id, {
+                status: questUpdateData.status,
+                summary: questUpdateData.summary,
+                log: questUpdateData.log
+             });
              
              // Toast notification
-             const statusText = questUpdateData.status === 'completed' ? '完成' : '失败';
-             const type = questUpdateData.status === 'completed' ? 'success' : 'error';
-             toastStore.addToast(`任务${statusText}：${quest.name}`, type);
+             if (questUpdateData.status === 'completed' || questUpdateData.status === 'failed') {
+                const statusText = questUpdateData.status === 'completed' ? '完成' : '失败';
+                const type = questUpdateData.status === 'completed' ? 'success' : 'error';
+                toastStore.addToast(`任务${statusText}：${quest.name}`, type);
+             } else if (questUpdateData.log) {
+                // Log update toast
+                toastStore.addToast(`任务进度更新：${quest.name}`, 'info');
+             }
          } else {
              console.warn('[GameLoop] Quest update requested but quest not found or not active:', questUpdateData.quest_name);
          }
@@ -559,7 +568,7 @@ class GameLoopService {
             const currentState = JSON.parse(JSON.stringify(gameStore.state));
             
             // Update snapshot with NEW game state
-            await db.snapshots.update(msg.snapshotId, {
+            await dbService.updateSnapshot(msg.snapshotId, {
                gameState: JSON.stringify(currentState)
             });
          }
@@ -740,31 +749,19 @@ class GameLoopService {
       );
 
       if (cardEntry) {
-         // Parse Lorebook data
-         const costStr = cardEntry.cost || '100';
-         const cost = parseInt(costStr.replace(/\D/g, '')) || 100;
+         // Parse Lorebook data (Numeric values are now directly stored in DB)
+         const cost = typeof cardEntry.cost === 'number' ? cardEntry.cost : (parseInt(String(cardEntry.cost || '100').replace(/\D/g, '')) || 100);
+         const dmg = typeof cardEntry.damage === 'number' ? cardEntry.damage : (parseInt(String(cardEntry.damage || '0').replace(/\D/g, '')) || 0);
          
-         const dmgStr = cardEntry.damage || '0';
-         const dmg = parseInt(dmgStr.replace(/\D/g, '')) || 0;
-         
-         // Simple Multiplier Logic based on dmg vs base
-         // Assuming Base Attack is ~100.
-         // (Multiplier logic removed for combat calculation, only used for heuristics if needed)
-
-         const isAoe = (cardEntry.damageType || '').includes('全') || cardEntry.tags?.includes('AOE') || false;
-
          return {
-            id: cardEntry.uuid,
             name: cardEntry.name,
-            description: cardEntry.description || 'Lorebook Defined Spell Card',
+            description: cardEntry.description || '暂无描述',
             cost: cost,
-            // targetType: 'enemy', // Removed: Not in SpellCard interface
             damage: dmg,
-            scope: isAoe ? 'aoe' : 'single',
-            type: cardEntry.type === 'spell_card' ? 'attack' : 'buff', // Basic inference
-            isUltimate: false,
-            hitRate: 0.1, // Default Hit Rate
-            // Pass through any buffDetails if defined in lorebook
+            scope: (cardEntry.scope as any) || 'single',
+            type: (cardEntry.damageType as any) || 'attack',
+            isUltimate: !!cardEntry.isUltimate,
+            hitRate: cardEntry.hitRate !== undefined ? cardEntry.hitRate : (cardEntry.isUltimate ? 1.0 : 0.1),
             buffDetails: cardEntry.buffDetails
          };
       }

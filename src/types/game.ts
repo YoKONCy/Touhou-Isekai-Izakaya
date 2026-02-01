@@ -71,6 +71,7 @@ export interface NPCStatus {
   favorability: number; // 0-100+
   obedience: number;    // 0-100+
   relationship: string; // e.g. "Friend", "Enemy"
+  addressing?: string;  // How the NPC calls the player (e.g. "Boss", "Brother")
   residence?: string;   // Home/Base
   
   // State / Visuals
@@ -96,6 +97,13 @@ export interface QuestReward {
 
 export type QuestStatus = 'active' | 'completed' | 'failed';
 
+export interface QuestLog {
+  content: string;
+  time: string;
+  date: string;
+  turn: number;
+}
+
 export interface Quest {
   id: string;
   name: string;
@@ -104,6 +112,7 @@ export interface Quest {
   requirements?: string[]; // Specific requirements/conditions for the quest
   rewards: QuestReward[];
   status: QuestStatus;
+  logs?: QuestLog[]; // Mission progress logs
   acceptedTurn: number;
   completedTurn?: number;
   completedDate?: string;

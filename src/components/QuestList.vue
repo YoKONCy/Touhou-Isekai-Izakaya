@@ -208,6 +208,23 @@
             <div class="italic text-izakaya-wood/80 font-serif">{{ selectedQuest.completionSummary }}</div>
           </div>
 
+          <!-- Quest Logs Timeline -->
+          <div v-if="selectedQuest.logs && selectedQuest.logs.length > 0">
+            <div class="font-bold font-display text-izakaya-wood mb-3 border-b border-izakaya-wood/10 pb-1 text-xs opacity-70">任务日志</div>
+            <div class="relative pl-3 border-l border-izakaya-wood/10 space-y-4">
+               <div v-for="(log, idx) in selectedQuest.logs" :key="idx" class="relative">
+                  <!-- Dot -->
+                  <div class="absolute -left-[17px] top-1.5 w-2 h-2 rounded-full bg-izakaya-wood/20 border border-izakaya-paper"></div>
+                  
+                  <div class="text-izakaya-wood/90 text-sm font-serif leading-relaxed">{{ log.content }}</div>
+                  <div class="text-[10px] text-izakaya-wood/40 mt-1 font-mono flex gap-2">
+                     <span>{{ log.date }} {{ log.time }}</span>
+                     <span>(第 {{ log.turn }} 轮)</span>
+                  </div>
+               </div>
+            </div>
+          </div>
+
           <div v-if="selectedQuest.rewards && selectedQuest.rewards.length > 0">
             <div class="font-bold font-display text-izakaya-wood mb-2 border-b border-izakaya-wood/10 pb-1">奖励</div>
             <ul class="space-y-2">

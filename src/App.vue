@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, nextTick, watch, computed } from 'vue';
-import { useGameStore } from '@/stores/game';
+  import { useGameStore } from '@/stores/game';
 import { useChatStore } from '@/stores/chat';
 import { useSettingsStore } from '@/stores/settings';
 import { useSaveStore } from '@/stores/save';
@@ -33,6 +33,9 @@ import { audioManager } from '@/services/audio';
 import MusicPlayer from '@/components/MusicPlayer.vue';
 import MobileNav from '@/components/MobileNav.vue';
 import MobileDrawer from '@/components/MobileDrawer.vue';
+import { checkMigrationNeeded, migrateData } from '@/services/migration';
+import { dbService } from '@/services/DatabaseService';
+import { memoryService } from '@/services/memory';
 
 const chatStore = useChatStore();
 const settingsStore = useSettingsStore();
@@ -78,6 +81,10 @@ const helpInitialSectionId = ref<string | undefined>(undefined);
 // Mobile navigation state
 const mobileActivePanel = ref<'chat' | 'status' | 'map' | 'characters' | 'quests'>('chat');
 const isMobileDrawerOpen = ref(false);
+
+const isMigrating = ref(false);
+const migrationProgress = ref(0);
+const migrationMessage = ref('');
 
 const userOpenCombat = ref(false);
 const userOpenQuest = ref(false);
@@ -188,6 +195,27 @@ onMounted(async () => {
   }, { immediate: true });
 
   await saveStore.init(); // This will load history for the active save
+  
+  // Database Migration Check
+  await dbService.init();
+  await memoryService.syncOldFacilitiesToRegistry();
+  const needsMigration = await checkMigrationNeeded();
+  if (needsMigration) {
+      isMigrating.value = true;
+      try {
+          await migrateData((msg: string, progress: number) => {
+              migrationMessage.value = msg;
+              migrationProgress.value = progress;
+          });
+          // Migration successful
+          window.location.reload(); // Reload to ensure clean state
+      } catch (e) {
+          console.error(e);
+          alert('数据迁移失败，请刷新重试。详细错误请查看控制台。');
+          isMigrating.value = false;
+      }
+      return; // Stop further initialization until reload
+  }
 });
 
 async function handleLoadMore() {
@@ -409,6 +437,18 @@ function handleMobilePanelSwitch(panel: 'chat' | 'status' | 'map' | 'characters'
 </script>
 
 <template>
+  <!-- Migration Overlay -->
+  <div v-if="isMigrating" class="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center text-white p-8">
+    <Loader2 class="w-16 h-16 animate-spin mb-4 text-primary-400" />
+    <h2 class="text-2xl font-bold mb-2">正在升级数据库...</h2>
+    <p class="text-gray-300 mb-6">为了提升性能，我们正在将存档迁移到新数据库。<br>请勿关闭页面，这可能需要几分钟。</p>
+    
+    <div class="w-full max-w-md bg-gray-800 rounded-full h-4 mb-2 overflow-hidden">
+      <div class="bg-primary-500 h-full transition-all duration-300" :style="{ width: `${migrationProgress}%` }"></div>
+    </div>
+    <p class="text-sm text-gray-400">{{ migrationMessage }} ({{ Math.floor(migrationProgress) }}%)</p>
+  </div>
+
   <div class="fixed inset-0 flex flex-col overflow-hidden font-sans text-ink bg-izakaya-paper">
     
     <SakuraBackground />

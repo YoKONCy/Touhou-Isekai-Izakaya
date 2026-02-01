@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { db } from '@/db';
+import { dbService } from '@/services/DatabaseService';
 import { useSaveStore } from '@/stores/save';
 import { X, MapPin, Users, Activity, Home } from 'lucide-vue-next';
 import { audioManager } from '@/services/audio';
@@ -20,27 +20,57 @@ async function loadFacilities() {
   isLoading.value = true;
   
   try {
-    // Fetch all facility memories
-    const allFacilityMemories = await db.memories
-      .where(['saveSlotId', 'type'])
-      .equals([saveStore.currentSaveId, 'facility'])
-      .reverse()
-      .toArray();
-
-    // Group by facility name to get the latest state for each
-    const facilityMap = new Map<string, any>();
+    // 1. Fetch from new Registry (Source of Truth)
+    const registryFacilities = await dbService.getFacilities(saveStore.currentSaveId);
     
+    // 2. Fetch from Memory (For backward compatibility and turn/date info)
+    const allFacilityMemories = await dbService.getAllMemoriesByType(saveStore.currentSaveId, 'facility');
+    
+    // Create a lookup for memory info
+    const memoryLookup = new Map<string, any>();
     allFacilityMemories.forEach(m => {
       const name = extractFacilityName(m.content);
-      if (name && !facilityMap.has(name)) {
-        facilityMap.set(name, {
-          ...m,
-          parsedData: parseFacilityContent(m.content)
-        });
+      if (name && !memoryLookup.has(name)) {
+        memoryLookup.set(name, m);
       }
     });
 
-    facilities.value = Array.from(facilityMap.values());
+    // 3. Merge: Prioritize Registry data, supplement with Memory metadata
+    facilities.value = registryFacilities.map(f => {
+      const mem = memoryLookup.get(f.name);
+      return {
+        id: f.id,
+        name: f.name,
+        location: f.location,
+        description: f.description,
+        status: f.status,
+        subLocations: f.sub_locations?.map((sl: any) => 
+          typeof sl === 'string' ? sl : `${sl.name}${sl.description ? '(' + sl.description + ')' : ''}`
+        ).join('、') || '',
+        staff: f.staff?.join('、') || '',
+        turnCount: mem?.turnCount || '?',
+        gameDate: mem?.gameDate || '?',
+        isFromRegistry: true
+      };
+    });
+
+    // 4. If registry is empty (unlikely after sync, but safe), fallback to old memory logic
+    if (facilities.value.length === 0 && allFacilityMemories.length > 0) {
+      const facilityMap = new Map<string, any>();
+      allFacilityMemories.forEach(m => {
+        const name = extractFacilityName(m.content);
+        if (name && !facilityMap.has(name)) {
+          const parsed = parseFacilityContent(m.content);
+          facilityMap.set(name, {
+            ...parsed,
+            id: m.id,
+            turnCount: m.turnCount,
+            gameDate: m.gameDate
+          });
+        }
+      });
+      facilities.value = Array.from(facilityMap.values());
+    }
   } catch (error) {
     console.error('Failed to load facilities:', error);
   } finally {
@@ -129,8 +159,8 @@ function close() {
 
           <div v-else class="grid grid-cols-1 gap-6">
             <div 
-              v-for="mem in facilities" 
-              :key="mem.id"
+              v-for="fac in facilities" 
+              :key="fac.id"
               class="bg-white/70 rounded-xl border border-izakaya-wood/10 shadow-sm hover:shadow-md transition-all overflow-hidden group"
             >
               <!-- Card Header -->
@@ -140,23 +170,23 @@ function close() {
                     <Home class="w-5 h-5 text-touhou-red" />
                   </div>
                   <div>
-                    <h3 class="font-bold text-lg text-izakaya-wood font-display">{{ mem.parsedData.name }}</h3>
+                    <h3 class="font-bold text-lg text-izakaya-wood font-display">{{ fac.name }}</h3>
                     <div class="flex items-center gap-1 text-xs text-izakaya-wood/60">
                       <MapPin class="w-3 h-3" />
-                      {{ mem.parsedData.location }}
+                      {{ fac.location }}
                     </div>
                   </div>
                 </div>
                 <div class="px-3 py-1 rounded-full text-xs font-bold" 
-                  :class="mem.parsedData.status.includes('正常') || mem.parsedData.status.includes('经营') ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'">
-                  {{ mem.parsedData.status }}
+                  :class="fac.status.includes('正常') || fac.status.includes('经营') ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'">
+                  {{ fac.status }}
                 </div>
               </div>
 
               <!-- Card Body -->
               <div class="p-4 space-y-4">
-                <div v-if="mem.parsedData.description" class="text-sm text-izakaya-wood/80 italic border-l-2 border-izakaya-wood/10 pl-3 leading-relaxed">
-                  {{ mem.parsedData.description }}
+                <div v-if="fac.description" class="text-sm text-izakaya-wood/80 italic border-l-2 border-izakaya-wood/10 pl-3 leading-relaxed">
+                  {{ fac.description }}
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -166,8 +196,8 @@ function close() {
                       <Activity class="w-3 h-3" /> 子地点 / 区域
                     </div>
                     <div class="flex flex-wrap gap-2">
-                      <template v-if="mem.parsedData.subLocations">
-                        <span v-for="loc in mem.parsedData.subLocations.split('、')" :key="loc" 
+                      <template v-if="fac.subLocations">
+                        <span v-for="loc in fac.subLocations.split('、')" :key="loc" 
                           class="px-2 py-1 bg-white border border-izakaya-wood/5 rounded text-xs text-izakaya-wood/70 shadow-sm">
                           {{ loc }}
                         </span>
@@ -182,8 +212,8 @@ function close() {
                       <Users class="w-3 h-3" /> 相关人员
                     </div>
                     <div class="flex flex-wrap gap-2">
-                      <template v-if="mem.parsedData.staff">
-                        <span v-for="person in mem.parsedData.staff.split('、')" :key="person"
+                      <template v-if="fac.staff">
+                        <span v-for="person in fac.staff.split('、')" :key="person"
                           class="px-2 py-1 bg-touhou-red/5 border border-touhou-red/10 rounded text-xs text-touhou-red/70 font-medium">
                           {{ person }}
                         </span>
@@ -196,8 +226,8 @@ function close() {
 
               <!-- Card Footer -->
               <div class="px-4 py-2 bg-izakaya-wood/[0.02] text-[10px] text-izakaya-wood/30 flex justify-between">
-                <span>最后变动于 Turn {{ mem.turnCount }}</span>
-                <span>档案更新：{{ mem.gameDate }}</span>
+                <span>最后变动于 Turn {{ fac.turnCount }}</span>
+                <span>档案更新：{{ fac.gameDate }}</span>
               </div>
             </div>
           </div>

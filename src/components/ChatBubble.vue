@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
-import { type ChatMessage } from '@/db';
+import { type ChatMessage } from '@/types/db';
 import { User, Bot, Trash2, Bug, Copy, Edit, MoreVertical, Terminal, X, RefreshCw } from 'lucide-vue-next';
 import { useChatStore } from '@/stores/chat';
 import { useGameStore } from '@/stores/game';

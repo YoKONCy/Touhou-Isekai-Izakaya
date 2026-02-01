@@ -1,141 +1,121 @@
-# 《东方异界食堂》技术设计文档 (Technical Design Document)
+# 技术设计文档 - 东方异界食堂 (Touhou Isekai Izakaya)
 
-> 最后更新时间: 2025-12-25
-> 状态: Production-Ready (Beta Phase 6)
-> 关键词: Embodied AI, Multi-Agent, RAG, Web-based RPG
+## 1. 项目概述
+“东方异界食堂”是一款基于浏览器的 AI 原生角色扮演游戏 (RPG)。利用 LLM 生成动态叙事和游戏逻辑。架构设计旨在实现完全在浏览器环境运行的**持久化**、**状态一致性**和**复杂上下文管理**。
 
----
+## 2. 技术栈
 
-## 1. 项目概览 (Overview)
+- **前端框架**: Vue 3 (Composition API) + Vite 7
+- **状态管理**: Pinia (响应式内存状态)
+- **数据库**: SQLite Wasm (官方构建版) + OPFS (源私有文件系统)
+- **开发语言**: TypeScript
+- **样式方案**: TailwindCSS
+- **并发处理**: Web Workers (用于数据库操作，避免阻塞主线程)
 
-**《东方异界食堂》** 是一款基于《东方Project》世界观的 LLM 驱动型 Web 角色扮演与经营游戏。
-本项目核心在于探索“具身智能 (Embodied AI)”在虚拟环境中的工程化落地，通过高度解耦的智能体架构实现一个拥有**感知 (Perception)、记忆 (Memory)、决策 (Decision)、执行 (Execution)** 完整闭环的智能系统。
+## 3. 核心架构
 
-### 1.1 核心设计哲学
-*   **语义与数值对齐**：通过逻辑 Agent 将模糊的文学叙事转化为精确的数值状态。
-*   **长效因果链**：利用基于 RAG 的记忆系统，使 NPC 的行为具备历史一致性。
-*   **非入侵式交互**：在不中断玩家叙事流的前提下，实现复杂的系统触发（战斗、任务）。
+应用采用以 `GameLoopService` 为核心的**流水线驱动架构 (Pipeline-Driven Architecture)**。
 
----
+### 3.1. “三模型”流水线
+为了确保稳定性和结构化，游戏将职责拆分为三个截然不同的角色，而不是单一的 LLM 调用：
 
-## 2. 核心架构 (Core Architecture)
+1.  **叙事 (Storyteller)**:
+    -   **职责**: 生成沉浸式的角色扮演文本、对话和环境描写。
+    -   **输入**: 当前状态、用户行动、相关记忆。
+    -   **输出**: 自然语言文本（流式传输至 UI）。
+    -   **源码参考**: [gameLoop.ts](file:///c%3A/Users/Administrator/Desktop/Touhou%20Isekai%20Izakaya/src/services/gameLoop.ts) -> `llmService.chatStream`
 
-### 2.1 四重奏智能体协作模型 (The Quartet Architecture)
+2.  **逻辑引擎 (Game Master)**:
+    -   **职责**: 分析叙事和用户意图，更新游戏状态。
+    -   **输入**: 用户行动 + 生成的叙事内容。
+    -   **输出**: 严格的 JSON 格式状态增量（例如：`hp -10`, `money +500`, `add_item: "红茶"`）。
+    -   **源码参考**: [logic.ts](file:///c%3A/Users/Administrator/Desktop/Touhou%20Isekai%20Izakaya/src/services/logic.ts)
 
-系统将每一轮交互拆解为四个独立运行的智能体，模拟人类大脑的功能分区：
+3.  **记忆引擎 (Scribe)**:
+    -   **职责**: 将本回合发生的事件压缩为简短的“记忆”，构建记忆关联图谱。
+    -   **输入**: 用户行动 + 叙事内容 + 状态变更。
+    -   **输出**: 结构化的记忆条目（摘要、实体、标签、重要度）及其在图谱中的关联。
+    -   **源码参考**: [memory.ts](file:///c%3A/Users/Administrator/Desktop/Touhou%20Isekai%20Izakaya/src/services/memory.ts)
 
-| Agent | 角色 | 核心职责 | 输入 (Input) | 输出 (Output) |
-| :--- | :--- | :--- | :--- | :--- |
-| **LLM #1** | **Storyteller** | 叙事驱动 & NPC 扮演 | 玩家输入 + 历史记忆 | 剧情文本 + XML Triggers |
-| **LLM #2** | **Game Master** | 逻辑解析 & 状态提取 | 剧情文本 + 游戏快照 | 结构化 JSON 指令 |
-| **LLM #3** | **Scribe** | 记忆加工 & RAG 管理 | 原始对话 + 逻辑变更 | 结构化记忆快照 |
-| **LLM #4** | **Misc/Tool** | 特化判定 (战斗/生成) | 任务特定上下文 | 判定结果/生成数据 |
+### 3.2. 游戏循环流程 (`src/services/gameLoop.ts`)
 
-### 2.2 逻辑处理流水线 (Logic Processing Pipeline)
-
-为了解决大模型输出的非确定性（Non-determinism），`LogicService` 实现了工业级的鲁棒性方案：
-
-#### 2.2.1 容错与重试策略 (Retry Strategy)
-针对 API 失败或 JSON 语法错误，系统采用 **3 次指数退避重试 (Exponential Backoff)**：
-```typescript
-// 指数退避重试实现片段 (logic.ts)
-for (let attempt = 1; attempt <= maxRetries; attempt++) {
-  try {
-    return await this._executeLogicRequest(userContent, storyContent, gameState);
-  } catch (e: any) {
-    const delay = attempt * 1000; // 1s, 2s, 3s...
-    await new Promise(r => setTimeout(r, delay));
-  }
-}
+```mermaid
+graph TD
+    Idle((空闲)) -->|用户输入| Preparing[准备阶段]
+    Preparing -->|检索上下文 RAG| ContextReady[上下文就绪]
+    ContextReady -->|提示词 1: 叙事| GeneratingStory[生成故事]
+    GeneratingStory -->|流式文本| UI_Display[UI 显示]
+    GeneratingStory -->|文本生成完成| LogicAnalysis[逻辑分析]
+    LogicAnalysis -->|提示词 2: 游戏逻辑| ProcessingLogic[处理逻辑]
+    ProcessingLogic -->|JSON 增量| StateUpdate[状态更新]
+    StateUpdate -->|Pinia Action| GameStore[游戏仓库]
+    GameStore -->|持久化| Committing[提交阶段]
+    Committing -->|保存快照与记忆| Idle
 ```
 
-#### 2.2.2 数据清洗 (Data Sanitization)
-利用正则表达式修复 LLM 常见的格式缺陷，如：
-- 移除多余的 Markdown 代码块标记 (` ```json `)。
-- 修复非法转义字符和控制符。
-- 自动平衡缺失的括号。
+## 4. 状态管理与持久化
 
----
+### 4.1. 双层状态架构
+1.  **运行时状态 (Pinia)**:
+    -   `GameStore`: 保存活跃的游戏状态（玩家属性、物品栏、NPC 关系、世界标记）。
+    -   `ChatStore`: 管理 UI 对话历史和虚拟化加载（分页）。
+    -   **单一事实来源**: Pinia store 是当前回合的权威状态。
 
-## 3. 记忆检索系统 (Scribe-Retrieval System)
+2.  **持久化状态 (SQLite + OPFS)**:
+    -   **为何选择 SQLite?**: `IndexedDB` (及 Dexie 等封装) 在处理大型 JSON 块和复杂查询（如全文搜索）时性能较差。SQLite Wasm 通过 OPFS 提供了强大的 SQL 能力和稳健的文件存储。
+    -   **快照 (Snapshots)**: 每次 LLM 响应都会触发状态快照。这允许通过将之前的快照重新加载到 Pinia store 来实现“时间旅行”（回滚）。
 
-项目采用 **"Agentic RAG"** 架构，旨在解决传统对话模型在长周期游戏中的“失忆”问题。
+### 4.2. 数据库模式 (`src/worker/schema.ts`)
 
-### 3.1 混合检索模型 (Hybrid Retrieval)
-
-为了兼顾性能与深度，系统实现了两阶段过滤：
-
-1.  **Level 1 粗筛 (Heuristic Filter)**：
-    - **关键词匹配**：基于玩家输入的词云匹配。
-    - **时间衰减 (Time Decay)**：$Score = \frac{1}{\sqrt{CurrentTurn - MemoryTurn}}$。
-    - **重要性加权**：由 Scribe Agent 在记录时预先评估（1-5分）。
-2.  **Level 2 精选 (Semantic Refinement)**：
-    - 调用高智力模型对前 50 条粗筛结果进行语义评估，输出最终注入 Context Window 的记忆 IDs。
-
-### 3.2 记忆分类 (Memory Schema)
-| 类型 | 存储格式 | 检索触发条件 |
+| 数据表 | 描述 | 核心列 |
 | :--- | :--- | :--- |
-| **Summary** | 自然语言摘要 | 语义相关性/关键词 |
-| **Facility** | 设施属性 JSON | 地点匹配/经营行为 |
-| **Variable** | 数值变动 Diff | 经济行为/物品交互 |
-| **Alliance** | 关系契约文本 | 关键角色入场 |
+| `saves` | 存档位元数据 | `id`, `name`, `lastPlayed`, `location` |
+| `chats` | 对话历史 | `id`, `saveSlotId`, `role`, `content`, `timestamp`, `snapshotId` |
+| `snapshots` | 完整状态转储 | `id`, `saveSlotId`, `turnCount`, `gameState` (JSON), `chatId` |
+| `memories` | 长期知识 (RAG) | `id`, `saveSlotId`, `content`, `tags`, `related_entities`, `importance` |
+| `memory_relations` | 记忆关联图谱 | `source_id`, `target_id`, `rel_type`, `strength` |
 
----
+*注：`memories` 表支持 FTS5 全文搜索，用于高效检索。*
 
-## 4. 具身智能与物理对齐 (Physical Alignment)
+## 5. 关键模块实现
 
-### 4.1 程序化地图生成 (Procedural Map Generation)
-利用 LLM 生成空间语义，再由确定性算法完成物理填充。
-- **语义层**：LLM 规划“厨房”、“储物间”、“用餐区”的逻辑连接。
-- **物理层**：`ZonePopulator` 计算瓦片连通性，自动生成吧台、楼梯及装饰物。
+### 5.1. 数据库服务 (DAL)
+-   **位置**: [DatabaseService.ts](file:///c%3A/Users/Administrator/Desktop/Touhou%20Isekai%20Izakaya/src/services/DatabaseService.ts)
+-   **模式**: Web Worker 的异步代理。
+-   **机制**: 使用类似 `Comlink` 的消息传递机制（请求/响应 ID）与 `db.worker.ts` 通信。
+-   **特性**:
+    -   `addChatMessage`: 对话与快照的事务性插入。
+    -   `searchMemories`: 针对 RAG 上下文的 FTS 查询。
+    -   `importSave`: 用于迁移的批量处理。
 
-### 4.2 战斗与交互逻辑 (Combat & Interaction)
-- **非阻塞触发 (Non-blocking Triggers)**：系统检测到冲突信号后，在 UI 侧生成悬浮图标。玩家可自由决定介入时间，避免了传统阻塞弹窗对叙事体验的割裂。
-- **嘴遁判定 (Persuasion Logic)**：战斗中实时调用 LLM #4 评估玩家文本输入的逻辑合理性与情感冲击力，从而动态修改敌方战意。
+### 5.2. 逻辑处理器
+-   **位置**: [logic.ts](file:///c%3A/Users/Administrator/Desktop/Touhou%20Isekai%20Izakaya/src/services/logic.ts)
+-   **验证**: 强制执行数值规则（例如：“HP 不能超过 MaxHP”，“金钱不能为负”）。
+-   **映射**: 将模糊的 LLM 输出（如“她生气了”）映射为具体的数值变更（`favorability -5`）。
 
----
+### 5.3. 记忆系统 (星型+链式图谱 RAG)
+-   **位置**: [memory.ts](file:///c%3A/Users/Administrator/Desktop/Touhou%20Isekai%20Izakaya/src/services/memory.ts)
+-   **图谱结构**: 
+    -   **链式 (Sequence)**: 记忆按时间顺序连接，形成叙事主轴。
+    -   **星型 (Entity Star)**: 围绕相同实体（NPC、地点、物品）建立关联，形成语义网络。
+-   **提取**: 每回合结束后，提取结构化信息并根据实体重合度自动建立图谱连接。
+-   **检索 (PEDSA 算法)**:
+    1.  **关键词检索**: 利用 SQLite FTS 寻找初步匹配的“种子”记忆。
+    2.  **能量扩散 (Spreading Activation)**: 种子记忆获得初始能量，沿图谱边向邻近节点扩散。
+    3.  **衰减与修剪**: 能量随跳数衰减（Decay），低于阈值的节点停止扩散，最终召回高能量的相关记忆，即使其不含当前关键词。
+-   **图谱服务**: [MemoryGraphService.ts](file:///c%3A/Users/Administrator/Desktop/Touhou%20Isekai%20Izakaya/src/services/MemoryGraphService.ts) 实现内存级图谱缓存与并行激活。
 
-## 5. 数据模型设计 (Data Models)
+## 6. 迁移策略
+-   **旧版**: Dexie (IndexedDB)。
+-   **新版**: SQLite Wasm (OPFS)。
+-   **流程**:
+    1.  用户触发迁移。
+    2.  `src/services/migration.ts` 读取所有 Dexie 数据。
+    3.  数据分块（避免内存溢出）并发送至 Worker。
+    4.  Worker 执行 `BEGIN TRANSACTION` -> 批量插入 -> `COMMIT`。
+    5.  迁移成功后，归档/清理 Dexie 数据库。
 
-```typescript
-// 核心状态模型 (GameState)
-interface GameState {
-  player: PlayerStatus;        // 包含 hp, money, power, location 等
-  npcs: Record<string, NPCStatus>; // NPC 好感度、衣着、心理、姿态
-  system: GameSystemState;     // 包含 turn_count, active_quests, current_scene
-  flags: Record<string, any>;  // 全局剧情开关
-}
-
-// 逻辑指令模型 (GameAction)
-interface GameAction {
-  type: 'UPDATE_PLAYER' | 'UPDATE_NPC' | 'INVENTORY' | 'SCENE';
-  op: 'add' | 'subtract' | 'set' | 'push';
-  field: string;
-  value: any;
-}
-```
-
----
-
-## 6. 技术栈 (Tech Stack)
-
-*   **Runtime**: Node.js 18+ / Browser (Modern)
-*   **Frontend**: Vue 3 + Vite + TypeScript
-*   **State**: Pinia (持久化游戏核心状态)
-*   **Database**: Dexie.js (IndexedDB 封装，用于本地存储万级记忆片段)
-*   **Styling**: Tailwind CSS v4 (高性能和风 UI 方案)
-*   **Audio**: Web Audio API (动态环境音效合成)
-
----
-
-## 7. 未来路线图 (Roadmap)
-
-- [x] **Quartet Architecture**: 四重 Agent 协作模型落地。
-- [x] **Agentic RAG**: 实现基于 IndexedDB 的长效记忆系统。
-- [x] **Embodied UI**: 非阻塞任务/战斗触发系统。
-- [ ] **Multimodal Alignment**: 结合 Stable Diffusion 实现 NPC 形象的实时生成。
-- [ ] **Autonomous Behavior**: 引入 NPC 的独立时间轴与自主寻路。
-- [ ] **Multi-language Support**: 全球化叙事适配。
-
----
-> *The boundary between Gensokyo and Reality is guarded by code.*
+## 7. 未来展望
+-   **高级语义关联**: 目前已实现基于图谱的能量扩散检索（PEDSA）。未来可进一步集成轻量级向量模型（Wasm），实现向量搜索与图谱关联的混合检索。
+-   **语音/TTS**: `GameLoop` 中已预留集成点，用于在文本流式传输后生成语音。
+-   **多代理协作**: 引入专门的角色驱动代理，处理更复杂的 NPC 背景与长期动机。

@@ -82,6 +82,13 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0', // Listen on all network interfaces
-    port: 14791
+    port: 14791,
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    }
+  },
+  optimizeDeps: {
+    exclude: ['@sqlite.org/sqlite-wasm']
   }
 })

@@ -1138,10 +1138,10 @@ const props = defineProps<{
 const emit = defineEmits(['close', 'combat-end']);
 
 // --- BGM Management ---
-const bgmFiles = import.meta.glob('/src/assets/audio/bgm/RPG_battle/**/*.{mp3,wav,ogg,flac,m4a,aac}', { as: 'url', eager: true });
+const bgmFiles = import.meta.glob('/src/assets/audio/bgm/RPG_battle/**/*.{mp3,wav,ogg,flac,m4a,aac}', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
 
 // --- Background Management ---
-const backgroundImages = import.meta.glob('/src/assets/images/battle_bg/*.{jpg,png,webp}', { as: 'url', eager: true });
+const backgroundImages = import.meta.glob('/src/assets/images/battle_bg/*.{jpg,png,webp}', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
 
 const currentBackground = computed(() => {
     // Attempt to match current location
@@ -1617,7 +1617,7 @@ function addPopup(target: UICombatant, value: number | string, type: 'damage' | 
   }, 1000);
 }
 
-const characterSprites = import.meta.glob('/src/assets/images/battle_sprites/*.png', { as: 'url', eager: true });
+const characterSprites = import.meta.glob('/src/assets/images/battle_sprites/*.png', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
 
 function getSpriteUrl(name?: string) {
     if (!name) return defaultSprite;

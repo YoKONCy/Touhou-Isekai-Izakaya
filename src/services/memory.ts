@@ -1,89 +1,121 @@
-import { db, type MemoryEntry, type ChatMessage } from '@/db';
+import { dbService } from '@/services/DatabaseService';
 import { useGameStore } from '@/stores/game';
 import { useCharacterStore } from '@/stores/character';
 import { generateCompletion } from '@/services/llm';
-import { resolveCharacterId } from '@/services/characterMapping';
 import _ from 'lodash';
 
 import { useSettingsStore } from '@/stores/settings';
 import { useToastStore } from '@/stores/toast';
+import { memoryGraph } from './MemoryGraphService';
+
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 
 // Prompts
 const EXTRACTION_SYSTEM_PROMPT = `
-You are the "Scribe" (Memory System) for an RPG game.
-Your task is to analyze the latest interaction and extract key information into structured memory entries.
+你是一个RPG游戏的“书记员”（记忆系统）。
+你的任务是分析最近的互动，并将关键信息提取为结构化的记忆条目。
 
-Input:
-1. Current Turn Dialogue
-2. Game State Changes (Actions taken)
+输入:
+1. 当前回合对话
+2. 游戏状态变更 (采取的行动)
 
-Output Format (JSON):
+输出格式 (JSON):
 {
-  "summary": "Objective summary of the event (3rd person). Must be detailed (30-60 Chinese characters). Include WHO did WHAT, key information revealed, and emotional context.",
-  "entities": ["Specific NPC Names", "Locations", "Unique Items"],
-  "tags": ["Specific Topics", "Actions", "Emotions", "Plot Keywords"],
-  "importance": 1-5 (5 is critical plot point, 1 is trivial),
+  "summary": "客观的事件总结（第三人称）。必须详细（30-60个中文字符）。包括谁做了什么、揭示的关键信息以及情感背景。",
+  "entities": ["具体的NPC名字", "地点", "独特物品"],
+  "tags": ["具体话题", "行动", "情绪", "剧情关键词"],
+  "importance": 1-5 (5为关键剧情点，1为琐事),
   "facility": {
-    "name": "Specific name of player-owned facility (e.g., '玩家的酒馆', '主角的房屋'). If no change, leave empty.",
-    "location": "Standard area name (e.g., '博丽神社', '人间之里'). Must be the general area, not specific spot.",
-    "description": "Brief description of the facility's function, quality, and current state.",
-    "status": "Operational status keyword (e.g., '正常', '扩建中', '装修中', '荒废', '经营中').",
+    "id": "UUID (如果匹配现有设施)。如果是新设施则为 null。",
+    "name": "玩家拥有的设施的具体名称 (例如 '玩家的酒馆', '主角的房屋')。如果没有变化，留空。",
+    "location": "标准区域名称 (例如 '博丽神社', '人间之里')。必须是大概区域，而非具体地点。",
+    "description": "设施的功能、质量和当前状态的简要描述。",
+    "status": "运营状态关键词 (例如 '正常', '扩建中', '装修中', '荒废', '经营中')。",
     "sub_locations": [
       {
-        "name": "Sub-area name (e.g., '厨房', '仓库', '客房')",
-        "description": "Specific condition, level, or contents of this sub-area."
+        "name": "子区域名称 (例如 '厨房', '仓库', '客房')",
+        "description": "该子区域的具体状况、等级或内容。"
       }
     ],
-    "staff": ["Names of NPCs working at or managing this facility"],
-    "is_new_acquisition": "boolean, true if the player just gained ownership of this facility this turn"
+    "staff": ["在此设施工作或管理的NPC名字"],
+    "is_new_acquisition": "boolean, 如果玩家在本回合刚获得该设施的所有权，则为 true"
   },
   "alliance": {
-    "name": "Name of the alliance/partnership",
-    "content": "Terms, goals, and nature of the alliance",
-    "related_characters": ["Names of characters involved"],
-    "established_time": "Current in-game date/time string"
+    "name": "联盟/合作关系的名称",
+    "content": "条款、目标和联盟的性质",
+    "related_characters": ["涉及的角色名字"],
+    "established_time": "当前游戏内的日期/时间字符串"
   },
   "intelligence": {
-    "name": "Name/Title of the secret or intelligence",
-    "content": "Detailed content of the truth/secret revealed",
-    "acquired_time": "Current in-game date/time string"
+    "name": "秘密或情报的名称/标题",
+    "content": "揭示的真相/秘密的详细内容",
+    "acquired_time": "当前游戏内的日期/时间字符串"
   }
 }
 
-Focus on:
-- New facts learned about the world or characters.
-- Changes in relationships.
-- Significant player actions (building, fighting, trading).
-- Key plot progression.
-- Facility acquisitions and modifications (houses, shops, farms, etc.)
-- **Long-term Alliances**: Formal or deep cooperative relationships formed (not just temporary teams).
-- **Known Intelligence**: Major world secrets or hidden truths revealed (not common info).
+关注点:
+- 关于世界或角色的新事实。
+- 关系的变动。
+- 重要的玩家行动（建造、战斗、交易）。
+- 关键剧情推进。
+- 设施的获取与修改（房屋、商店、农场等）。
+- **长期联盟**: 形成的正式或深度的合作关系（不仅仅是临时组队）。
+- **已知情报**: 揭示的重大世界秘密或隐藏真相（非普通信息）。
 
-Instructions for Tags:
-- Generate 3-8 specific keywords.
-- **Strict Format**: Use concise, single words or short phrases (mostly 2-4 characters).
-- **Prohibited**: Do NOT use symbols, punctuation, or complex phrases within a tag. (e.g. NO "Healing/Comfort", NO "Relationship-Change").
-- **Examples**:
-    - Bad: "Emotional Trauma Repair", "NPC Relationship Change", "Learning New Knowledge", "Healing/Comfort".
-    - Good: "Healing", "Education", "Intimacy", "Magic", "Awe", "Shame".
-- Include concrete nouns (e.g. 'Grimoire', 'Tea') and abstract concepts (e.g. 'Betrayal', 'Negotiation').
-- Avoid generic tags like 'chat', 'dialogue', 'system'.
+**设施管理规则**:
+- 检查输入中提供的“现有设施”列表。
+- 如果对话提到现有设施（即使名称略有不同，如“我的酒馆” vs “玩家的酒馆”），**你必须**重用其 UUID 和确切名称。
+- 只有在 100% 确定是首次获得的新设施时，才将 "id" 设为 null。
+
+标签 (Tags) 指南:
+- 生成 3-8 个具体关键词。
+- **严格格式**: 使用简洁的单词或短语（大多为 2-4 个字符）。
+- **禁止**: 不要在标签中使用符号、标点或复杂短语。(例如：不要用 "治疗/安慰", 不要用 "关系-变化")。
+- **示例**:
+    - 坏: "情感创伤修复", "NPC关系变化", "学习新知识", "治疗/安慰"。
+    - 好: "治疗", "教育", "亲密", "魔法", "敬畏", "羞耻"。
+- 包含具体名词（如 '魔导书', '茶'）和抽象概念（如 '背叛', '谈判'）。
+- 避免通用标签，如 '聊天', '对话', '系统'。
 `;
 
 const RETRIEVAL_SYSTEM_PROMPT = `
-You are the Memory Retrieval System.
-Select the most relevant memories from the provided list to help the Game Master generate the next response.
+你是记忆检索系统。
+从提供的列表中选择最相关的记忆，以帮助游戏管理员 (GM) 生成下一个回复。
 
-Input:
-1. Current User Input
-2. List of Candidate Memories (ID: Content)
+输入:
+1. 当前用户输入
+2. 候选记忆列表 (ID: 内容)
 
-Output:
-Return a JSON array of selected Memory IDs. e.g. [12, 15, 2]
-Select ONLY memories that are directly relevant to the current context.
-Limit your selection to a maximum of 20 items.
-If nothing is relevant, return [].
+输出:
+返回选中记忆 ID 的 JSON 数组。例如 [12, 15, 2]
+仅选择与当前上下文**直接相关**的记忆。
+选择上限为 20 项。
+如果没有相关的，返回 []。
 `;
+
+interface MemoryEntry {
+  id?: number;
+  saveSlotId: number;
+  turnCount: number;
+  type: string;
+  content: string;
+  tags?: string[];
+  related_entities?: string[];
+  importance?: number;
+  createdAt?: number;
+  gameDate?: string;
+  gameTime?: string;
+  location?: string;
+  characters?: string[];
+}
 
 /**
  * Scribe Memory Service (Agentic RAG / World Model)
@@ -94,6 +126,53 @@ If nothing is relevant, return [].
  */
 export class MemoryService {
   
+  /**
+   * Update the memory graph with a new node.
+   * establishes 'sequence' (time) and 'entity' (star) connections.
+   */
+  private async updateGraph(newMemory: MemoryEntry) {
+    if (!newMemory.id) return;
+    
+    try {
+      // 1. Sequence Link: Connect to the most recent memory of the same type
+      const recentMemories = await dbService.getMemoriesByType(newMemory.saveSlotId, newMemory.type, 2);
+      
+      if (recentMemories.length > 1) {
+        // recentMemories[0] is the one we just added (since we call this AFTER adding)
+        // recentMemories[1] is the previous one.
+        const prevMemory = recentMemories[1];
+        if (prevMemory && prevMemory.id) {
+            await dbService.addMemoryRelation(newMemory.id, prevMemory.id, 'sequence', 1.0);
+            memoryGraph.addConnection(newMemory.id, prevMemory.id, 1.0, 'sequence');
+        }
+      }
+
+      // 2. Entity Star: Connect to memories sharing the same entities
+      if (newMemory.related_entities && newMemory.related_entities.length > 0) {
+        for (const entity of newMemory.related_entities) {
+           // Search for recent memories mentioning this entity
+           const relevant = await dbService.searchMemories(newMemory.saveSlotId, [entity]);
+           // Filter out self
+           const others = relevant.filter(m => m.id !== newMemory.id).slice(0, 5); 
+           
+           for (const other of others) {
+             if (other.id) {
+               await dbService.addMemoryRelation(newMemory.id, other.id, 'entity', 0.8);
+               memoryGraph.addConnection(newMemory.id, other.id, 0.8, 'entity');
+               
+               // Bidirectional
+               await dbService.addMemoryRelation(other.id, newMemory.id, 'entity', 0.8);
+               memoryGraph.addConnection(other.id, newMemory.id, 0.8, 'entity');
+             }
+           }
+        }
+      }
+      
+    } catch (e) {
+      console.error('[MemoryService] Failed to update graph:', e);
+    }
+  }
+
   /**
    * Extract and save memory from the current turn.
    */
@@ -124,9 +203,7 @@ export class MemoryService {
 
       if (variableChanges.length > 0) {
         // [Fix] Prevent duplicates: Delete existing variable_change for this turn
-        await db.memories.where('[saveSlotId+type+turnCount]')
-          .equals([saveSlotId, 'variable_change', turnCount])
-          .delete();
+        await dbService.deleteMemories(saveSlotId, 'variable_change', turnCount);
 
         const gameStore = useGameStore();
         const charStore = useCharacterStore();
@@ -165,12 +242,10 @@ export class MemoryService {
           if (a.type === 'INVENTORY') tags.push('物品', 'inventory');
         });
 
-        // [Fix] Prevent duplicates for variable changes
-        await db.memories.where('[saveSlotId+type+turnCount]')
-          .equals([saveSlotId, 'variable_change', turnCount])
-          .delete();
+        // [Fix] Prevent duplicates for variable changes (redundant check, but safe)
+        await dbService.deleteMemories(saveSlotId, 'variable_change', turnCount);
 
-        await db.memories.add({
+        const memData = {
           saveSlotId,
           turnCount,
           type: 'variable_change',
@@ -183,7 +258,9 @@ export class MemoryService {
           gameTime: context?.time,
           location: context?.location,
           characters: context?.characters
-        });
+        };
+        const mid = await dbService.addMemory(memData);
+        await this.updateGraph({ ...memData, id: mid });
       }
     }
 
@@ -191,8 +268,17 @@ export class MemoryService {
     // We only trigger this if there was meaningful dialogue
     const dialogueContent = `User (${userParam.name}): ${userParam.input}\nAI: ${aiResponse}`;
     
+    // Fetch existing facilities for context
+    const facilities = await dbService.getFacilities(saveSlotId);
+    const facilitiesContext = facilities.map(f => 
+      `- [${f.id}] ${f.name} (${f.location}): ${f.description ? f.description.substring(0, 50) + '...' : 'No description'}`
+    ).join('\n');
+
     try {
       const prompt = `
+Existing Facilities:
+${facilitiesContext || 'None'}
+
 Dialogue:
 ${dialogueContent}
 
@@ -217,11 +303,9 @@ ${JSON.stringify(actions)}
       
       if (result.summary) {
         // [Fix] Prevent duplicates: Delete existing summary for this turn
-        await db.memories.where('[saveSlotId+type+turnCount]')
-          .equals([saveSlotId, 'summary', turnCount])
-          .delete();
+        await dbService.deleteMemories(saveSlotId, 'summary', turnCount);
 
-        await db.memories.add({
+        const summaryData = {
           saveSlotId,
           turnCount,
           type: 'summary',
@@ -234,16 +318,46 @@ ${JSON.stringify(actions)}
           gameTime: context?.time,
           location: context?.location,
           characters: context?.characters
-        });
+        };
+        const mid = await dbService.addMemory(summaryData);
+        await this.updateGraph({ ...summaryData, id: mid });
       }
 
       // [Fix] Prevent duplicates for facilities
       if (result.facility && result.facility.name) {
-          await db.memories.where('[saveSlotId+type+turnCount]')
-            .equals([saveSlotId, 'facility', turnCount])
-            .delete();
+          await dbService.deleteMemories(saveSlotId, 'facility', turnCount);
 
         const f = result.facility;
+        
+        // --- LOGIC INTERCEPTION: Update Facility Registry ---
+        let facilityId = f.id;
+        let existingFacility = facilities.find(ef => ef.id === facilityId);
+
+        // Fallback: Name match
+        if (!existingFacility) {
+            existingFacility = facilities.find(ef => ef.name === f.name);
+            if (existingFacility) facilityId = existingFacility.id;
+        }
+
+        // Create ID if new
+        if (!facilityId) {
+            facilityId = generateUUID();
+        }
+
+        // Update Registry
+        await dbService.upsertFacility({
+            id: facilityId,
+            saveSlotId,
+            name: f.name,
+            location: f.location || existingFacility?.location,
+            description: f.description || existingFacility?.description,
+            status: f.status || existingFacility?.status,
+            sub_locations: f.sub_locations || existingFacility?.sub_locations,
+            staff: f.staff || existingFacility?.staff,
+            is_player_owned: true,
+            created_at: existingFacility?.created_at
+        });
+
         const subLocs = f.sub_locations?.map((sl: any) => `${sl.name}(${sl.description || '正常'})`).join('、') || '无';
         const staff = f.staff?.length > 0 ? f.staff.join('、') : '无';
         
@@ -262,7 +376,7 @@ ${JSON.stringify(actions)}
         const entities = [...(result.entities || [])];
         if (!entities.includes(f.name)) entities.push(f.name);
 
-        await db.memories.add({
+        const facilityData = {
           saveSlotId,
           turnCount,
           type: 'facility',
@@ -275,17 +389,17 @@ ${JSON.stringify(actions)}
           gameTime: context?.time,
           location: context?.location,
           characters: context?.characters
-        });
+        };
+        const mid = await dbService.addMemory(facilityData);
+        await this.updateGraph({ ...facilityData, id: mid });
       }
 
       // Handle Alliance
       if (result.alliance && result.alliance.name) {
          // [Fix] Prevent duplicates for alliance
-         await db.memories.where('[saveSlotId+type+turnCount]')
-           .equals([saveSlotId, 'alliance', turnCount])
-           .delete();
+         await dbService.deleteMemories(saveSlotId, 'alliance', turnCount);
 
-         await db.memories.add({
+         const allianceData = {
            saveSlotId,
            turnCount,
            type: 'alliance',
@@ -298,17 +412,17 @@ ${JSON.stringify(actions)}
            gameTime: context?.time,
            location: context?.location,
            characters: context?.characters
-         });
+         };
+         const mid = await dbService.addMemory(allianceData);
+         await this.updateGraph({ ...allianceData, id: mid });
       }
 
       // Handle Intelligence
       if (result.intelligence && result.intelligence.name) {
          // [Fix] Prevent duplicates for intelligence
-         await db.memories.where('[saveSlotId+type+turnCount]')
-           .equals([saveSlotId, 'intelligence', turnCount])
-           .delete();
+         await dbService.deleteMemories(saveSlotId, 'intelligence', turnCount);
 
-         await db.memories.add({
+         const intelData = {
            saveSlotId,
            turnCount,
            type: 'intelligence',
@@ -321,7 +435,9 @@ ${JSON.stringify(actions)}
            gameTime: context?.time,
            location: context?.location,
            characters: context?.characters
-         });
+         };
+         const mid = await dbService.addMemory(intelData);
+         await this.updateGraph({ ...intelData, id: mid });
       }
 
     } catch (error: any) {
@@ -338,17 +454,13 @@ ${JSON.stringify(actions)}
    */
   async retryExtraction(messageId: number) {
     // 1. Fetch the assistant message
-    const assistantMsg = await db.chats.get(messageId);
+    const assistantMsg = await dbService.getChat(messageId);
     if (!assistantMsg || assistantMsg.role !== 'assistant') {
       throw new Error('无效的消息ID或消息不是AI回复');
     }
 
     // 2. Fetch the user message (preceding this assistant message)
-    const userMsg = await db.chats
-      .where('id')
-      .below(messageId)
-      .and((m: ChatMessage) => m.saveSlotId === assistantMsg.saveSlotId && m.role === 'user')
-      .last();
+    const userMsg = await dbService.getPrecedingUserMessage(messageId, assistantMsg.saveSlotId);
     
     if (!userMsg) {
       throw new Error('找不到关联的用户输入');
@@ -358,7 +470,7 @@ ${JSON.stringify(actions)}
     if (!assistantMsg.snapshotId) {
       throw new Error('该轮次没有关联的状态快照，无法重新生成记忆');
     }
-    const snapshot = await db.snapshots.get(assistantMsg.snapshotId);
+    const snapshot = await dbService.getSnapshot(assistantMsg.snapshotId);
     if (!snapshot) {
       throw new Error('快照已丢失');
     }
@@ -395,6 +507,59 @@ ${JSON.stringify(actions)}
     );
   }
 
+  async rollback(saveSlotId: number, targetTurnCount: number) {
+     // Delete all memories created AFTER the target turn count
+     // SQL: DELETE FROM memories WHERE saveSlotId = ? AND turnCount > ?
+     await dbService.exec(
+        'DELETE FROM memories WHERE saveSlotId = ? AND turnCount > ?',
+        [saveSlotId, targetTurnCount]
+     );
+  }
+
+  /**
+   * Retrieve global memories (Alliance & Intelligence) that are always active.
+   */
+  async getGlobalMemories(saveSlotId: number): Promise<string> {
+    try {
+      // Fetch all alliance and intelligence memories
+      const alliances = await dbService.getMemoriesByType(saveSlotId, 'alliance');
+      const intelligences = await dbService.getMemoriesByType(saveSlotId, 'intelligence');
+      
+      let content = '';
+      
+      if (alliances.length > 0) {
+        content += '<alliances>\n';
+        alliances.forEach(m => {
+          try {
+             const data = JSON.parse(m.content);
+             content += `- [${data.name}]: ${data.content} (Related: ${data.related_characters?.join(', ') || 'None'})\n`;
+          } catch(e) {
+             content += `- ${m.content}\n`;
+          }
+        });
+        content += '</alliances>\n\n';
+      }
+      
+      if (intelligences.length > 0) {
+        content += '<intelligence>\n';
+        intelligences.forEach(m => {
+          try {
+             const data = JSON.parse(m.content);
+             content += `- [${data.name}]: ${data.content}\n`;
+          } catch(e) {
+             content += `- ${m.content}\n`;
+          }
+        });
+        content += '</intelligence>';
+      }
+      
+      return content.trim();
+    } catch (error) {
+      console.error('Failed to get global memories:', error);
+      return '';
+    }
+  }
+
   /**
    * Retrieve relevant memories for the current context.
    */
@@ -412,12 +577,7 @@ ${JSON.stringify(actions)}
     // 1. 条件性包含设施变动记忆（支持多设施）
     try {
       // 查询最近的设施记录（获取较多记录以覆盖不同地点）
-      const allRecentFacilities = await db.memories
-        .where(['saveSlotId', 'type'])
-        .equals([saveSlotId, 'facility'])
-        .reverse()
-        .limit(20)
-        .toArray();
+      const allRecentFacilities = await dbService.getMemoriesByType(saveSlotId, 'facility', 20);
 
       if (allRecentFacilities.length > 0) {
         // 获取主角当前位置
@@ -427,6 +587,7 @@ ${JSON.stringify(actions)}
 
         // 按设施名去重，只保留每个设施最新的状态
         const facilityMap = new Map<string, MemoryEntry>();
+        // Note: allRecentFacilities is already sorted by ID DESC (newest first)
         allRecentFacilities.forEach(m => {
           const name = this.extractFacilityNameFromContent(m.content) || `loc:${this.extractLocationFromFacility(m.content)}`;
           if (!facilityMap.has(name)) {
@@ -472,37 +633,59 @@ ${JSON.stringify(actions)}
     // 2. 对剧情摘要进行粗筛和精选
     try {
       // A. 获取最近的30条摘要记忆
-      const recentSummaries = await db.memories
-        .where(['saveSlotId', 'type'])
-        .equals([saveSlotId, 'summary'])
-        .reverse()
-        .limit(30)
-        .toArray();
+      const recentSummaries = await dbService.getMemoriesByType(saveSlotId, 'summary', 30);
 
-      // B. 关键词搜索所有摘要记忆
-      const allSummaries = await db.memories
-        .where(['saveSlotId', 'type'])
-        .equals([saveSlotId, 'summary'])
-        .reverse()
-        .toArray();
-
+      // B. 关键词搜索所有摘要记忆 (作为图谱扩散的种子节点)
       const keywords = currentInput.split(/[\s,，.。!！?？]+/).filter(k => k.length > 1);
       
-      const keywordMatches = allSummaries.filter(m => {
-        const contentStr = typeof m.content === 'string' ? m.content : JSON.stringify(m.content);
-        // Check content
-        if (keywords.some(k => contentStr.includes(k))) return true;
-        // Check tags
-        if (m.tags && m.tags.some(t => keywords.some(k => t.includes(k) || k.includes(t)))) return true;
-        // Check entities
-        if (m.related_entities && m.related_entities.some(e => keywords.some(k => e.includes(k) || k.includes(e)))) return true;
-        return false;
-      });
+      let keywordMatches: MemoryEntry[] = [];
+      let graphMatches: MemoryEntry[] = [];
+
+      if (keywords.length > 0) {
+          const searchResults = await dbService.searchMemories(saveSlotId, keywords);
+          keywordMatches = searchResults.filter(m => m.type === 'summary');
+
+          // --- PEDSA Graph Activation ---
+          try {
+            await memoryGraph.ensureInitialized(saveSlotId);
+
+            if (keywordMatches.length > 0) {
+                const seedMap = new Map<number, number>();
+                keywordMatches.forEach(m => {
+                    if (m.id) seedMap.set(m.id, 1.0); // Initial energy 1.0
+                });
+
+                const activationResults = memoryGraph.spreadActivation(seedMap);
+                
+                // Filter out seeds and take top N
+                const activatedIds: number[] = [];
+                for (const [id, energy] of activationResults.entries()) {
+                    if (!seedMap.has(id) && energy > 0.1) {
+                        activatedIds.push(id);
+                    }
+                }
+                
+                // Sort by energy
+                activatedIds.sort((a, b) => (activationResults.get(b) || 0) - (activationResults.get(a) || 0));
+                
+                // Take top 10 activated memories
+                const topActivatedIds = activatedIds.slice(0, 10);
+                
+                if (topActivatedIds.length > 0) {
+                    console.log(`[MemoryGraph] Found ${topActivatedIds.length} associated memories via spreading activation.`);
+                    graphMatches = await dbService.getMemoriesByIds(topActivatedIds);
+                }
+            }
+          } catch (e) {
+            console.error('[MemoryService] Graph activation failed:', e);
+          }
+      }
 
       // C. 合并并去重
       const candidatesMap = new Map<number, MemoryEntry>();
-      recentSummaries.forEach(m => candidatesMap.set(m.id, m));
-      keywordMatches.forEach(m => candidatesMap.set(m.id, m)); // Use all keyword matches for scoring
+      recentSummaries.forEach(m => candidatesMap.set(m.id!, m));
+      keywordMatches.forEach(m => candidatesMap.set(m.id!, m));
+      graphMatches.forEach(m => candidatesMap.set(m.id!, m));
       const summaryCandidates = Array.from(candidatesMap.values());
 
       if (summaryCandidates.length > 0) {
@@ -516,307 +699,224 @@ ${JSON.stringify(actions)}
           scoredCandidates.sort((a, b) => b.score - a.score);
           const topForLLM = scoredCandidates.slice(0, 50).map(x => x.memory);
           
-          console.log('[Memory Retrieval] Retrieved', topForLLM.length, 'candidates for LLM refinement');
-
-          const candidates = topForLLM.map(m => {
-            let meta = '';
-            if (m.gameDate) meta += `[${m.gameDate} ${m.gameTime || ''}] `;
-            if (m.location) meta += `[${m.location}] `;
-            if (m.characters && m.characters.length > 0) meta += `(在场: ${m.characters.join(', ')}) `;
-            if (m.related_entities && m.related_entities.length > 0) meta += `(相关: ${m.related_entities.join(', ')}) `;
-            const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content);
-            return `[ID: ${m.id}] (${m.type}) ${meta}${content}`;
-          }).join('\n');
-
-          const prompt = `
-Current User Input: "${currentInput}"
-
-Candidate Memories:
-${candidates}
-          `;
-
-          const response = await generateCompletion({
-            systemPrompt: RETRIEVAL_SYSTEM_PROMPT,
-            messages: [{ role: 'user', content: prompt }],
-            jsonMode: true,
-            modelType: 'memory'
-          });
-
-          const cleanedResponse = this.cleanJsonString(response || '[]');
-          const selectedIds: number[] = JSON.parse(cleanedResponse);
-          console.log('[Memory Retrieval] LLM selected IDs:', selectedIds);
+          const selectedIds = await this.refineMemoriesWithLLM(currentInput, topForLLM);
           
-          if (Array.isArray(selectedIds) && selectedIds.length > 0) {
-            const selectedMemories = topForLLM.filter(m => selectedIds.includes(m.id));
-            console.log('[Memory Retrieval] Final memory count (refined):', selectedMemories.length);
-            result.push(...selectedMemories.map(m => {
-              let meta = '';
-              if (m.gameDate) meta += `[${m.gameDate} ${m.gameTime || ''}] `;
-              if (m.location) meta += `[${m.location}] `;
-              if (m.characters && m.characters.length > 0) meta += `(在场: ${m.characters.join(', ')}) `;
-              if (m.related_entities && m.related_entities.length > 0) meta += `(相关: ${m.related_entities.join(', ')}) `;
-              return `<memory type="${m.type}">${meta}${m.content}</memory>`;
-            }));
-          }
+          const finalSelection = topForLLM.filter(m => selectedIds.includes(m.id!));
+          
+          result.push(...finalSelection.map(m => {
+             let meta = '';
+             if (m.gameDate) meta += `[${m.gameDate} ${m.gameTime || ''}] `;
+             if (m.location) meta += `[${m.location}] `;
+             if (m.characters && m.characters.length > 0) meta += `(在场: ${m.characters.join(', ')}) `;
+             return `<memory type="${m.type}" turn="${m.turnCount}">${meta}${m.content}</memory>`;
+          }));
         } else {
-          // E. 粗筛模式 (无需 LLM)
-          // 评分并取前 50 条
+          // Fallback: 简单的关键词匹配打分 + 时间衰减
           const scoredCandidates = summaryCandidates.map(m => ({
             memory: m,
             score: this.calculateRelevanceScore(m, keywords, currentTurnCount)
           }));
-          
+
+          // Sort by score desc
           scoredCandidates.sort((a, b) => b.score - a.score);
           
-          const topCandidates = scoredCandidates.slice(0, 50).map(x => x.memory);
+          // Take top 10
+          const top10 = scoredCandidates.slice(0, 10).map(x => x.memory);
           
-          console.log('[Memory Retrieval] Coarse filtering mode - top', topCandidates.length, 'memories selected');
-          console.log('[Memory Retrieval] Final memory count (coarse):', topCandidates.length);
-          
-          result.push(...topCandidates.map(m => {
-            let meta = '';
-            if (m.gameDate) meta += `[${m.gameDate} ${m.gameTime || ''}] `;
-            if (m.location) meta += `[${m.location}] `;
-            if (m.characters && m.characters.length > 0) meta += `(在场: ${m.characters.join(', ')}) `;
-            if (m.related_entities && m.related_entities.length > 0) meta += `(相关: ${m.related_entities.join(', ')}) `;
-            return `<memory type="${m.type}">${meta}${m.content}</memory>`;
+          result.push(...top10.map(m => {
+             let meta = '';
+             if (m.gameDate) meta += `[${m.gameDate} ${m.gameTime || ''}] `;
+             if (m.location) meta += `[${m.location}] `;
+             if (m.characters && m.characters.length > 0) meta += `(在场: ${m.characters.join(', ')}) `;
+             return `<memory type="${m.type}" turn="${m.turnCount}">${meta}${m.content}</memory>`;
           }));
         }
       }
-    } catch (error: any) {
-      console.error('Memory retrieval failed:', error);
-      const toastStore = useToastStore();
-      toastStore.addToast(`记忆检索失败: ${error.message}`, 'error');
-    }
-
-    // 3. 获取最近的变量变动（硬记忆，如金钱、道具变动）
-    try {
-      const recentVariables = await db.memories
-        .where(['saveSlotId', 'type'])
-        .equals([saveSlotId, 'variable_change'])
-        .reverse()
-        .limit(5)
-        .toArray();
-      
-      if (recentVariables.length > 0) {
-        result.push(...recentVariables.map(m => 
-          `<memory type="variable" turn="${m.turnCount}">${m.content}</memory>`
-        ));
-      }
     } catch (error) {
-      console.error('Failed to retrieve variable memories:', error);
+      console.error('Failed to retrieve summary memories:', error);
     }
 
     return result.join('\n');
   }
 
-  /**
-   * Rollback memories to a specific turn (e.g. after loading a save).
-   * Deletes all memories created AFTER the target turn.
-   */
-  async rollback(saveSlotId: number, targetTurnCount: number) {
-    await db.memories
-      .where('[saveSlotId+turnCount]')
-      .between([saveSlotId, targetTurnCount + 1], [saveSlotId, Infinity])
-      .delete();
-  }
+  // --- Helper Methods ---
 
-  private extractEntityIdsFromActions(actions: any[], staticCharacters: any[] = [], runtimeNpcs: Record<string, any> = {}): string[] {
+  private extractEntityIdsFromActions(actions: any[], characters: any[], npcs: any): string[] {
     const entities = new Set<string>();
-    actions.forEach(a => {
-      if (a.npcId) entities.add(resolveCharacterId(a.npcId, staticCharacters, runtimeNpcs));
-      if (a.add_chars) a.add_chars.forEach((c: any) => {
-          const rawId = typeof c === 'string' ? c : c.id || c.name;
-          entities.add(resolveCharacterId(rawId, staticCharacters, runtimeNpcs));
-      });
+    
+    if (!actions) return [];
+
+    actions.forEach(action => {
+      // 1. Check for 'target' (usually NPC ID)
+      if (action.target && typeof action.target === 'string') {
+        // Try to resolve name from NPCs or Characters
+        const npc = npcs[action.target];
+        if (npc) {
+          entities.add(npc.name);
+        } else {
+          // Try global characters
+          const char = characters.find((c: any) => c.uuid === action.target || c.id === action.target);
+          if (char) {
+            entities.add(char.name);
+          } else {
+            entities.add(action.target);
+          }
+        }
+      }
+      
+      // 2. Check for 'characterId'
+      if (action.characterId && typeof action.characterId === 'string') {
+         const npc = npcs[action.characterId];
+         if (npc) {
+            entities.add(npc.name);
+         } else {
+             entities.add(action.characterId);
+         }
+      }
+      
+      // 3. Inventory items
+      if (action.type === 'INVENTORY' && action.value) {
+         if (typeof action.value === 'string') {
+             entities.add(action.value.split(',')[0]);
+         } else if (action.value.name) {
+             entities.add(action.value.name);
+         }
+      }
     });
+    
     return Array.from(entities);
   }
 
-  /**
-   * Helper to clean JSON string from LLM response (remove markdown, extra text)
-   */
   private cleanJsonString(str: string): string {
-    if (!str) return '';
-    let cleaned = str.trim();
-    
-    // Remove markdown code blocks if present
-     const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/i;
-     const match = cleaned.match(codeBlockRegex);
-     if (match && match[1]) {
-       cleaned = match[1].trim();
-     }
-    
-    // Try to find the valid JSON object or array
-    // Look for the first '{' or '[' and the last '}' or ']'
-    const firstBrace = cleaned.search(/[{\[]/);
-    if (firstBrace !== -1) {
-      // Find the corresponding closing character
-      const lastBrace = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
-      if (lastBrace !== -1 && lastBrace > firstBrace) {
-         cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    return str.replace(/```json/g, '').replace(/```/g, '').trim();
+  }
+
+  private normalizeLocation(loc: string): string {
+    if (!loc) return '';
+    return loc.replace(/[\[\]【】\s]/g, '');
+  }
+
+  private extractLocationFromFacility(content: string): string {
+    const match = content.match(/地点：(.*?)\n/);
+    return (match && match[1]) ? this.normalizeLocation(match[1]) : '';
+  }
+
+  private extractFacilityNameFromContent(content: string): string {
+     const match = content.match(/【(.*?)】/);
+     return (match && match[1]) ? match[1] : '';
+  }
+
+  /**
+   * Sync old facility memories to the new registry.
+   * This is called on game startup to ensure old data is migrated.
+   */
+  async syncOldFacilitiesToRegistry() {
+    try {
+      console.log('[MemoryService] Starting old facility data sync...');
+      const oldMemories = await dbService.getAllMemoriesAcrossSlots();
+      const facilityMemories = oldMemories.filter(m => m.type === 'facility');
+      
+      if (facilityMemories.length === 0) {
+        console.log('[MemoryService] No old facility memories found.');
+        return;
       }
-    }
-    
-    return cleaned;
-  }
 
-  /**
-   * 从设施变动条目中提取地点信息
-   * 支持新格式：地点：[地点]
-   * 以及旧格式：地点：[地点]，介绍：...
-   */
-  private extractLocationFromFacility(content: string | any): string | null {
-    const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
-    // 匹配"地点："后面到换行或逗号之前的内容
-    const locationMatch = contentStr.match(/地点：([^，\n\r]+)/);
-    if (locationMatch && locationMatch[1]) {
-      return locationMatch[1].trim();
-    }
-    return null;
-  }
-
-  /**
-   * 从设施内容中提取设施名称
-   * 支持新格式：【设施名称】
-   * 以及旧格式的推断
-   */
-  private extractFacilityNameFromContent(content: string | any): string | null {
-    const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
-    
-    // 1. 匹配新格式 【设施名称】
-    const nameMatch = contentStr.match(/【([^】]+)】/);
-    if (nameMatch && nameMatch[1]) {
-      return nameMatch[1].trim();
-    }
-
-    // 2. 兼容旧数据推断
-    const locationMatch = contentStr.match(/地点：([^，\n]+)/);
-    if (locationMatch && locationMatch[1]) {
-      const location = locationMatch[1].trim();
-      if (['博丽神社', '雾之湖', '人间之里', '红魔馆', '白玉楼', '永远亭'].includes(location)) {
-        return location;
+      // Group by saveSlotId and then by facility name to get the LATEST state for each facility per slot
+      const slotMap = new Map<number, Map<string, any>>();
+      
+      // memories are already sorted by ID DESC (newest first)
+      for (const m of facilityMemories) {
+        if (!slotMap.has(m.saveSlotId)) {
+          slotMap.set(m.saveSlotId, new Map());
+        }
+        
+        const name = this.extractFacilityNameFromContent(m.content);
+        if (name && !slotMap.get(m.saveSlotId)!.has(name)) {
+          slotMap.get(m.saveSlotId)!.set(name, m);
+        }
       }
-      if (contentStr.includes('酒馆')) return location + '酒馆';
-      if (contentStr.includes('农田')) return location + '农田';
-      if (contentStr.includes('工坊')) return location + '工坊';
-      return location;
+
+      let syncCount = 0;
+      for (const [saveSlotId, facilities] of slotMap.entries()) {
+        for (const [name, memory] of facilities.entries()) {
+          // Check if already in registry
+          const existing = await dbService.getFacilityByName(saveSlotId, name);
+          if (!existing) {
+            // Extract data from content
+            const location = this.extractLocationFromFacility(memory.content);
+            const descriptionMatch = memory.content.match(/介绍：(.*?)\n/);
+            const statusMatch = memory.content.match(/状态：(.*?)\n/);
+            
+            await dbService.upsertFacility({
+              id: generateUUID(),
+              saveSlotId,
+              name: name,
+              location: location || '',
+              description: descriptionMatch ? descriptionMatch[1] : '',
+              status: statusMatch ? statusMatch[1].split(' ')[0] : '正常',
+              sub_locations: [], // Old format didn't have structured sub_locations easily extractable
+              staff: [],
+              is_player_owned: true,
+              created_at: memory.createdAt
+            });
+            syncCount++;
+          }
+        }
+      }
+      
+      console.log(`[MemoryService] Old facility data sync completed. Migrated ${syncCount} facilities.`);
+    } catch (err) {
+      console.error('[MemoryService] Failed to sync old facilities:', err);
     }
-    return null;
   }
 
-  /**
-   * Retrieve global/permanent memories (Alliance, Intelligence).
-   */
-  async getGlobalMemories(saveSlotId: number): Promise<string> {
-    const memories = await db.memories
-      .where('[saveSlotId+type]')
-      .anyOf([saveSlotId, 'alliance'], [saveSlotId, 'intelligence'])
-      .toArray();
-
-    if (memories.length === 0) return '';
-
-    let output = '';
-    
-    const alliances = memories.filter(m => m.type === 'alliance');
-    if (alliances.length > 0) {
-      output += `<alliances>\n`;
-      alliances.forEach(m => {
-        try {
-          const data = JSON.parse(m.content);
-          output += `<alliance>\n`;
-          output += `  <name>${data.name}</name>\n`;
-          output += `  <content>${data.content}</content>\n`;
-          if (data.related_characters && data.related_characters.length > 0) {
-            output += `  <related>${data.related_characters.join(', ')}</related>\n`;
-          }
-          if (data.established_time) {
-            output += `  <time>${data.established_time}</time>\n`;
-          }
-          output += `</alliance>\n`;
-        } catch (e) {
-          // Fallback for raw text
-          output += `<alliance>${m.content}</alliance>\n`;
-        }
-      });
-      output += `</alliances>\n`;
-    }
-
-    const intelligence = memories.filter(m => m.type === 'intelligence');
-    if (intelligence.length > 0) {
-      output += `<known_intelligence>\n`;
-      intelligence.forEach(m => {
-        try {
-          const data = JSON.parse(m.content);
-          output += `<intelligence>\n`;
-          output += `  <name>${data.name}</name>\n`;
-          output += `  <content>${data.content}</content>\n`;
-          if (data.acquired_time) {
-            output += `  <time>${data.acquired_time}</time>\n`;
-          }
-          output += `</intelligence>\n`;
-        } catch (e) {
-          output += `<intelligence>${m.content}</intelligence>\n`;
-        }
-      });
-      output += `</known_intelligence>\n`;
-    }
-
-    return output;
-  }
-
-  // Calculate relevance score (simple keyword matching + recency)
-  private calculateRelevanceScore(memory: MemoryEntry, keywords: string[], currentTurnCount: number): number {
+  private calculateRelevanceScore(memory: MemoryEntry, keywords: string[], currentTurn: number): number {
     let score = 0;
-    const contentStr = typeof memory.content === 'string' ? memory.content : JSON.stringify(memory.content);
+    const contentStr = (memory.content + (memory.tags?.join('') || '')).toLowerCase();
     
-    // 1. Keyword Matching (Content: 10 pts per match)
+    // Keyword match
     keywords.forEach(k => {
-      if (contentStr.includes(k)) score += 10;
+      if (contentStr.includes(k.toLowerCase())) score += 10;
     });
 
-    // 2. Tags Matching (3 pts per match)
-    if (memory.tags) {
-      memory.tags.forEach(t => {
-        if (keywords.some(k => t.includes(k) || k.includes(t))) score += 3;
-      });
-    }
+    // Recency boost (simple decay)
+    const turnDiff = currentTurn - memory.turnCount;
+    if (turnDiff < 5) score += 5;
+    else if (turnDiff < 20) score += 2;
 
-    // 3. Entities Matching (5 pts per match)
-    if (memory.related_entities) {
-      memory.related_entities.forEach(e => {
-        if (keywords.some(k => e.includes(k) || k.includes(e))) score += 5;
-      });
-    }
-
-    // 4. Importance Weight (1-5) * 2
-    score += (memory.importance || 1) * 2;
-
-    // 5. Recency Decay (Linear decay based on turn count difference)
-    // Recent memories get a boost.
-    const age = currentTurnCount - memory.turnCount;
-    if (age < 50) {
-      score += Math.max(0, 20 - age * 0.4); 
-    }
+    // Importance boost
+    score += (memory.importance || 0) * 2;
 
     return score;
   }
 
-  /**
-   * 标准化地点名称，提取主要地点部分
-   * 支持：博丽神社、正殿前 → 博丽神社
-   *      雾之湖，芦苇丛左侧 → 雾之湖
-   *      人间之里/商业街 → 人间之里
-   */
-  private normalizeLocation(location: string): string {
-    if (!location) return '';
-    // 匹配：地点 + 分割符 + 其他内容
-    // 支持更多分隔符：、，／ , / | 空格
-    const match = location.match(/^([^、，／,/\s|]+)[、，／,/\s|]/);
-    if (match && match[1]) {
-      return match[1].trim();
-    }
-    return location;
+  private async refineMemoriesWithLLM(input: string, candidates: MemoryEntry[]): Promise<number[]> {
+     if (candidates.length === 0) return [];
+     
+     const candidateList = candidates.map(m => `${m.id}: ${m.content.substring(0, 100)}...`).join('\n');
+     
+     const prompt = `
+Current Input: ${input}
+
+Candidate Memories:
+${candidateList}
+     `;
+
+     try {
+         const response = await generateCompletion({
+            systemPrompt: RETRIEVAL_SYSTEM_PROMPT,
+            messages: [{ role: 'user', content: prompt }],
+            jsonMode: true,
+            modelType: 'memory'
+         });
+         
+         const cleaned = this.cleanJsonString(response || '[]');
+         const ids = JSON.parse(cleaned);
+         return Array.isArray(ids) ? ids : [];
+     } catch (e) {
+         console.error('LLM refinement failed', e);
+         return [];
+     }
   }
 }
 

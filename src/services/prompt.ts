@@ -355,8 +355,8 @@ export class PromptService {
              } else {
                 // It IS in scene, so treat it as such (and append status)
                 const runtimeStatus = gameStore.state.npcs[card.uuid] || gameStore.state.npcs[card.name];
-                if (runtimeStatus) {
-                  content += `\n[当前状态]
+                if (runtimeStatus && (card.type === 'character' || !card.type)) {
+                   content += `\n[当前状态]
 好感度: ${runtimeStatus.favorability}
 心情: ${runtimeStatus.mood}
 姿势: ${runtimeStatus.posture}
@@ -446,7 +446,8 @@ MP：${p.mp}/${p.max_mp}
         const name = card?.name || status?.name || npcId;
         
         let charInfo = `- ${name}`;
-        if (status) {
+        // Only inject status details for character types to avoid nonsensical data for locations/info
+        if (status && (!card || card.type === 'character' || !card.type)) {
           // Add runtime variables if available
           const details = [];
           if (status.favorability !== undefined) details.push(`好感:${status.favorability}`);
@@ -465,7 +466,11 @@ MP：${p.mp}/${p.max_mp}
           if (status.residence) details.push(`住所:${status.residence}`);
           if (status.face) details.push(`脸部:${status.face}`);
           if (status.mouth) details.push(`嘴部:${status.mouth}`);
-          if (status.relationship) details.push(`关系:${status.relationship}`);
+          
+          let relStr = '';
+          if (status.relationship) relStr = `关系:${status.relationship}`;
+          if (status.addressing) relStr += ` (称呼你:${status.addressing})`;
+          if (relStr) details.push(relStr.trim());
           
           if (details.length > 0) {
             charInfo += `: ${details.join(', ')}`;
@@ -522,7 +527,12 @@ MP：${p.mp}/${p.max_mp}
           const details = [];
           if ((status as any).favorability !== undefined) details.push(`好感:${(status as any).favorability}`);
           if ((status as any).obedience !== undefined) details.push(`服从:${(status as any).obedience}`);
-          if ((status as any).relationship) details.push(`关系:${(status as any).relationship}`);
+          
+          let relStr = '';
+          if ((status as any).relationship) relStr = `关系:${(status as any).relationship}`;
+          if ((status as any).addressing) relStr += ` (称呼你:${(status as any).addressing})`;
+          if (relStr) details.push(relStr.trim());
+
           if ((status as any).residence) details.push(`住所:${(status as any).residence}`);
           
           if (details.length > 0) {

@@ -4,7 +4,7 @@ import { useChatStore } from '@/stores/chat';
 import { useSaveStore } from '@/stores/save';
 import { useGameStore } from '@/stores/game';
 import { audioManager } from '@/services/audio';
-import { db } from '@/db';
+import { dbService } from '@/services/DatabaseService';
 import { generateCompletion } from '@/services/llm';
 import { X, Loader2, Copy, RefreshCw, FileText, Check, Sparkles } from 'lucide-vue-next';
 
@@ -88,9 +88,7 @@ async function generateSummary() {
     // 2. Fetch Memories
     if (!saveStore.currentSaveId) throw new Error("No active save");
     
-    const memories = await db.memories
-      .where({ saveSlotId: saveStore.currentSaveId })
-      .toArray();
+    const memories = await dbService.getAllMemories(saveStore.currentSaveId);
       
     // Sort memories by creation time or turn count if needed?
     // Usually they are inserted in order.

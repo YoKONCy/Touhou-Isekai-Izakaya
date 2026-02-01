@@ -3,10 +3,11 @@ import { ref, computed } from 'vue';
 import { type GameState, INITIAL_GAME_STATE, type GameAction, type Quest, type QuestStatus, type Item, type PromiseState } from '@/types/game';
 import { type SpellCard } from '@/types/combat';
 import { useCharacterStore } from '@/stores/character';
+import { useSettingsStore } from '@/stores/settings';
 import { resolveCharacterId } from '@/services/characterMapping';
 import { PRESET_ITEMS } from '@/data/items';
 import { PRESET_SPELLCARDS } from '@/data/spellcards';
-import { db } from '@/db';
+import { dbService } from '@/services/DatabaseService';
 import _ from 'lodash';
 
 const NPC_FIELD_MAPPING: Record<string, string> = {
@@ -134,109 +135,124 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  function updateQuestStatus(questId: string, status: QuestStatus, summary?: string) {
+  function updateQuestStatus(questId: string, updates: { status?: QuestStatus, summary?: string, log?: string }) {
     if (!state.value.system.quests) return;
     
     const quest = state.value.system.quests.find(q => q.id === questId);
     if (quest) {
-      // Prevent double completion (and double rewards)
-      if (quest.status === 'completed' && status === 'completed') {
-         return; 
+      // 1. Handle Log Update (Progress Report)
+      if (updates.log) {
+         if (!quest.logs) quest.logs = [];
+         quest.logs.push({
+            content: updates.log,
+            time: state.value.player.time,
+            date: state.value.player.date,
+            turn: state.value.system.turn_count
+         });
       }
 
-      quest.status = status;
-      if (status === 'completed' || status === 'failed') {
-        quest.completedTurn = state.value.system.turn_count;
-        quest.completedDate = state.value.player.date;
-        quest.completedTime = state.value.player.time;
-        if (summary) {
-          quest.completionSummary = summary;
-        }
-        
-        // Distribute Rewards
-        if (status === 'completed' && quest.rewards) {
-           console.log('[GameStore] Distributing rewards for quest:', quest.name, quest.rewards);
-           for (const reward of quest.rewards) {
-              try {
-                 if (reward.type === 'money') {
-                    applyAction({
-                       type: 'UPDATE_PLAYER',
-                       field: 'money',
-                       op: 'add',
-                       value: Number(reward.value) || 0
-                    });
-                 } else if (reward.type === 'item') {
-                    applyAction({
-                       type: 'INVENTORY',
-                       target: 'items',
-                       op: 'add',
-                       value: reward.value
-                    });
-                 } else if (reward.type === 'spell_card') {
-                    applyAction({
-                       type: 'INVENTORY',
-                       target: 'spell_cards',
-                       op: 'add',
-                       value: reward.value
-                    });
-                 } else if (reward.type === 'attribute') {
-                    let field = '';
-                    let val = 0;
+      // 2. Handle Status Update (if provided)
+      const newStatus = updates.status;
+      if (newStatus) {
+         // Prevent double completion (and double rewards)
+         if (quest.status === 'completed' && newStatus === 'completed') {
+            return; 
+         }
 
-                    // Case 1: Standard Object Format
-                    if (typeof reward.value === 'object' && reward.value.field) {
-                        field = reward.value.field;
-                        val = Number(reward.value.value) || 0;
-                    } 
-                    // Case 2: LLM Text Format (Infer from description/value)
-                    else {
-                        // Infer Field
-                        const desc = (reward.description || '').toLowerCase();
-                        const valStr = String(reward.value || '');
-                        
-                        if (desc.includes('声望') || desc.includes('reputation')) field = 'reputation';
-                        else if (desc.includes('金钱') || desc.includes('money')) field = 'money';
-                        else if (desc.includes('战斗力') || desc.includes('power')) field = 'power';
-                        
-                        // Infer Value
-                        if (field) {
-                            // Try extracting number first
-                            const numMatch = valStr.match(/-?\d+/);
-                            if (numMatch) {
-                                val = parseInt(numMatch[0]);
-                            } else {
-                                // Fallback defaults based on field/text content
-                                if (field === 'reputation') {
-                                    // Heuristic for reputation levels if mentioned in text
-                                    if (valStr.includes('小有名气')) val = 25;
-                                    else if (valStr.includes('名声鹤起')) val = 45;
-                                    else if (valStr.includes('闻名遐迩')) val = 65;
-                                    else if (valStr.includes('驰名天下')) val = 85;
-                                    else val = 10; // Default small boost
+         quest.status = newStatus;
+         if (newStatus === 'completed' || newStatus === 'failed') {
+           quest.completedTurn = state.value.system.turn_count;
+           quest.completedDate = state.value.player.date;
+           quest.completedTime = state.value.player.time;
+           if (updates.summary) {
+             quest.completionSummary = updates.summary;
+           }
+           
+           // Distribute Rewards
+           if (newStatus === 'completed' && quest.rewards) {
+              console.log('[GameStore] Distributing rewards for quest:', quest.name, quest.rewards);
+              for (const reward of quest.rewards) {
+                 try {
+                    if (reward.type === 'money') {
+                       applyAction({
+                          type: 'UPDATE_PLAYER',
+                          field: 'money',
+                          op: 'add',
+                          value: Number(reward.value) || 0
+                       });
+                    } else if (reward.type === 'item') {
+                       applyAction({
+                          type: 'INVENTORY',
+                          target: 'items',
+                          op: 'add',
+                          value: reward.value
+                       });
+                    } else if (reward.type === 'spell_card') {
+                       applyAction({
+                          type: 'INVENTORY',
+                          target: 'spell_cards',
+                          op: 'add',
+                          value: reward.value
+                       });
+                    } else if (reward.type === 'attribute') {
+                        let field = '';
+                        let val = 0;
+
+                        // Case 1: Standard Object Format
+                        if (typeof reward.value === 'object' && reward.value.field) {
+                            field = reward.value.field;
+                            val = Number(reward.value.value) || 0;
+                        } 
+                        // Case 2: LLM Text Format (Infer from description/value)
+                        else {
+                            // Infer Field
+                            const desc = (reward.description || '').toLowerCase();
+                            const valStr = String(reward.value || '');
+                            
+                            if (desc.includes('声望') || desc.includes('reputation')) field = 'reputation';
+                            else if (desc.includes('金钱') || desc.includes('money')) field = 'money';
+                            else if (desc.includes('战斗力') || desc.includes('power')) field = 'power';
+                            
+                            // Infer Value
+                            if (field) {
+                                // Try extracting number first
+                                const numMatch = valStr.match(/-?\d+/);
+                                if (numMatch) {
+                                    val = parseInt(numMatch[0]);
+                                } else {
+                                    // Fallback defaults based on field/text content
+                                    if (field === 'reputation') {
+                                        // Heuristic for reputation levels if mentioned in text
+                                        if (valStr.includes('小有名气')) val = 25;
+                                        else if (valStr.includes('名声鹤起')) val = 45;
+                                        else if (valStr.includes('闻名遐迩')) val = 65;
+                                        else if (valStr.includes('驰名天下')) val = 85;
+                                        else val = 10; // Default small boost
+                                    }
+                                    if (field === 'money') val = 1000;
+                                    if (field === 'power') val = 1;
                                 }
-                                if (field === 'money') val = 1000;
-                                if (field === 'power') val = 1;
                             }
                         }
-                    }
 
-                    if (field && val !== 0) {
-                        applyAction({
-                            type: 'UPDATE_PLAYER',
-                            field: field,
-                            op: 'add',
-                            value: val
-                        });
-                        console.log(`[GameStore] Applied inferred attribute reward: ${field} += ${val}`);
-                    } else {
-                         console.warn('[GameStore] Could not parse attribute reward:', reward);
+                        if (field && val !== 0) {
+                            applyAction({
+                                type: 'UPDATE_PLAYER',
+                                field: field,
+                                op: 'add',
+                                value: val
+                            });
+                            console.log(`[GameStore] Applied inferred attribute reward: ${field} += ${val}`);
+                        } else {
+                             console.warn('[GameStore] Could not parse attribute reward:', reward);
+                        }
                     }
+                 } catch (e) {
+                    console.error('[GameStore] Error applying reward:', reward, e);
                  }
-              } catch (e) {
-                 console.error('[GameStore] Error applying reward:', reward, e);
               }
            }
-        }
+         }
       }
     }
   }
@@ -524,7 +540,7 @@ export const useGameStore = defineStore('game', () => {
              // Enhanced Item Logic
              const items = state.value.player.items;
              
-             if (action.op === 'push' || action.op === 'add') {
+             if (action.op && ['push', 'add', 'set'].includes(action.op)) {
                 let newItem: Item;
                 const val = action.value;
                 
@@ -586,7 +602,7 @@ export const useGameStore = defineStore('game', () => {
                    }
                 }
 
-                // 2. Add or Stack
+                // 2. Add, Stack, or Set
                 // Match by ID (preferred) or Name
                 const existingItem = items.find(i => 
                    (newItem.id && i.id === newItem.id) || 
@@ -594,21 +610,48 @@ export const useGameStore = defineStore('game', () => {
                 );
                 
                 if (existingItem) {
-                   existingItem.count += newItem.count;
+                   if (action.op === 'set') {
+                      existingItem.count = newItem.count;
+                      // Also update metadata to allow standardization/fixes
+                      existingItem.description = newItem.description;
+                      existingItem.type = newItem.type;
+                      existingItem.effects = newItem.effects;
+                   } else {
+                      existingItem.count += newItem.count;
+                   }
                 } else {
                    items.push(newItem);
                 }
              }
              
              if (action.op === 'remove') {
-                const val = action.value; // string ID or Name or Object
-                const idToCheck = typeof val === 'string' ? val : (val.id || val.name);
+                let val = action.value; // string ID or Name or Object
+                let countToRemove = 1;
+                let idToCheck = '';
+
+                if (typeof val === 'string') {
+                   // Support "Name,Count" format (e.g. "Apple,5")
+                   if (val.includes(',')) {
+                      const lastIndex = val.lastIndexOf(',');
+                      const possibleCount = parseInt(val.substring(lastIndex + 1).trim());
+                      if (!isNaN(possibleCount)) {
+                         idToCheck = val.substring(0, lastIndex).trim();
+                         countToRemove = possibleCount;
+                      } else {
+                         idToCheck = val;
+                      }
+                   } else {
+                      idToCheck = val;
+                   }
+                } else {
+                   idToCheck = val.id || val.name;
+                   countToRemove = val.count || 1;
+                }
                 
                 // Find by ID or Name
                 const existingItem = items.find(i => i.id === idToCheck || i.name === idToCheck);
                 
                 if (existingItem) {
-                   const countToRemove = (typeof val === 'object' && val.count) ? val.count : 1;
                    existingItem.count -= countToRemove;
                    
                    if (existingItem.count <= 0) {
@@ -623,7 +666,7 @@ export const useGameStore = defineStore('game', () => {
             if (!state.value.player.spell_cards) state.value.player.spell_cards = [];
             const spellCards = state.value.player.spell_cards;
             
-            if (action.op === 'add' || action.op === 'push') {
+            if (action.op && ['push', 'add', 'set'].includes(action.op)) {
                const values = Array.isArray(action.value) ? action.value : [action.value];
                
                for (const val of values) {
@@ -694,8 +737,14 @@ export const useGameStore = defineStore('game', () => {
                      }
                   }
                   
-                  // Avoid duplicates by Name
-                  if (!spellCards.find(c => c.name === newCard.name)) {
+                  // Avoid duplicates by Name, but allow updates via SET
+                  const existingCard = spellCards.find(c => c.name === newCard.name);
+                  if (existingCard) {
+                     if (action.op === 'set') {
+                        // Update existing card properties
+                        Object.assign(existingCard, newCard);
+                     }
+                  } else {
                      spellCards.push(newCard);
                   }
                }
@@ -882,16 +931,16 @@ export const useGameStore = defineStore('game', () => {
    */
   async function saveCurrentStateToLastSnapshot() {
     try {
+      const settingsStore = useSettingsStore();
+      const currentSaveSlotId = settingsStore.currentSaveSlotId;
+      if (!currentSaveSlotId) return;
+
       // Find the last chat message with a snapshot
-      const lastChatWithSnapshot = await db.chats
-        .where('snapshotId')
-        .notEqual(0)
-        .reverse()
-        .first();
+      const lastChatWithSnapshot = await dbService.getLastChatWithSnapshot(currentSaveSlotId);
 
       if (lastChatWithSnapshot && lastChatWithSnapshot.snapshotId) {
         const currentState = JSON.parse(JSON.stringify(state.value));
-        await db.snapshots.update(lastChatWithSnapshot.snapshotId, {
+        await dbService.updateSnapshot(lastChatWithSnapshot.snapshotId, {
           gameState: JSON.stringify(currentState)
         });
         console.log('[GameStore] Persisted current state to snapshot:', lastChatWithSnapshot.snapshotId);

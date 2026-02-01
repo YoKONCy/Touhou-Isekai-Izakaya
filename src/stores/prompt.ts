@@ -405,6 +405,34 @@ const DEFAULT_BLOCKS: PromptBlock[] = [
     ]
   },
   {
+    id: 'narrative_relay',
+    name: '转述设定',
+    description: '决定 LLM 是否会代替玩家扮演的角色发言。',
+    enabled: true,
+    configurable: false,
+    role: 'system',
+    selectedOptionId: 'normal_relay',
+    options: [
+      {
+        id: 'normal_relay',
+        name: '正常转述',
+        content: ''
+      },
+      {
+        id: 'anti_interruption',
+        name: '防抢话',
+        content: `<narrative_relay_setting>
+防抢话模式: 开启
+指令:
+  - 绝对禁止代替 {{user}} 进行任何形式的发言、心理活动描写或主动行为决策。
+  - 叙事焦点必须始终保持在 NPC、环境以及对 {{user}} 行为的被动反馈上。
+  - 当剧情发展需要 {{user}} 做出回应（无论是对话、动作还是心理反应）时，必须立即停止生成。
+  - 即使是简单的点头或确认，也必须留给玩家自己操作。
+</narrative_relay_setting>`
+      }
+    ]
+  },
+  {
     id: 'world_info',
     name: '世界观设定',
     description: '描述幻想乡的基本背景。',
@@ -798,21 +826,27 @@ const DEFAULT_BLOCKS: PromptBlock[] = [
 
 <quest_update_protocol>
 【任务状态更新规则】 (Quest Update Protocol)
-当玩家完成了一个已接受的任务，或任务失败时，请**在回复末尾**（文本之外）附带一个 <quest_update> JSON 块。
+你可以随时更新任务的进度，无论是完成任务、任务失败，还是仅仅记录中间过程。
 
 触发条件：
-1. 玩家完成了任务目标。
-2. 任务因剧情原因失败或无法继续。
+1. 玩家完成了任务目标 (Status: completed)。
+2. 任务因剧情原因失败或无法继续 (Status: failed)。
+3. 任务取得了阶段性进展，需要记录日志，但任务尚未结束 (Log only)。
 
 输出格式：
 <quest_update>
 {
   "update": true,
   "quest_name": "任务名称（必须与任务列表中的名称完全一致）",
-  "status": "completed" | "failed",
-  "summary": "任务完成/失败的简要总结（如：成功将信件送达）"
+  "status": "completed" | "failed" | "active", // 可选。如果只是记录日志，可省略或填 "active"。
+  "log": "阶段性进度描述（例如：‘找到了第一个红蘑菇’）。仅在需要记录过程时填写。",
+  "summary": "最终完成/失败时的总结。仅在 status 为 completed/failed 时填写。"
 }
 </quest_update>
+
+注意：
+- 如果只是为了更新日志 (Log)，不要将 status 设为 completed，否则会触发奖励结算。
+- 日志 (log) 会显示在玩家的任务面板中，作为任务执行过程的记录，增加沉浸感。
 </quest_update_protocol>
 
 <promise_trigger_protocol>
@@ -1018,12 +1052,29 @@ export const usePromptStore = defineStore('prompt', () => {
            const defaultBlock = DEFAULT_BLOCKS.find(b => b.id === savedBlock.id);
            if (defaultBlock) {
              // Exist in current code: Update metadata, keep user state
+             
+             // Merge options if they exist
+             let mergedOptions = defaultBlock.options ? [...defaultBlock.options] : undefined;
+             if (savedBlock.options && mergedOptions) {
+               // Update default options with saved content/name (to keep user edits)
+               mergedOptions = mergedOptions.map(opt => {
+                 const savedOpt = savedBlock.options!.find(o => o.id === opt.id);
+                 return savedOpt ? { ...opt, ...savedOpt } : opt;
+               });
+               
+               // Add custom options that don't exist in DEFAULT_BLOCKS
+               const defaultOptionIds = new Set(defaultBlock.options!.map(o => o.id));
+               const customOptions = savedBlock.options.filter(o => !defaultOptionIds.has(o.id));
+               mergedOptions.push(...customOptions);
+             }
+
              mergedBlocks.push({
                ...defaultBlock, // Get latest metadata/options/content defaults
                enabled: savedBlock.enabled,
                content: savedBlock.content ?? defaultBlock.content, // Use saved content if any, else default
                metadata: { ...defaultBlock.metadata, ...savedBlock.metadata }, // Merge metadata
-               selectedOptionId: savedBlock.selectedOptionId ?? defaultBlock.selectedOptionId // Keep selected option
+               selectedOptionId: savedBlock.selectedOptionId ?? defaultBlock.selectedOptionId, // Keep selected option
+               options: mergedOptions
              });
            } else {
              // Deprecated block? Maybe keep it or drop it. 

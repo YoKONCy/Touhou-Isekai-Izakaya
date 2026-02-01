@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { db } from '@/db';
+import { dbService } from '@/services/DatabaseService';
 import _ from 'lodash';
 import { 
     DEFAULT_DRAWING_PROMPT_SYSTEM, 
@@ -168,7 +168,7 @@ export const useSettingsStore = defineStore('settings', () => {
   });
 
   async function loadSettings() {
-    const settings = await db.settings.get(1);
+    const settings = await dbService.getSettings();
     if (settings) {
       if (settings.globalProvider) globalProvider.value = settings.globalProvider;
       if (settings.llmConfigs) {
@@ -254,7 +254,7 @@ export const useSettingsStore = defineStore('settings', () => {
       drawingConfig: JSON.parse(JSON.stringify(drawingConfig.value))
     };
     
-    await db.settings.put(settingsToSave);
+    await dbService.saveSettings(settingsToSave);
   }
 
   // --- Export/Import Logic ---
@@ -262,6 +262,8 @@ export const useSettingsStore = defineStore('settings', () => {
 
   async function exportGlobalConfig() {
     // 1. Prepare global settings data
+    const dbData = await dbService.exportGlobalData();
+    
     const config: any = {
       version: 2, // Upgraded version to include game data
       timestamp: Date.now(),
@@ -274,13 +276,7 @@ export const useSettingsStore = defineStore('settings', () => {
         sfxVolume: sfxVolume.value,
       },
       customOrigins: [] as any[],
-      gameData: {
-        saveSlots: await db.saveSlots.toArray(),
-        chats: await db.chats.toArray(),
-        snapshots: await db.snapshots.toArray(),
-        memories: await db.memories.toArray(),
-        characters: await db.characters.toArray(),
-      }
+      gameData: dbData
     };
 
     // Load custom origins from localStorage
@@ -336,27 +332,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
       // 2. Import Game Data (if exists)
       if (config.gameData) {
-        const { gameData } = config;
-        
-        // Use a transaction for safety
-        await db.transaction('rw', [db.saveSlots, db.chats, db.snapshots, db.memories, db.characters], async () => {
-          // Clear existing data for a full restore
-          await Promise.all([
-            db.saveSlots.clear(),
-            db.chats.clear(),
-            db.snapshots.clear(),
-            db.memories.clear(),
-            db.characters.clear()
-          ]);
-
-          // Import data while preserving IDs
-          if (Array.isArray(gameData.saveSlots)) await db.saveSlots.bulkAdd(gameData.saveSlots);
-          if (Array.isArray(gameData.chats)) await db.chats.bulkAdd(gameData.chats);
-          if (Array.isArray(gameData.snapshots)) await db.snapshots.bulkAdd(gameData.snapshots);
-          if (Array.isArray(gameData.memories)) await db.memories.bulkAdd(gameData.memories);
-          if (Array.isArray(gameData.characters)) await db.characters.bulkAdd(gameData.characters);
-        });
-        
+        await dbService.importGlobalData(config.gameData);
         console.log('Game data imported successfully (Version:', config.version, ')');
       }
 

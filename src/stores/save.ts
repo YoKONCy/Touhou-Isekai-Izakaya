@@ -1,21 +1,33 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { db, type SaveSlot } from '@/db';
+import { dbService } from '@/services/DatabaseService';
 import { useSettingsStore } from './settings';
 import { useChatStore } from './chat';
 import { useGameStore } from './game';
 
 import { gameLoop } from '@/services/gameLoop';
 
+// Define SaveSlot interface locally or import if available
+// Assuming DatabaseService returns objects matching this structure
+export interface SaveSlot {
+  id: number;
+  name: string;
+  summary: string;
+  lastPlayed: number;
+  location?: string;
+  gameDate?: string;
+  gameTime?: string;
+  playTime?: number;
+}
+
 export const useSaveStore = defineStore('save', () => {
   const currentSaveId = ref<number | null>(null);
   const saves = ref<SaveSlot[]>([]);
   
   const settingsStore = useSettingsStore();
-  // Lazy load other stores to avoid circular dependency
   
   async function loadSaves() {
-    saves.value = await db.saveSlots.orderBy('lastPlayed').reverse().toArray();
+    saves.value = await dbService.getSaveSlots();
   }
 
   async function init() {
@@ -49,20 +61,9 @@ export const useSaveStore = defineStore('save', () => {
   }
 
   async function createSave(name: string) {
-    const id = await db.saveSlots.add({
-      name,
-      lastPlayed: Date.now(),
-      summary: '新游戏',
-      location: '未知'
-    }) as number;
+    const id = await dbService.createSaveSlot(name);
     
     await loadSaves();
-    
-    // Initialize Game State from Lorebook for the new save
-    // We need to temporarily switch context to this save? 
-    // Actually, createSave is usually followed by switchSave.
-    // If we want to ensure the initial state is correct, we should do it when switching to a FRESH save.
-    
     return id;
   }
 
@@ -77,7 +78,7 @@ export const useSaveStore = defineStore('save', () => {
     await settingsStore.saveSettings();
     
     // 3. Update Last Played
-    await db.saveSlots.update(id, { lastPlayed: Date.now() });
+    await dbService.updateSaveSlot(id, { lastPlayed: Date.now() });
     await loadSaves();
 
     // 4. Reload Game Data
@@ -87,9 +88,8 @@ export const useSaveStore = defineStore('save', () => {
     // 4.1 Sync Location from loaded state
     const gameStore = useGameStore();
     if (gameStore.state.player.location) {
-       await db.saveSlots.update(id, { location: gameStore.state.player.location });
-       // Update local cache to reflect change immediately without full reload if possible, 
-       // or just reload saves again.
+       await dbService.updateSaveSlot(id, { location: gameStore.state.player.location });
+       // Update local cache
        const saveIndex = saves.value.findIndex(s => s.id === id);
        if (saveIndex !== -1 && saves.value[saveIndex]) {
          saves.value[saveIndex].location = gameStore.state.player.location;
@@ -99,9 +99,9 @@ export const useSaveStore = defineStore('save', () => {
     // 5. Check if it's a new game (empty history)
     if (chatStore.messages.length === 0) {
        // Check if we already have an initial snapshot
-       const hasSnapshot = await db.snapshots.where({ saveSlotId: id }).count();
+       const latestSnapshot = await dbService.getLatestSnapshot(id);
        
-       if (hasSnapshot === 0) {
+       if (!latestSnapshot) {
           console.log('[SaveStore] Detected new/empty save. Initializing World State...');
           await gameLoop.initializeNewGame();
           await chatStore.createInitialSnapshot();
@@ -112,20 +112,15 @@ export const useSaveStore = defineStore('save', () => {
   }
 
   async function renameSave(id: number, newName: string) {
-    await db.saveSlots.update(id, { name: newName });
+    await dbService.updateSaveSlot(id, { name: newName });
     await loadSaves();
   }
 
   async function deleteSave(id: number) {
     if (!id) return;
     
-    // Delete all related data
-    await db.transaction('rw', db.saveSlots, db.chats, db.memories, db.snapshots, async () => {
-      await db.chats.where('saveSlotId').equals(id).delete();
-      await db.memories.where('saveSlotId').equals(id).delete();
-      await db.snapshots.where('saveSlotId').equals(id).delete();
-      await db.saveSlots.delete(id);
-    });
+    // Delete all related data (Cascading handled by DB Service / Schema)
+    await dbService.deleteSaveSlot(id);
 
     if (currentSaveId.value === id) {
       currentSaveId.value = null;
@@ -138,176 +133,12 @@ export const useSaveStore = defineStore('save', () => {
 
   async function exportSave(id: number): Promise<Blob> {
     const numericId = Number(id);
-    const saveSlot = await db.saveSlots.get(numericId);
-    if (!saveSlot) throw new Error("Save not found");
-
-    const blobParts: string[] = [];
-
-    // Helper to push string parts
-    const push = (str: string) => blobParts.push(str);
-
-    push('{');
-    push(`"version":2,"timestamp":${Date.now()},`);
-    push(`"saveSlot":${JSON.stringify({ ...saveSlot, id: undefined })},`);
-
-    // Chats
-    push('"chats":[');
-    let first = true;
-    await db.chats.where('saveSlotId').equals(numericId).each(chat => {
-      if (!first) push(',');
-      push(JSON.stringify(chat));
-      first = false;
-    });
-    push('],');
-
-    // Memories
-    push('"memories":[');
-    first = true;
-    await db.memories.where('saveSlotId').equals(numericId).each(memory => {
-      if (!first) push(',');
-      push(JSON.stringify(memory));
-      first = false;
-    });
-    push('],');
-
-    // Snapshots
-    push('"snapshots":[');
-    first = true;
-    await db.snapshots.where('saveSlotId').equals(numericId).each(snapshot => {
-      if (!first) push(',');
-
-      // [Optimization] Remove large avatar data from export to prevent memory overflow and huge file sizes
-      // The user suggested excluding it from export.
-      try {
-        if (snapshot.gameState) {
-          const stateObj = JSON.parse(snapshot.gameState);
-          if (stateObj.player) {
-            let changed = false;
-            if (stateObj.player.avatarUrl) {
-              delete stateObj.player.avatarUrl;
-              changed = true;
-            }
-            if (stateObj.player.referenceImageUrl) {
-              delete stateObj.player.referenceImageUrl;
-              changed = true;
-            }
-            if (changed) {
-              snapshot.gameState = JSON.stringify(stateObj);
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to parse snapshot state for export optimization', e);
-      }
-
-      push(JSON.stringify(snapshot));
-      first = false;
-    });
-    push('],');
-
-    // Characters
-    push('"characters":[');
-    first = true;
-    await db.characters.each(character => {
-      if (!first) push(',');
-      push(JSON.stringify(character));
-      first = false;
-    });
-    push(']');
-
-    push('}');
-
-    return new Blob(blobParts, { type: 'application/json' });
+    return await dbService.exportSave(numericId);
   }
 
   async function importSave(fileContent: string) {
     try {
-      const data = JSON.parse(fileContent);
-      
-      if (!data.saveSlot || !Array.isArray(data.chats)) {
-        throw new Error("Invalid save file format");
-      }
-
-      await db.transaction('rw', [db.saveSlots, db.chats, db.memories, db.snapshots, db.characters], async () => {
-        // 1. Create new Save Slot
-        const newSaveId = await db.saveSlots.add({
-          ...data.saveSlot,
-          name: `${data.saveSlot.name} (导入)`,
-          lastPlayed: Date.now()
-        }) as number;
-
-        // Map for Chat IDs (Old ID -> New ID)
-        const chatIdMap = new Map<number, number>();
-        // Map for Snapshot IDs (Old ID -> New ID)
-        const snapshotIdMap = new Map<number, number>();
-
-        // 2. Import Characters (Global)
-        if (Array.isArray(data.characters)) {
-          for (const char of data.characters) {
-            await db.characters.put(char); // Use put to update existing or add new
-          }
-        }
-
-        // 3. Import Chats
-        for (const chat of data.chats) {
-            const oldId = chat.id;
-            const newChatId = await db.chats.add({
-                ...chat,
-                id: undefined,
-                saveSlotId: newSaveId
-            }) as number;
-            
-            if (oldId) {
-                chatIdMap.set(oldId, newChatId);
-            }
-        }
-
-        // 4. Import Snapshots
-        if (Array.isArray(data.snapshots)) {
-          for (const snapshot of data.snapshots) {
-              const oldSnapshotId = snapshot.id;
-              const newChatId = snapshot.chatId ? chatIdMap.get(snapshot.chatId) : undefined;
-              
-              if (snapshot.chatId && snapshot.chatId !== 0 && !newChatId) {
-                  console.warn(`Skipping snapshot for missing chat ID ${snapshot.chatId}`);
-                  continue;
-              }
-
-              const newSnapshotId = await db.snapshots.add({
-                  ...snapshot,
-                  id: undefined,
-                  saveSlotId: newSaveId,
-                  chatId: newChatId || snapshot.chatId
-              }) as number;
-
-              if (oldSnapshotId) {
-                snapshotIdMap.set(oldSnapshotId, newSnapshotId);
-              }
-          }
-        }
-
-        // 5. Update Chat Messages with new Snapshot IDs
-        const newChats = await db.chats.where('saveSlotId').equals(newSaveId).toArray();
-        for (const chat of newChats) {
-          if (chat.snapshotId && snapshotIdMap.has(chat.snapshotId)) {
-            await db.chats.update(chat.id, {
-              snapshotId: snapshotIdMap.get(chat.snapshotId)
-            });
-          }
-        }
-
-        // 6. Import Memories
-        if (Array.isArray(data.memories)) {
-          for (const memory of data.memories) {
-              await db.memories.add({
-                  ...memory,
-                  id: undefined,
-                  saveSlotId: newSaveId
-              });
-          }
-        }
-      });
-      
+      await dbService.importSave(fileContent);
       await loadSaves();
     } catch (e) {
       console.error("Import failed:", e);

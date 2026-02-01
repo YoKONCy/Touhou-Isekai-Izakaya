@@ -97,7 +97,7 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
 
   function loadLocalMusic() {
     // Glob import all audio files in src/assets/music
-    const modules = import.meta.glob('@/assets/music/**/*.{mp3,ogg,wav}', { eager: true, as: 'url' });
+    const modules = import.meta.glob('@/assets/music/**/*.{mp3,ogg,wav}', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
     
     const tracks: Track[] = [];
     for (const path in modules) {

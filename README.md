@@ -95,9 +95,14 @@
 <sub>4-Model Collaboration</sub>
 </td>
 <td align="center" width="160">
-<img src="https://img.shields.io/badge/RAG-Memory-10B981?style=for-the-badge&labelColor=1c1c1e" alt="Memory"/><br/>
-<b>长记忆系统</b><br/>
-<sub>Scribe & Retrieval</sub>
+<img src="https://img.shields.io/badge/SQLite-Wasm-003B57?style=for-the-badge&logo=sqlite&logoColor=white&labelColor=1c1c1e" alt="SQLite"/><br/>
+<b>高性能存储</b><br/>
+<sub>SQLite + OPFS</sub>
+</td>
+<td align="center" width="160">
+<img src="https://img.shields.io/badge/Memory-Graph-10B981?style=for-the-badge&logo=target&logoColor=white&labelColor=1c1c1e" alt="Memory"/><br/>
+<b>联想记忆图谱</b><br/>
+<sub>PeroCore PEDSA</sub>
 </td>
 <td align="center" width="160">
 <img src="https://img.shields.io/badge/Management-Sim-3B82F6?style=for-the-badge&labelColor=1c1c1e" alt="Sim"/><br/>
@@ -207,32 +212,41 @@ Agent 不仅接收用户的文本输入，还实时监控**游戏环境状态**�
 
 ## 🧠 Long-term Memory
 
-> 本项目采用了一套独特的 **"Scribe-Retrieval"** 记忆机制，旨在解决传统 LLM 游戏“聊久了就忘”的通病，实现真正的长期角色扮演体验。
+> 本项目采用了一套结合 **"SQLite FTS5"** 与 **"PeroCore 联想激活算法 (PEDSA)"** 的记忆机制，旨在模拟人类的联想记忆，解决传统 LLM 游戏“聊久了就忘”的通病。
 
 ### ⚙️ Mechanism
- 
+
 ```mermaid
 graph TD
     User[User Input] --> ST[#1 Storyteller]
     ST -->|Dialogue| Scribe[#3 Scribe]
-    Scribe -->|Summarize| DB[(IndexedDB Memory)]
+    Scribe -->|Summarize| DB[(SQLite Wasm)]
     
-    subgraph Retrieval Process
-        DB -->|Coarse Filter| L1[Level 1: Coarse]
-        L1 -->|Refined Check| L2[Level 2: Refined]
-        L2 -->|Inject| Context[Context Window]
+    subgraph Associative Graph
+        DB -->|Sequence Link| T[Time Axis]
+        DB -->|Entity Star| E[Entity Network]
     end
     
+    subgraph PEDSA Retrieval
+        Search[Keyword Search] --> Seed[Seed Nodes]
+        Seed -->|Energy Spread| Graph[Memory Graph]
+        Graph -->|Decay & Prune| Result[Associated Memories]
+    end
+    
+    Result -->|Inject| Context[Context Window]
     Context --> ST
 ```
- 
-#### 1. The Scribe (记录者)
-每一轮对话结束后，独立的 **LLM #3 (Scribe)** 会在后台异步工作，将原始对话**压缩、摘要**为结构化的记忆片段 (Memory Entry)。
- 
-#### 2. Hybrid Retrieval (混合检索)
-- **Level 1 粗筛 (Coarse Mode)**: 基于 **关键词 + 时间权重 + 语义标签** 在本地数据库 (IndexedDB) 中快速查找。零 Token 消耗，速度极快。
-- **Level 2 精选 (Refined Mode)**: 将粗筛结果发送给 LLM 进行二次阅读和评分，剔除不相关项，理解深层语义（如“红色的家伙” -> “灵梦”）。
-- **Level 3 动态注入**: 最终选出的记忆会被动态插入到 Prompt 中。
+
+#### 1. The Scribe & Graph Builder (记录者与建图)
+每一轮对话结束后，独立的 **LLM #3 (Scribe)** 会将原始对话压缩为结构化的记忆片段。系统会自动将其接入图谱：
+- **时间轴 (Sequence)**: 将记忆按发生顺序连接，形成叙事连续性。
+- **实体网络 (Entity Star)**: 围绕 NPC、地点、物品等实体建立星型关联，形成语义网络。
+
+#### 2. PEDSA Spreading Activation (能量扩散检索)
+本项目实现了与 PeroCore 同款的**并行能量衰减扩散激活算法 (Parallel Energy-Decay Spreading Activation)**：
+- **种子选取**: 通过 SQLite FTS5 全文搜索锁定与当前上下文最相关的核心记忆。
+- **激活联想**: 核心记忆作为“种子”获得能量，沿图谱边向邻近节点扩散。
+- **智能召回**: 即使不包含当前关键词，只要在语义图谱中与当前话题紧密相关（如提到“博丽神社”联想到“塞钱箱”），也会被高能量激活并注入上下文。
  
 ### 💾 Memory Types
 
@@ -285,7 +299,7 @@ graph TD
 <img src="https://img.shields.io/badge/Pinia-FFE46F?style=for-the-badge&logo=pinia&logoColor=black" />
 <br/>
 <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" />
-<img src="https://img.shields.io/badge/Dexie.js-323330?style=for-the-badge&logo=javascript&logoColor=F7DF1E" />
+<img src="https://img.shields.io/badge/SQLite_Wasm-003B57?style=for-the-badge&logo=sqlite&logoColor=white" />
 <img src="https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white" />
 
 </div>
@@ -350,7 +364,7 @@ graph TD
 
 1. **API Key 安全性**:
    - 您的 API Key **仅存储在浏览器本地** (`localStorage`)，不会上传至本项目开发者的服务器。
-   - 本项目是纯前端 Web 应用，不具备后端数据库存储功能。
+   - 本项目是纯前端 Web 应用，数据持久化通过浏览器端的 **SQLite Wasm + OPFS** 技术实现，无需后端服务器即可在本地存储大规模存档、对话历史与记忆图谱。
 
 2. **中转服务器 (Proxy) 说明**:
    - 由于浏览器跨域 (CORS) 限制，直接从网页调用 NovelAI API 通常会失败。因此，本项目默认提供了一个基于 **Cloudflare Workers** 的中转地址。
@@ -370,10 +384,9 @@ graph TD
 
 ## 📅 Roadmap
 
-- [ ] **角色立绘**: 施工中... (6枚差分/人)
+- [ ] **角色立绘**: 施工中... (11枚差分/人)
 - [ ] **角色像素绘**: 施工中... (用于小游戏)
 - [ ] **店铺经营 V2.0**: 自由装修与高级经营
-- [ ] **2D 探索小游戏**: 俯视角 RPG 模式
 
 <br/>
 

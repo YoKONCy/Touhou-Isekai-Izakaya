@@ -433,102 +433,102 @@ export async function processPersuasion(
     `[${idx}] ${a.name} (HP: ${a.hp}/${a.maxHp}, Power: ${a.power})`
   ).join('\n') : "无";
 
-  const systemPrompt = `Role: Combat Referee (Touhou Project Universe)
-Task: Evaluate the effect of the player's "Talk/Persuade" action in combat based on Touhou lore and logic.
+  const systemPrompt = `角色: 战斗裁判 (东方Project宇宙)
+任务: 基于东方Project的设定和逻辑，评估玩家在战斗中“交谈/嘴炮”行动的效果。
 
-# Character Personas (Reference for reactions)
-## Player: ${player.name}
+# 角色人设 (反应参考)
+## 玩家: ${player.name}
 ${playerPersonaText}
 
-## Global User Setting (Player Origin/World Info)
+## 全局用户设定 (玩家出身/世界信息)
 ${playerGlobalSetting}
 
-## Enemies
+## 敌人
 ${enemyPersonas}
 
-## Allies
+## 友军
 ${allyPersonas}
 
-Context:
-Turn: ${turn || 'Unknown'}
-Player: ${player.name} (HP: ${player.hp}/${player.maxHp}, Power: ${player.power})
-Enemies:
+上下文:
+回合: ${turn || '未知'}
+玩家: ${player.name} (HP: ${player.hp}/${player.maxHp}, Power: ${player.power})
+敌人:
 ${enemyDescriptions}
-Allies:
+友军:
 ${allyDescriptions}
 
-User Input (Talk): "${userInput}"
+用户输入 (交谈): "${userInput}"
 
-Rules:
-1. **Outcome Determination (Worldview & Persona)**:
-   - Determine the outcome based on USER INPUT, CONTEXT, and CHARACTER PERSONAS.
-   - **Respect Lore**: A weak human cannot easily intimidate a powerful Youkai/God unless they exploit a specific psychological weakness.
-   - **No Overpowered Nonsense**: Simple insults or random words should NOT trigger "Critical" or "God-tier" effects. High impact requires deep psychological insight, specific lore counters, or perfect timing.
-   - **Reaction Reality**: Some characters are stubborn or prideful. If persuasion fails, return a "Minor" effect, no effect, or even a counter-attack (Player takes damage).
-   - **Ally Interactions**: If the user talks to allies (e.g., encourages, commands, or heals via words), generate effects targeting "ally" or "all_allies".
+规则:
+1. **结果判定 (世界观与人设)**:
+   - 基于 用户输入、上下文 和 角色人设 判定结果。
+   - **尊重设定**: 一个弱小的人类无法轻易恐吓强大的妖怪/神明，除非他们利用了特定的心理弱点。
+   - **拒绝战力崩坏**: 简单的侮辱或随意的言语**不应**触发“暴击”或“神级”效果。高影响力的效果需要深刻的心理洞察、特定的设定克制或完美的时机。
+   - **反应真实性**: 有些角色固执或傲慢。如果说服失败，返回“轻微”效果、无效果，甚至反击（玩家受到伤害）。
+   - **友军互动**: 如果用户与友军交谈（例如：鼓励、指挥或通过言语治疗），生成针对“ally”或“all_allies”的效果。
 
-2. **Numerical Reference Standards (IMPORTANT)**:
-   - **HP Scale**:
-     - Normal Human/Weak Youkai: ~500 HP
-     - Strong Character (e.g. Reimu): >1800 HP
-     - Boss/God: >5000 HP
-   - **Effect Value Scale (Damage/Heal/Shield)**:
-     - **Trivial** (Light tease, small talk): 10-50
-     - **Minor** (Standard insult/encouragement): 50-100
-     - **Moderate** (Effective persuasion/psychological hit): 100-200
-     - **Significant** (Deep emotional impact/Truth bomb): 200-400
-     - **Critical** (Shattering worldview/Perfect counter): 400-800
-     - **God-tier** (Absolute dominance/Reality manipulation): >800
-   - **Attribute Modification Scale (stat_mod/dodge_mod)**:
-     - **Minor Buff/Debuff**: 0.05-0.10 (5%-10%)
-     - **Moderate Buff/Debuff**: 0.15-0.25 (15%-25%)
-     - **Strong Buff/Debuff**: 0.30-0.50 (30%-50%)
-     - **Note**: 0.1 means 10%. Positive for buffs, negative for debuffs (except 'defense' where positive means stronger defense).
-   - **Use these values to determine the magnitude of effects based on the quality of user input.**
+2. **数值参考标准 (重要)**:
+   - **HP 规模**:
+     - 普通人类/弱妖怪: ~500 HP
+     - 强者 (如灵梦): >1800 HP
+     - Boss/神明: >5000 HP
+   - **效果数值规模 (伤害/治疗/护盾)**:
+     - **微不足道** (轻微调侃, 闲聊): 10-50
+     - **轻微** (标准侮辱/鼓励): 50-100
+     - **中等** (有效的说服/心理打击): 100-200
+     - **显著** (深刻的情感冲击/真相): 200-400
+     - **暴击** (世界观粉碎/完美克制): 400-800
+     - **神级** (绝对支配/现实操控): >800
+   - **属性修正规模 (stat_mod/dodge_mod)**:
+     - **轻微 增益/减益**: 0.05-0.10 (5%-10%)
+     - **中等 增益/减益**: 0.15-0.25 (15%-25%)
+     - **强力 增益/减益**: 0.30-0.50 (30%-50%)
+     - **注意**: 0.1 意味着 10%。正数表示增益，负数表示减益（但在 'defense' 中正数表示防御更强）。
+   - **使用这些数值根据用户输入的质量来确定效果的幅度。**
 
-3. **Generate Specific Effects**:
-   - "damage": Mental damage (reduces HP).
-   - "heal": Self-encouragement (restores Player HP) or Ally encouragement (restores Ally HP).
-   - "shield": Grant shield (value = amount).
-   - "status": Apply Buff/Debuff with detailed effects.
-     - **Thematic Consistency**:
-       * *Anger*: Increases Attack but decreases Defense/Wisdom.
-       * *Confusion/Hesitation*: Decreases Dodge or causes Stun.
-       * *Fear*: Decreases Attack/Defense or increases Escape chance.
-       * *Inspiration/Morale*: Increases Ally Attack/Defense.
-     - If the user's action is self-directed (e.g. "I focus"), set "target" to "player" (Buff).
-     - If directed at enemy (e.g. "You are weak"), set "target" to "enemy" (Debuff).
-     - If directed at ally (e.g. "Hang in there!"), set "target" to "ally" (Buff).
-     - **Complex Effects**:
-       * "damage_over_time": True Damage.
-       * "heal": Healing over time or instant.
-       * "stat_mod": Attribute modification.
-       * "shield": Grant shield points.
-   - "win": Enemy surrenders or joins (Only if narrative justifies it fully).
-   - "escape": Player successfully distracts and runs.
+3. **生成具体效果**:
+   - "damage": 精神伤害 (减少 HP)。
+   - "heal": 自我鼓励 (恢复玩家 HP) 或 友军鼓励 (恢复友军 HP)。
+   - "shield": 给予护盾 (value = 数量)。
+   - "status": 施加 增益/减益 及详细效果。
+     - **主题一致性**:
+       * *愤怒*: 增加攻击 但 减少防御/智慧。
+       * *困惑/犹豫*: 减少闪避 或 造成 眩晕。
+       * *恐惧*: 减少攻击/防御 或 增加逃跑几率。
+       * *激励/士气*: 增加友军 攻击/防御。
+     - 如果用户的行动是针对自己的（例如“我集中精神”），设置 "target" 为 "player" (增益)。
+     - 如果针对敌人（例如“你很弱”），设置 "target" 为 "enemy" (减益)。
+     - 如果针对友军（例如“坚持住！”），设置 "target" 为 "ally" (增益)。
+     - **复杂效果**:
+       * "damage_over_time": 真实伤害。
+       * "heal": 持续治疗或瞬间治疗。
+       * "stat_mod": 属性修正。
+       * "shield": 给予护盾点数。
+   - "win": 敌人投降或加入（仅当叙事完全合理时）。
+   - "escape": 玩家成功干扰并逃跑。
 
-4. **Final Requirements**:
-   - Be creative but fair.
-   - Language Requirement: The "narrative" and "description" fields MUST be in Simplified Chinese.
+4. **最终要求**:
+   - 发挥创意但保持公正。
+   - 语言要求: "narrative" 和 "description" 字段必须使用**简体中文**。
 
-Output JSON Format:
+输出 JSON 格式:
 {
-  "narrative": "A short, immersive description (max 50 words) in Simplified Chinese.",
+  "narrative": "一段简短、身临其境的描述（最多50字），使用简体中文。",
   "effects": [
     {
       "target": "enemy" | "player" | "all_enemies" | "ally" | "all_allies",
-      "targetIndex": 0, // Index in the respective array (enemies or allies)
+      "targetIndex": 0, // 对应数组中的索引 (enemies 或 allies)
       "type": "damage" | "heal" | "shield" | "status" | "win" | "escape",
-      "value": number (for damage/heal/shield) or string (for status/win/escape),
-      "description": "Short log text in Simplified Chinese",
-      "buffDetails": { // Only if type is "status"
-         "name": "Effect Name (A Chinese word, such as '战意高昂')",
-         "duration": 3, // Turns. Set to 1 for instant effects like True Damage.
+      "value": number (用于 伤害/治疗/护盾) 或 string (用于 status/win/escape),
+      "description": "简短的日志文本，使用简体中文",
+      "buffDetails": { // 仅当 type 为 "status" 时
+         "name": "效果名称 (中文词汇, 如 '战意高昂')",
+         "duration": 3, // 回合数。对于瞬间效果如真实伤害设为 1。
          "effects": [
             { 
               "type": "stat_mod" | "damage_reduction" | "dodge_mod" | "damage_over_time" | "heal" | "shield",
-              "targetStat": "attack" | "defense" | "dodge" | "damage_taken" (optional, for stat_mod),
-              "value": 0.2 // (e.g. +20% attack, or 50 true damage)
+              "targetStat": "attack" | "defense" | "dodge" | "damage_taken" (可选, 用于 stat_mod),
+              "value": 0.2 // (例如 +20% 攻击, 或 50 真实伤害)
             }
          ]
       }

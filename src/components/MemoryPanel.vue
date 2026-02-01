@@ -1,10 +1,26 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { db, type MemoryEntry } from '@/db';
+import { dbService } from '@/services/DatabaseService';
 import { useSaveStore } from '@/stores/save';
 import { useChatStore } from '@/stores/chat';
 import { X, Search, Trash2, Calendar, FileText, Activity, Database, Users, Brain, Edit2, Save, Clock, MapPin, ExternalLink } from 'lucide-vue-next';
 import _ from 'lodash';
+
+interface MemoryEntry {
+  id: number;
+  saveSlotId: number;
+  turnCount: number;
+  type: string;
+  content: string;
+  tags: string[];
+  related_entities: string[];
+  importance: number;
+  createdAt: number;
+  gameDate?: string;
+  gameTime?: string;
+  location?: string;
+  characters?: string[];
+}
 
 const props = defineProps<{
   isOpen: boolean
@@ -26,12 +42,8 @@ async function handleJump(turnCount: number) {
 async function loadMemories() {
   if (!saveStore.currentSaveId) return;
   
-  let collection = db.memories
-    .where('saveSlotId')
-    .equals(saveStore.currentSaveId)
-    .reverse(); // Newest first
-    
-  let items = await collection.toArray();
+  // Fetch all memories for this save slot (sorted by ID DESC)
+  let items = await dbService.getAllMemories(saveStore.currentSaveId);
   
   if (filterType.value !== 'all') {
     items = items.filter(m => m.type === filterType.value);
@@ -41,7 +53,7 @@ async function loadMemories() {
     const q = searchQuery.value.toLowerCase();
     items = items.filter(m => 
       String(m.content).toLowerCase().includes(q) ||
-      m.tags.some(t => t.toLowerCase().includes(q))
+      (m.tags && m.tags.some((t: string) => t.toLowerCase().includes(q)))
     );
   }
   
@@ -98,14 +110,14 @@ async function saveEdit() {
       newContent = editingRawContent.value;
     }
     
-    // Update DB - Use JSON.parse/stringify to strip Vue proxies and ensure plain data
-    await db.memories.update(editingMemory.value.id, JSON.parse(JSON.stringify({
+    // Update DB
+    await dbService.updateMemory(editingMemory.value.id, {
       content: newContent,
       gameDate: editingMemory.value.gameDate,
       gameTime: editingMemory.value.gameTime,
       location: editingMemory.value.location,
       tags: editingMemory.value.tags
-    })));
+    });
     
     isEditing.value = false;
     editingMemory.value = null;
@@ -126,7 +138,7 @@ watch([searchQuery, filterType], () => {
 
 async function deleteMemory(id: number) {
   if (!window.confirm('确定要删除这条记忆吗？')) return;
-  await db.memories.delete(id);
+  await dbService.deleteMemory(id);
   await loadMemories();
 }
 
