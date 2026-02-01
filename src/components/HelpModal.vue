@@ -37,10 +37,10 @@ watch(() => props.isOpen, (val) => {
     if (props.initialSectionId) {
       activeSectionId.value = props.initialSectionId;
     }
-  } else {
+  } else if (val === false) { // Only play close sound if it was actually open
     audioManager.playWindowClose();
   }
-}, { immediate: true });
+});
 
 function handleSectionClick(id: string) {
   activeSectionId.value = id;

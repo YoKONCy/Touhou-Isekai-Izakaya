@@ -25,6 +25,26 @@ class AudioManager {
     // We'll initialize it lazily
   }
 
+  /**
+   * Unlocks audio context on user interaction
+   * Browsers block audio until a user gesture occurs
+   */
+  public async resume() {
+    this.init();
+    if (this.ctx && this.ctx.state === 'suspended') {
+      await this.ctx.resume();
+    }
+    
+    // If BGM was supposed to be playing but was blocked, try again
+    if (this.currentBgm && this.currentBgm.paused && this.bgmUrl) {
+      try {
+        await this.currentBgm.play();
+      } catch (e) {
+        console.warn('Failed to resume BGM after interaction:', e);
+      }
+    }
+  }
+
   private init() {
     if (!this.ctx) {
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;

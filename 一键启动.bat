@@ -39,15 +39,28 @@ if not exist "node_modules\" (
 )
 echo.
 
-rem 3. Start Dev Server
-echo [3/3] Starting dev server (npm run dev)...
-echo Once started, visit the URL in your browser: http://localhost:14791
+rem 3. Build Project
+echo [3/4] Building project (npm run build)...
+echo This ensures all components are compiled and ready.
+echo.
+call npm run build
+if %errorlevel% neq 0 (
+    echo.
+    echo [ERROR] Build failed!
+    pause
+    exit /b 1
+)
 echo.
 
-call npm run dev
+rem 4. Start Preview Server
+echo [4/4] Starting preview server (npm run preview)...
+echo Once started, visit the URL in your browser (usually http://localhost:4173)
+echo.
+
+call npm run preview
 
 if %errorlevel% neq 0 (
     echo.
-    echo [INFO] Server stopped.
+    echo [INFO] Preview stopped.
     pause
 )

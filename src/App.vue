@@ -91,6 +91,26 @@ const migrationMessage = ref('');
 const userOpenCombat = ref(false);
 const userOpenQuest = ref(false);
 
+// Audio Unlock Logic
+const hasInteracted = ref(false);
+const handleFirstInteraction = async () => {
+  if (!hasInteracted.value) {
+    hasInteracted.value = true;
+    await audioManager.resume();
+    // Remove listeners once unlocked
+    window.removeEventListener('click', handleFirstInteraction);
+    window.removeEventListener('keydown', handleFirstInteraction);
+    window.removeEventListener('touchstart', handleFirstInteraction);
+  }
+};
+
+onMounted(() => {
+  // Listen for first user interaction to unlock audio
+  window.addEventListener('click', handleFirstInteraction);
+  window.addEventListener('keydown', handleFirstInteraction);
+  window.addEventListener('touchstart', handleFirstInteraction);
+});
+
 const hasPendingTriggers = computed(() => {
   return !!gameStore.state.system.combat?.isPending || !!gameStore.state.system.pending_quest_trigger;
 });

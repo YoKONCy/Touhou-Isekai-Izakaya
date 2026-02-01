@@ -99,5 +99,17 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['@sqlite.org/sqlite-wasm']
   },
-  assetsInclude: ['**/*.wasm']
+  build: {
+    chunkSizeWarningLimit: 1500,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-vue': ['vue', 'vue-router', 'pinia'],
+          'vendor-utils': ['lodash', 'uuid', 'dayjs', 'jszip'],
+          'vendor-ui': ['lucide-vue-next', 'vuedraggable'],
+        }
+      }
+    }
+  },
+  assetsInclude: ['**/*.wasm'],
 })
