@@ -57,6 +57,19 @@ export class DatabaseService {
     console.log('[DatabaseService] Worker initialized and ready.');
   }
 
+  public async getDbInfo(): Promise<{ type: string; sqliteVersion?: string }> {
+    return new Promise((resolve, reject) => {
+        const id = this.generateId();
+        this.pendingRequests.set(id, { resolve, reject });
+        
+        this.worker.postMessage({
+            id,
+            type: 'GET_DB_INFO',
+            payload: {}
+        });
+    });
+  }
+
   public exec<T = any>(sql: string, bind?: any[]): Promise<T[]> {
     return new Promise((resolve, reject) => {
       const id = this.generateId();

@@ -18,9 +18,11 @@ const initPromise = (sqlite3InitModule as any)({
     if ('opfs' in sqlite3) {
       db = new sqlite3.oo1.OpfsDb('/touhou_isekai.sqlite3');
       log('OPFS Database opened successfully: /touhou_isekai.sqlite3');
+      (self as any).dbType = 'opfs';
     } else {
       error('OPFS is not available, falling back to transient in-memory DB.');
       db = new sqlite3.oo1.DB('/touhou_isekai_mem.sqlite3', 'ct');
+      (self as any).dbType = 'memory';
     }
 
     // Apply Schema
@@ -77,6 +79,13 @@ self.onmessage = async (e: MessageEvent) => {
         
       case 'PING':
         result = { status: 'ok', time: Date.now() };
+        break;
+
+      case 'GET_DB_INFO':
+        result = { 
+            type: (self as any).dbType || 'unknown',
+            sqliteVersion: (self as any).sqlite3?.version?.libVersion 
+        };
         break;
         
       default:
@@ -210,24 +219,34 @@ function importSaveWithCorrectOrder(db: any, jsonContent: string) {
     // 2. Import Characters (Upsert)
     if (Array.isArray(data.characters)) {
       for (const char of data.characters) {
-        const existing = exec('SELECT id FROM characters WHERE uuid = ?', [char.uuid]);
-        
-        // Remove id from char object for insertion
-        const { id, ...charData } = char;
-        const fields = Object.keys(charData);
-        const values = Object.values(charData);
+        try {
+            const existing = exec('SELECT id FROM characters WHERE uuid = ?', [char.uuid]);
+            
+            // Remove id from char object for insertion
+            const { id, ...charData } = char;
+            const fields = Object.keys(charData);
+            // Ensure values are primitives (stringify objects/arrays)
+            const values = Object.values(charData).map(val => 
+                (typeof val === 'object' && val !== null) ? JSON.stringify(val) : val
+            );
 
-        if (existing.length > 0) {
-          // Update
-          const setClause = fields.map(k => `${k} = ?`).join(', ');
-          exec(`UPDATE characters SET ${setClause} WHERE uuid = ?`, [...values, char.uuid]);
-        } else {
-          // Insert
-          const placeholders = fields.map(() => '?').join(', ');
-          exec(
-            `INSERT OR IGNORE INTO characters (${fields.join(', ')}) VALUES (${placeholders})`,
-            values
-          );
+            if (existing.length > 0) {
+              // Update
+              const setClause = fields.map(k => `${k} = ?`).join(', ');
+              exec(`UPDATE characters SET ${setClause} WHERE uuid = ?`, [...values, char.uuid]);
+            } else {
+              // Insert
+              const placeholders = fields.map(() => '?').join(', ');
+              exec(
+                `INSERT OR IGNORE INTO characters (${fields.join(', ')}) VALUES (${placeholders})`,
+                values
+              );
+            }
+        } catch (e: any) {
+            console.warn(`[Import] Failed to import character ${char.name || char.uuid}:`, e);
+            // Continue with other characters? Or throw?
+            // Throwing stops the whole import. Let's throw to ensure data integrity.
+            throw new Error(`Failed to import character ${char.name}: ${e.message}`);
         }
       }
     }

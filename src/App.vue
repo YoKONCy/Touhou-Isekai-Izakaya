@@ -36,11 +36,13 @@ import MobileDrawer from '@/components/MobileDrawer.vue';
 import { checkMigrationNeeded, migrateData } from '@/services/migration';
 import { dbService } from '@/services/DatabaseService';
 import { memoryService } from '@/services/memory';
+import { useToastStore } from '@/stores/toast';
 
 const chatStore = useChatStore();
 const settingsStore = useSettingsStore();
 const saveStore = useSaveStore();
 const gameStore = useGameStore();
+const toastStore = useToastStore();
 const { confirm } = useConfirm();
 
 // Setup smooth streaming
@@ -198,6 +200,18 @@ onMounted(async () => {
   
   // Database Migration Check
   await dbService.init();
+
+  // Check Persistence Status
+  try {
+    const dbInfo = await dbService.getDbInfo();
+    if (dbInfo.type !== 'opfs') {
+        toastStore.addToast('警告：当前环境不支持持久化存储（OPFS），刷新页面将丢失存档。建议使用 Chrome 浏览器或检查服务器头信息配置。', 'error', 10000);
+        console.warn('Database is running in non-persistent mode:', dbInfo);
+    }
+  } catch(e) {
+      console.error("Failed to check DB info:", e);
+  }
+
   await memoryService.syncOldFacilitiesToRegistry();
   const needsMigration = await checkMigrationNeeded();
   if (needsMigration) {
