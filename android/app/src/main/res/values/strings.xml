@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Touhou Isekai Izakaya</string>
-    <string name="title_activity_main">Touhou Isekai Izakaya</string>
+    <string name="app_name">东方异界食堂</string>
+    <string name="title_activity_main">东方异界食堂</string>
     <string name="package_name">com.touhou.isekai.izakaya</string>
     <string name="custom_url_scheme">com.touhou.isekai.izakaya</string>
 </resources>
