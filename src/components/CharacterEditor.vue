@@ -206,11 +206,11 @@ function removeTag(index: number) {
 
         <!-- Left: Category & List (Desktop always visible, Mobile hidden when editing) -->
         <div
-          class="w-full md:w-80 border-r border-izakaya-wood/10 flex flex-col bg-stone-100/80 dark:bg-stone-800/80 backdrop-blur-sm overflow-hidden"
+          class="w-full md:w-80 border-r border-izakaya-wood/10 flex flex-col bg-stone-100/80 dark:bg-stone-800/80 backdrop-blur-sm overflow-hidden h-full"
           :class="{ 'hidden md:flex': mobileShowEditor }"
         >
           <!-- Category Sidebar Section -->
-          <div class="flex-[0.45] min-h-[180px] flex flex-col overflow-hidden border-b border-izakaya-wood/10">
+          <div class="flex-shrink-0 flex flex-col max-h-[40%] border-b border-izakaya-wood/10">
             <div class="p-3 pb-2 flex items-center justify-between">
               <h3 class="text-[10px] font-bold text-izakaya-wood/40 dark:text-stone-500 uppercase tracking-wider px-2">分类目录</h3>
               <span class="text-[10px] text-izakaya-wood/30 dark:text-stone-600 px-2">{{ categories.length }} 文件夹</span>
@@ -237,12 +237,12 @@ function removeTag(index: number) {
                   </span>
                   <!-- Actions (Only show for custom categories when active) -->
                   <div v-if="cat !== '全部' && cat !== '未分类' && selectedCategory === cat" class="flex items-center gap-1 ml-1 animate-fade-in">
-                     <button @click.stop="handleRenameCategory" class="p-1 hover:bg-white/20 rounded transition-colors" title="重命名">
-                       <Edit2 class="w-3 h-3" />
-                     </button>
-                     <button @click.stop="handleDeleteCategory" class="p-1 hover:bg-red-400 rounded transition-colors" title="删除">
-                       <Trash2 class="w-3 h-3" />
-                     </button>
+                    <button @click.stop="handleRenameCategory" class="p-1 hover:bg-white/20 rounded transition-colors" title="重命名">
+                      <Edit2 class="w-3 h-3" />
+                    </button>
+                    <button @click.stop="handleDeleteCategory" class="p-1 hover:bg-red-400 rounded transition-colors" title="删除">
+                      <Trash2 class="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -250,15 +250,15 @@ function removeTag(index: number) {
           </div>
 
           <!-- Character List Section -->
-          <div class="flex-[0.55] flex flex-col overflow-hidden bg-stone-50/30 dark:bg-stone-900/10">
+          <div class="flex-1 flex flex-col overflow-hidden bg-stone-50/30 dark:bg-stone-900/10 min-h-0">
             <!-- Character List Header -->
-            <div class="px-4 py-2 bg-stone-200/30 dark:bg-stone-900/20 border-b border-izakaya-wood/10 flex items-center justify-between">
+            <div class="px-4 py-2 bg-stone-200/30 dark:bg-stone-900/20 border-b border-izakaya-wood/10 flex items-center justify-between flex-shrink-0">
               <span class="text-[10px] font-bold text-izakaya-wood/40 dark:text-stone-500 uppercase tracking-wider">条目列表 ({{ selectedCategory }})</span>
               <span class="text-[10px] text-izakaya-wood/30 dark:text-stone-600">{{ filteredCharacters.length }} 项</span>
             </div>
 
             <!-- Character List -->
-            <div class="flex-1 overflow-y-auto p-3 space-y-1.5 custom-scrollbar">
+            <div class="flex-1 overflow-y-auto p-3 space-y-1.5 custom-scrollbar min-h-0">
               <button 
                 v-for="char in filteredCharacters" 
                 :key="char.uuid"

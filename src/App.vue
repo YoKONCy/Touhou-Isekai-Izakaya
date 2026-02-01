@@ -225,7 +225,10 @@ onMounted(async () => {
   try {
     const dbInfo = await dbService.getDbInfo();
     if (dbInfo.type !== 'opfs') {
-        toastStore.addToast('警告：当前环境不支持持久化存储（OPFS），刷新页面将丢失存档。建议使用 Chrome 浏览器或检查服务器头信息配置。', 'error', 10000);
+        const message = dbInfo.type === 'memory-fallback' 
+            ? '警告：OPFS 数据库初始化失败，已回退到内存模式。刷新页面将丢失存档！'
+            : '警告：当前浏览器环境不支持持久化存储（OPFS），刷新页面将丢失存档。';
+        toastStore.addToast(message, 'error', 15000);
         console.warn('Database is running in non-persistent mode:', dbInfo);
     }
   } catch(e) {

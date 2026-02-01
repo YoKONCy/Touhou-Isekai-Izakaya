@@ -22,9 +22,15 @@ const initPromise = (sqlite3InitModule as any)({
     
     // Check for OPFS support
     if ('opfs' in sqlite3) {
-      db = new sqlite3.oo1.OpfsDb('/touhou_isekai.sqlite3');
-      log('OPFS Database opened successfully: /touhou_isekai.sqlite3');
-      (self as any).dbType = 'opfs';
+      try {
+        db = new sqlite3.oo1.OpfsDb('/touhou_isekai.sqlite3');
+        log('OPFS Database opened successfully: /touhou_isekai.sqlite3');
+        (self as any).dbType = 'opfs';
+      } catch (e: any) {
+        error('Failed to open OPFS database, falling back to transient in-memory DB:', e.message);
+        db = new sqlite3.oo1.DB('/touhou_isekai_mem.sqlite3', 'ct');
+        (self as any).dbType = 'memory-fallback';
+      }
     } else {
       error('OPFS is not available, falling back to transient in-memory DB.');
       db = new sqlite3.oo1.DB('/touhou_isekai_mem.sqlite3', 'ct');
