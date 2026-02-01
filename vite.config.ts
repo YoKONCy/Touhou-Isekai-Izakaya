@@ -88,6 +88,14 @@ export default defineConfig({
       'Cross-Origin-Embedder-Policy': 'require-corp',
     }
   },
+  preview: {
+    host: '0.0.0.0',
+    port: 14791,
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    }
+  },
   optimizeDeps: {
     exclude: ['@sqlite.org/sqlite-wasm']
   }

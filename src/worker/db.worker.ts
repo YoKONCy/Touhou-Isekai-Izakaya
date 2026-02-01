@@ -39,12 +39,57 @@ const initPromise = (sqlite3InitModule as any)({
     });
     log('Schema applied successfully.');
     
+    // Run Migrations for existing databases
+    runMigrations(db);
+    
     return true;
   } catch (err: any) {
     error('Initialization failed:', err.name, err.message);
     throw err;
   }
 });
+
+function runMigrations(db: any) {
+  log('Running Migrations...');
+  try {
+    // 1. Check characters table for missing 'type' column
+    const charTableInfo = db.exec({
+      sql: 'PRAGMA table_info(characters)',
+      returnValue: 'resultRows',
+      rowMode: 'object'
+    });
+    
+    if (charTableInfo.length > 0) {
+      const hasTypeColumn = charTableInfo.some((col: any) => col.name === 'type');
+      if (!hasTypeColumn) {
+        log('Migration: Adding "type" column to "characters" table...');
+        db.exec('ALTER TABLE characters ADD COLUMN type TEXT DEFAULT "character"');
+        log('Migration: "type" column added successfully.');
+      }
+    }
+
+    // 2. Check save_slots table for missing 'playTime' column
+    const saveSlotsInfo = db.exec({
+      sql: 'PRAGMA table_info(save_slots)',
+      returnValue: 'resultRows',
+      rowMode: 'object'
+    });
+    if (saveSlotsInfo.length > 0) {
+      const hasPlayTime = saveSlotsInfo.some((col: any) => col.name === 'playTime');
+      if (!hasPlayTime) {
+        log('Migration: Adding "playTime" column to "save_slots" table...');
+        db.exec('ALTER TABLE save_slots ADD COLUMN playTime INTEGER DEFAULT 0');
+        log('Migration: "playTime" column added successfully.');
+      }
+    }
+
+    // Add more migrations here as the schema evolves
+    
+  } catch (e: any) {
+    error('Migration failed:', e.message);
+    // Don't throw, let the app try to continue, but log the error
+  }
+}
 
 self.onmessage = async (e: MessageEvent) => {
   const { id, type, payload } = e.data;
