@@ -451,7 +451,7 @@ function handleTouchEnd() {
             <!-- Image container with relative positioning for markers -->
             <div class="relative">
               <img
-                src="@/assets/images/map/幻想乡地图.jpg"
+                src="@/assets/images/map/幻想乡地图.webp"
                 alt="幻想乡地图"
                 class="block pointer-events-none select-none max-w-none h-[90vh]"
               />

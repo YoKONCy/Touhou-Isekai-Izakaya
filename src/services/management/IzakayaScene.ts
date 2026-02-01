@@ -1,12 +1,12 @@
 
 import { type Entity, type Position, TileType, TileTypeNames, type Customer, type Item, type Furniture } from '@/types/management';
 import { TextureManager } from '@/services/graphics/TextureManager';
-import floorTileImage from '@/assets/images/tilesets/地板.jpg';
-import wallTileImage from '@/assets/images/tilesets/墙体.jpg';
-import counterTileImage from '@/assets/images/tilesets/吧台.jpg';
-import propsTileImage from '@/assets/images/tilesets/装饰杂项.jpg';
-import chairTileImage from '@/assets/images/tilesets/椅子.jpg';
-import tableTileImage from '@/assets/images/tilesets/桌子.jpg';
+import floorTileImage from '@/assets/images/tilesets/地板.webp';
+import wallTileImage from '@/assets/images/tilesets/墙体.webp';
+import counterTileImage from '@/assets/images/tilesets/吧台.webp';
+import propsTileImage from '@/assets/images/tilesets/装饰杂项.webp';
+import chairTileImage from '@/assets/images/tilesets/椅子.webp';
+import tableTileImage from '@/assets/images/tilesets/桌子.webp';
 
 export class IzakayaScene {
   private canvas: HTMLCanvasElement;

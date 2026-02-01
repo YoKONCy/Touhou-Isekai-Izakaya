@@ -77,7 +77,7 @@
 
 <div align="center">
 
-<img src="./src/assets/github_cover/cover1.jpg" width="100%" alt="Touhou Isekai Izakaya Cover" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);" />
+<img src="./src/assets/github_cover/cover1.webp" width="100%" alt="Touhou Isekai Izakaya Cover" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);" />
 
 <br/><br/>
 
@@ -269,7 +269,7 @@ graph TD
 > 幻想乡的解决异变方式——符卡规则 (Spell Card System) 与 LLM 逻辑判断的完美结合。
 
 <div align="center">
-  <img src="./src/assets/github_cover/战斗系统.png" width="100%" alt="Combat System Cover" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);" />
+  <img src="./src/assets/github_cover/战斗系统.webp" width="100%" alt="Combat System Cover" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);" />
 </div>
 
 ### 🎮 系统特色
