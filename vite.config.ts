@@ -2,6 +2,8 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { visualizer } from 'rollup-plugin-visualizer'
+import mkcert from 'vite-plugin-mkcert'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
@@ -13,6 +15,7 @@ export default defineConfig({
   plugins: [
     vue(),
     tailwindcss(),
+    mkcert(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
@@ -73,7 +76,13 @@ export default defineConfig({
           }
         ]
       }
-    })
+    }),
+    visualizer({
+      open: false,
+      filename: 'stats.html',
+      gzipSize: true,
+      brotliSize: true,
+    }) as any
   ],
   resolve: {
     alias: {
@@ -103,10 +112,14 @@ export default defineConfig({
     chunkSizeWarningLimit: 1500,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-vue': ['vue', 'vue-router', 'pinia'],
-          'vendor-utils': ['lodash', 'uuid', 'dayjs', 'jszip'],
-          'vendor-ui': ['lucide-vue-next', 'vuedraggable'],
+        manualChunks: (id) => {
+          if (id.includes('node_modules')) {
+            if (id.includes('lucide-vue-next')) return 'vendor-ui-icons';
+            if (id.includes('vue') || id.includes('pinia')) return 'vendor-framework';
+            if (id.includes('lodash') || id.includes('jszip') || id.includes('dayjs')) return 'vendor-utils';
+            if (id.includes('sqlite-wasm')) return 'vendor-sqlite';
+            return 'vendor-others';
+          }
         }
       }
     }

@@ -7,7 +7,7 @@ echo ======================================================
 echo.
 
 rem 1. Check Node.js and pnpm
-echo [1/3] Checking environment...
+echo [1/4] Checking environment...
 node -v >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] Node.js not found!
@@ -17,9 +17,9 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-pnpm -v >nul 2>&1
+where pnpm >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [INFO] pnpm not found. Installing pnpm via npm...
+    echo [INFO] pnpm not found. Trying to install pnpm via npm...
     call npm install -g pnpm
     if %errorlevel% neq 0 (
         echo [ERROR] Failed to install pnpm!
@@ -31,12 +31,12 @@ if %errorlevel% neq 0 (
 echo Node.js version: 
 node -v
 echo pnpm version:
-pnpm -v
+call pnpm -v
 echo.
 
 rem 2. Check node_modules
 if not exist "node_modules\" (
-    echo [2/3] node_modules not found. Installing dependencies with pnpm...
+    echo [2/4] node_modules not found. Installing dependencies with pnpm...
     echo This may take a few minutes...
     echo.
     call pnpm install
@@ -48,7 +48,7 @@ if not exist "node_modules\" (
     )
     echo Installation complete.
 ) else (
-    echo [2/3] node_modules exists. Skipping install.
+    echo [2/4] node_modules exists. Skipping install.
 )
 echo.
 
@@ -67,7 +67,8 @@ echo.
 
 rem 4. Start Preview Server
 echo [4/4] Starting preview server (pnpm preview)...
-echo Once started, visit the URL in your browser (usually http://localhost:4173)
+echo Once started, visit the HTTPS URL in your browser (usually https://localhost:14791)
+echo Note: You may need to accept the self-signed certificate in your browser.
 echo.
 
 call pnpm preview

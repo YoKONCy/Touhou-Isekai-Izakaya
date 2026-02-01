@@ -7,9 +7,16 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "static-build": "vite build",
+    "cap-copy": "cap copy",
+    "cap-sync": "cap sync",
+    "android-open": "cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.0.2",
+    "@capacitor/cli": "^8.0.2",
+    "@capacitor/core": "^8.0.2",
     "@sqlite.org/sqlite-wasm": "^3.51.2-build6",
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.1.18",
@@ -39,6 +46,7 @@
     "rollup-plugin-visualizer": "^6.0.5",
     "typescript": "~5.9.3",
     "vite": "^7.2.4",
+    "vite-plugin-mkcert": "^1.17.9",
     "vite-plugin-pwa": "^1.2.0",
     "vue-tsc": "^3.1.4"
   }
