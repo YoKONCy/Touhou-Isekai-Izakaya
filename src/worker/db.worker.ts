@@ -291,20 +291,41 @@ function importSaveWithCorrectOrder(db: any, jsonContent: string) {
     if (Array.isArray(data.characters)) {
       for (const char of data.characters) {
         try {
-            const existing = exec('SELECT id FROM characters WHERE uuid = ?', [char.uuid]);
+            // Mapping for old fields
+            const mappedChar: any = {
+                uuid: char.uuid || `char-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                name: char.name || '未知角色',
+                type: char.type || 'character',
+                category: char.category || '未分类',
+                tags: Array.isArray(char.tags) ? char.tags : [],
+                description: char.description || '',
+                avatarUrl: char.avatarUrl || char.avatar || '',
+                gender: char.gender || '',
+                referenceImageUrl: char.referenceImageUrl || '',
+                personality: char.personality || char.creatorNotes || '',
+                stats: typeof char.stats === 'object' ? { ...char.stats } : {}
+            };
+
+            // Collect extra fields into stats
+            const extraFields = ['initialPower', 'initialMaxHp', 'initialResidence', 'cost', 'damage', 'damageType', 'buffDetails'];
+            extraFields.forEach(field => {
+                if (char[field] !== undefined) {
+                    mappedChar.stats[field] = char[field];
+                }
+            });
+
+            const existing = exec('SELECT id FROM characters WHERE uuid = ?', [mappedChar.uuid]);
             
-            // Remove id from char object for insertion
-            const { id, ...charData } = char;
-            const fields = Object.keys(charData);
-            // Ensure values are primitives (stringify objects/arrays)
-            const values = Object.values(charData).map(val => 
-                (typeof val === 'object' && val !== null) ? JSON.stringify(val) : val
-            );
+            const fields = Object.keys(mappedChar);
+            const values = fields.map(k => {
+                const val = mappedChar[k];
+                return (typeof val === 'object' && val !== null) ? JSON.stringify(val) : val;
+            });
 
             if (existing.length > 0) {
               // Update
               const setClause = fields.map(k => `${k} = ?`).join(', ');
-              exec(`UPDATE characters SET ${setClause} WHERE uuid = ?`, [...values, char.uuid]);
+              exec(`UPDATE characters SET ${setClause} WHERE uuid = ?`, [...values, mappedChar.uuid]);
             } else {
               // Insert
               const placeholders = fields.map(() => '?').join(', ');
@@ -324,9 +345,21 @@ function importSaveWithCorrectOrder(db: any, jsonContent: string) {
 
     // 3. Import Chats (First Pass: snapshotId = NULL)
     for (const chat of data.chats) {
+        // Fallback for required fields in old saves
+        const role = chat.role || 'assistant';
+        const timestamp = chat.timestamp || Date.now();
+        const turnCount = chat.turnCount !== undefined ? chat.turnCount : 0;
+        const content = chat.content || '';
+        const debugLog = typeof chat.debugLog === 'object' ? JSON.stringify(chat.debugLog) : (chat.debugLog || null);
+        
+        // Extra fields from old version
+        const thoughtContent = chat.thought_content || null;
+        const illustrationUrl = chat.illustrationUrl || null;
+        const illustrationPrompt = chat.illustrationPrompt || null;
+
         exec(
-            'INSERT INTO chats (saveSlotId, role, content, debugLog, timestamp, turnCount, snapshotId) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [newSaveId, chat.role, chat.content, chat.debugLog, chat.timestamp, chat.turnCount, null]
+            'INSERT INTO chats (saveSlotId, role, content, debugLog, timestamp, turnCount, snapshotId, thought_content, illustrationUrl, illustrationPrompt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [newSaveId, role, content, debugLog, timestamp, turnCount, null, thoughtContent, illustrationUrl, illustrationPrompt]
         );
         const newChatId = exec('SELECT last_insert_rowid() as id')[0].id;
         chatIdMap.set(chat.id, newChatId);
@@ -341,11 +374,17 @@ function importSaveWithCorrectOrder(db: any, jsonContent: string) {
              gameStateStr = JSON.stringify(gameStateStr);
          }
          
-         const newChatId = chatIdMap.get(snap.chatId) || 0; // Use 0 or null if not found (though should exist)
+         const oldChatId = snap.chatId;
+         const newChatId = chatIdMap.get(oldChatId) || 0;
+
+         if (newChatId === 0) {
+             console.warn(`[Import] Snapshot ${snap.id} refers to non-existent chat ${oldChatId}, skipping.`);
+             continue;
+         }
 
          exec(
             'INSERT INTO snapshots (saveSlotId, chatId, createdAt, gameState) VALUES (?, ?, ?, ?)',
-            [newSaveId, newChatId, snap.createdAt, gameStateStr]
+            [newSaveId, newChatId, snap.createdAt || Date.now(), gameStateStr]
          );
          const newId = exec('SELECT last_insert_rowid() as id')[0].id;
          snapshotIdMap.set(snap.id, newId);
@@ -370,20 +409,20 @@ function importSaveWithCorrectOrder(db: any, jsonContent: string) {
             const placeholders = fields.map(() => '?').join(', ');
             
             // Need to ensure JSON fields are stringified if they come as objects
-            const ensureString = (val: any) => (typeof val === 'object' && val !== null) ? JSON.stringify(val) : val;
+            const ensureString = (val: any) => (typeof val === 'object' && val !== null) ? JSON.stringify(val) : (val || '[]');
 
             const values = [
               newSaveId,
-              mem.turnCount,
-              mem.type,
-              mem.content,
+              mem.turnCount || 0,
+              mem.type || 'event',
+              mem.content || '',
               ensureString(mem.tags),
               ensureString(mem.related_entities),
-              mem.importance,
-              mem.createdAt,
-              mem.gameDate,
-              mem.gameTime,
-              mem.location,
+              mem.importance || 1,
+              mem.createdAt || Date.now(),
+              mem.gameDate || '',
+              mem.gameTime || '',
+              mem.location || '',
               ensureString(mem.characters)
             ];
 

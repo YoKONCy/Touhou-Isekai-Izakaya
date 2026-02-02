@@ -7,7 +7,6 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
     hostname: 'touhou-izakaya.app',
-    allowMixedContent: true,
     cleartext: true
   }
 };
