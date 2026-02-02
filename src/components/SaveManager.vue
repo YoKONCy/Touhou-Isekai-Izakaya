@@ -5,12 +5,14 @@ import { useGameStore } from '@/stores/game';
 import { useChatStore } from '@/stores/chat';
 import NewGameWizard from './NewGameWizard.vue';
 import { gameLoop } from '@/services/gameLoop';
-import { X, Plus, Trash2, Edit2, Play, Check, Download, Upload } from 'lucide-vue-next';
+import { X, Plus, Trash2, Edit2, Play, Check, Download, Upload, RefreshCw } from 'lucide-vue-next';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
 import { useConfirm } from '@/utils/confirm';
 import { generateMap } from '@/services/management/MapGenerator';
+import { checkMigrationNeeded, migrateData } from '@/services/migration';
+import { useToastStore } from '@/stores/toast';
 
 dayjs.extend(relativeTime);
 dayjs.locale('zh-cn');
@@ -26,7 +28,14 @@ const emit = defineEmits<{
 const saveStore = useSaveStore();
 const gameStore = useGameStore();
 const chatStore = useChatStore();
+const toastStore = useToastStore();
 const { confirm } = useConfirm();
+
+const isMigrating = ref(false);
+const migrationProgress = ref(0);
+const migrationMessage = ref('');
+const showMigrationButton = ref(false);
+
 const saves = computed(() => saveStore.saves);
 const currentSaveId = computed(() => saveStore.currentSaveId);
 
@@ -38,11 +47,42 @@ const editName = ref('');
 const showWizard = ref(false);
 const tempSaveName = ref('');
 
-watch(() => props.isOpen, (val) => {
-  if (val && saves.value.length === 0) {
-    isCreating.value = true;
+watch(() => props.isOpen, async (val) => {
+  if (val) {
+    if (saves.value.length === 0) {
+      isCreating.value = true;
+    }
+    // Check if migration might be needed
+    const needed = await checkMigrationNeeded(true); // pass true to skip localStorage check
+    showMigrationButton.value = needed;
   }
 });
+
+async function handleManualMigration() {
+  const ok = await confirm('检测到旧版（Dexie）中存有数据，是否尝试迁移到新版（SQLite）？迁移不会删除旧数据。', {
+    title: '迁移旧版存档',
+    confirmText: '开始迁移',
+    cancelText: '取消'
+  });
+
+  if (!ok) return;
+
+  isMigrating.value = true;
+  try {
+    await migrateData((msg, progress) => {
+      migrationMessage.value = msg;
+      migrationProgress.value = progress;
+    });
+    toastStore.addToast('迁移成功！页面即将刷新。', 'success');
+    setTimeout(() => {
+      window.location.reload();
+    }, 1500);
+  } catch (e: any) {
+    console.error(e);
+    toastStore.addToast(`迁移失败: ${e.message}`, 'error');
+    isMigrating.value = false;
+  }
+}
 
 async function handleCreate() {
   if (!newSaveName.value.trim()) return;
@@ -254,12 +294,35 @@ function formatTime(timestamp: number) {
 
         <!-- Header -->
         <div class="relative z-10 p-4 border-b border-izakaya-wood/10 flex justify-between items-center bg-touhou-red text-white shadow-md">
-          <h2 class="text-xl font-bold font-display flex items-center gap-3 tracking-wide">
-            <span>💾</span> 存档管理
-          </h2>
+          <div class="flex items-center gap-3">
+            <h2 class="text-xl font-bold font-display flex items-center gap-3 tracking-wide">
+              <span>💾</span> 存档管理
+            </h2>
+            <button 
+              v-if="showMigrationButton"
+              @click="handleManualMigration"
+              class="flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 dark:text-amber-300 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 rounded-full border border-amber-200 dark:border-amber-800 transition-colors shadow-sm"
+              title="检测到旧版存档，点击尝试迁移"
+            >
+              <RefreshCw class="w-3 h-3" />
+              发现旧存档
+            </button>
+          </div>
           <button @click="emit('close')" class="p-1.5 hover:bg-white/20 rounded-full transition-colors text-white">
             <X class="w-6 h-6" />
           </button>
+        </div>
+
+        <!-- Migration Progress Overlay -->
+        <div v-if="isMigrating" class="absolute inset-0 z-50 bg-white/90 dark:bg-stone-900/90 flex flex-col items-center justify-center p-6 text-center">
+          <RefreshCw class="w-12 h-12 text-touhou-red animate-spin mb-4" />
+          <h3 class="text-lg font-bold text-stone-900 dark:text-white mb-2">正在迁移存档数据</h3>
+          <p class="text-sm text-stone-500 dark:text-stone-400 mb-4">{{ migrationMessage }}</p>
+          <div class="w-full max-w-xs bg-stone-200 dark:bg-stone-700 rounded-full h-2.5 mb-2 overflow-hidden">
+            <div class="bg-touhou-red h-2.5 rounded-full transition-all duration-300" :style="{ width: `${migrationProgress}%` }"></div>
+          </div>
+          <p class="text-xs text-stone-400">{{ Math.round(migrationProgress) }}%</p>
+          <p class="mt-4 text-xs text-touhou-red font-medium">请勿关闭页面，迁移完成后将自动刷新</p>
         </div>
 
         <!-- Content -->

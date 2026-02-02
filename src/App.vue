@@ -216,26 +216,8 @@ onMounted(async () => {
     }
   }, { immediate: true });
 
-  await saveStore.init(); // This will load history for the active save
-  
   // Database Migration Check
   await dbService.init();
-
-  // Check Persistence Status
-  try {
-    const dbInfo = await dbService.getDbInfo();
-    if (dbInfo.type !== 'opfs') {
-        const message = dbInfo.type === 'memory-fallback' 
-            ? '警告：OPFS 数据库初始化失败，已回退到内存模式。刷新页面将丢失存档！'
-            : '警告：当前浏览器环境不支持持久化存储（OPFS），刷新页面将丢失存档。';
-        toastStore.addToast(message, 'error', 15000);
-        console.warn('Database is running in non-persistent mode:', dbInfo);
-    }
-  } catch(e) {
-      console.error("Failed to check DB info:", e);
-  }
-
-  await memoryService.syncOldFacilitiesToRegistry();
   const needsMigration = await checkMigrationNeeded();
   if (needsMigration) {
       isMigrating.value = true;
@@ -253,6 +235,24 @@ onMounted(async () => {
       }
       return; // Stop further initialization until reload
   }
+
+  await saveStore.init(); // This will load history for the active save
+  
+  // Check Persistence Status
+  try {
+    const dbInfo = await dbService.getDbInfo();
+    if (dbInfo.type !== 'opfs') {
+        const message = dbInfo.type === 'memory-fallback' 
+            ? '警告：OPFS 数据库初始化失败，已回退到内存模式。刷新页面将丢失存档！'
+            : '警告：当前浏览器环境不支持持久化存储（OPFS），刷新页面将丢失存档。';
+        toastStore.addToast(message, 'error', 15000);
+        console.warn('Database is running in non-persistent mode:', dbInfo);
+    }
+  } catch(e) {
+      console.error("Failed to check DB info:", e);
+  }
+
+  await memoryService.syncOldFacilitiesToRegistry();
 });
 
 async function handleLoadMore() {

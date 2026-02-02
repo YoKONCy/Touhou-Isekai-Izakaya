@@ -4,27 +4,49 @@ import Dexie from 'dexie';
 
 const BATCH_SIZE = 50;
 
-export async function checkMigrationNeeded(): Promise<boolean> {
+export async function checkMigrationNeeded(ignoreLocalStorage = false): Promise<boolean> {
   const migrated = localStorage.getItem('DB_MIGRATED_V1');
-  if (migrated === 'true') return false;
+  
+  // Proactive check: If user has NO saves in SQLite but HAS saves in Dexie, 
+  // maybe the previous migration failed or was skipped.
+  // We only do this if it's NOT already marked as migrated, 
+  // OR if we are explicitly ignoring the flag.
+  if (!ignoreLocalStorage && migrated === 'true') {
+      return false;
+  }
 
   try {
       // Check if Dexie DB exists and has data
       const exists = await Dexie.exists('touhou-isekai-db');
       if (!exists) {
-          // If DB doesn't exist, no migration needed.
-          // Mark as migrated to avoid future checks
-          localStorage.setItem('DB_MIGRATED_V1', 'true');
+          if (!ignoreLocalStorage) {
+            localStorage.setItem('DB_MIGRATED_V1', 'true');
+          }
           return false;
       }
 
       await dexieDb.open();
       const count = await dexieDb.saveSlots.count();
       if (count === 0) {
-           // Empty DB, no migration needed
-           localStorage.setItem('DB_MIGRATED_V1', 'true');
+           if (!ignoreLocalStorage) {
+             localStorage.setItem('DB_MIGRATED_V1', 'true');
+           }
            return false;
       }
+
+      // If we are here, Dexie HAS data.
+      // If we are in "check" mode (not manual), we should also verify if SQLite is empty.
+      if (!ignoreLocalStorage) {
+          await dbService.init();
+          const sqliteSaves = await dbService.exec('SELECT id FROM save_slots LIMIT 1');
+          if (sqliteSaves.length > 0) {
+              // SQLite already has data, don't force auto-migration
+              // But mark as migrated so we don't keep checking
+              localStorage.setItem('DB_MIGRATED_V1', 'true');
+              return false;
+          }
+      }
+
       return true;
   } catch (e) {
       console.warn('[Migration] Dexie DB check failed:', e);
