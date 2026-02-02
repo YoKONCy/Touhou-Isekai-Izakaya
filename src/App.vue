@@ -263,6 +263,31 @@ onMounted(async () => {
             toastStore.addToast('建议：安卓用户请在应用商店更新 "Android System WebView"，或使用最新版 Chrome/Edge 浏览器。', 'info', 15000);
         } else if (!diag.hasSharedArrayBuffer) {
             console.warn('COOP/COEP Headers missing or blocked by browser/extension.');
+            
+            // 尝试引导用户修复环境（针对旧 SW 缓存问题）
+            const shouldRepair = await confirm(
+                '检测到浏览器环境可能存在缓存冲突（如旧版 Service Worker 残留），导致无法开启 OPFS 存档功能。是否尝试一键修复？\n\n（操作将清理缓存并自动刷新页面，您的存档数据是安全的）',
+                {
+                    title: '环境修复建议',
+                    confirmText: '修复并刷新',
+                    cancelText: '暂不处理',
+                    destructive: false
+                }
+            );
+
+            if (shouldRepair) {
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (const registration of registrations) {
+                        await registration.unregister();
+                        console.log('Unregistered SW:', registration);
+                    }
+                }
+                // 强制刷新
+                window.location.reload();
+                return;
+            }
+
             if (Capacitor.isNativePlatform()) {
                 toastStore.addToast('检测到正在使用打包版本：如果多次刷新仍报错，请尝试在手机设置中清除应用缓存并重新打开。', 'info', 15000);
             } else {
