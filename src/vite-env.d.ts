@@ -3,6 +3,10 @@ declare module '@sqlite.org/sqlite-wasm' {
     export default sqlite3InitModule;
 }
 
+declare module '@capacitor/core' {
+    export const Capacitor: any;
+}
+
 declare module 'vite-plugin-mkcert' {
     import { Plugin } from 'vite';
     const mkcert: (options?: any) => Plugin;

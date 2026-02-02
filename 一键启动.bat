@@ -60,6 +60,7 @@ call pnpm build
 if %errorlevel% neq 0 (
     echo.
     echo [ERROR] Build failed!
+    echo Suggestion: If you see "Cannot find module" errors, try deleting the "node_modules" folder and run this script again.
     pause
     exit /b 1
 )
