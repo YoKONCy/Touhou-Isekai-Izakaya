@@ -20,6 +20,13 @@ const initPromise = (sqlite3InitModule as any)({
   try {
     log('Running SQLite3 version', sqlite3.version.libVersion);
     
+    // Diagnostic logging for OPFS requirements
+    log('Diagnostic - isSecureContext:', self.isSecureContext);
+    log('Diagnostic - SharedArrayBuffer:', !!(self as any).SharedArrayBuffer);
+    log('Diagnostic - Atomics:', !!(self as any).Atomics);
+    log('Diagnostic - FileSystemHandle:', !!(self as any).FileSystemHandle);
+    log('Diagnostic - navigator.storage.getDirectory:', !!(navigator?.storage?.getDirectory));
+    
     // Check for OPFS support
     if ('opfs' in sqlite3) {
       try {
@@ -62,44 +69,37 @@ const initPromise = (sqlite3InitModule as any)({
 });
 
 function runMigrations(db: any) {
-  log('Running Migrations...');
+  log('Starting database migrations...');
   try {
-    // 1. Check characters table for missing 'type' column
-    const charTableInfo = db.exec({
-      sql: 'PRAGMA table_info(characters)',
-      returnValue: 'resultRows',
-      rowMode: 'object'
-    });
-    
-    if (charTableInfo.length > 0) {
-      const hasTypeColumn = charTableInfo.some((col: any) => col.name === 'type');
-      if (!hasTypeColumn) {
-        log('Migration: Adding "type" column to "characters" table...');
-        db.exec('ALTER TABLE characters ADD COLUMN type TEXT DEFAULT "character"');
-        log('Migration: "type" column added successfully.');
-      }
-    }
+    // Helper to check and add column if missing
+    const ensureColumn = (tableName: string, colName: string, typeDef: string) => {
+        const tableInfo = db.exec({
+            sql: `PRAGMA table_info(${tableName})`,
+            returnValue: 'resultRows',
+            rowMode: 'object'
+        });
+        if (!tableInfo.some((col: any) => col.name === colName)) {
+            log(`Migration: Adding "${colName}" column to "${tableName}" table...`);
+            db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${colName} ${typeDef}`);
+            log(`Migration: "${colName}" column added to "${tableName}" successfully.`);
+        }
+    };
 
-    // 2. Check save_slots table for missing 'playTime' column
-    const saveSlotsInfo = db.exec({
-      sql: 'PRAGMA table_info(save_slots)',
-      returnValue: 'resultRows',
-      rowMode: 'object'
-    });
-    if (saveSlotsInfo.length > 0) {
-      const hasPlayTime = saveSlotsInfo.some((col: any) => col.name === 'playTime');
-      if (!hasPlayTime) {
-        log('Migration: Adding "playTime" column to "save_slots" table...');
-        db.exec('ALTER TABLE save_slots ADD COLUMN playTime INTEGER DEFAULT 0');
-        log('Migration: "playTime" column added successfully.');
-      }
-    }
+    // 1. Characters table migrations
+    ensureColumn('characters', 'type', 'TEXT DEFAULT "character"');
+    ensureColumn('characters', 'gender', 'TEXT');
 
-    // Add more migrations here as the schema evolves
-    
+    // 2. Chats table migrations
+    ensureColumn('chats', 'thought_content', 'TEXT');
+    ensureColumn('chats', 'illustrationUrl', 'TEXT');
+    ensureColumn('chats', 'illustrationPrompt', 'TEXT');
+
+    // 3. Save slots table migrations
+    ensureColumn('save_slots', 'playTime', 'INTEGER DEFAULT 0');
+
+    log('All database migrations completed.');
   } catch (e: any) {
     error('Migration failed:', e.message);
-    // Don't throw, let the app try to continue, but log the error
   }
 }
 
@@ -141,7 +141,14 @@ self.onmessage = async (e: MessageEvent) => {
       case 'GET_DB_INFO':
         result = { 
             type: (self as any).dbType || 'unknown',
-            sqliteVersion: (self as any).sqlite3?.version?.libVersion 
+            sqliteVersion: (self as any).sqlite3?.version?.libVersion,
+            diagnostics: {
+                isSecureContext: self.isSecureContext,
+                hasSharedArrayBuffer: !!(self as any).SharedArrayBuffer,
+                hasAtomics: !!(self as any).Atomics,
+                hasFileSystemHandle: !!(self as any).FileSystemHandle,
+                hasGetDirectory: !!(navigator?.storage?.getDirectory)
+            }
         };
         break;
         

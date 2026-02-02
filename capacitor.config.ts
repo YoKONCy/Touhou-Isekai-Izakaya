@@ -5,7 +5,9 @@ const config: CapacitorConfig = {
   appName: '东方异界食堂',
   webDir: 'dist',
   server: {
-    androidScheme: 'https'
+    androidScheme: 'https',
+    hostname: 'localhost',
+    cleartext: true
   }
 };
 

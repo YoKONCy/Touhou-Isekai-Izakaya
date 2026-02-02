@@ -17,7 +17,7 @@ export async function checkMigrationNeeded(ignoreLocalStorage = false): Promise<
 
   try {
       // Check if Dexie DB exists and has data
-      const exists = await Dexie.exists('touhou-isekai-db');
+      const exists = await Dexie.exists('TouhouIsekaiIzakayaDB');
       if (!exists) {
           if (!ignoreLocalStorage) {
             localStorage.setItem('DB_MIGRATED_V1', 'true');
@@ -90,35 +90,30 @@ export async function migrateData(onProgress: (msg: string, progress: number) =>
     onProgress('正在迁移角色卡...', 10);
     const characters = await dexieDb.characters.toArray();
     if (characters.length > 0) {
-        const rows = characters.map(c => ({
-            // id: c.id, // Let SQLite assign new IDs to avoid conflicts? Or preserve?
-            // Since UUID is the unique identifier for logic, ID is just internal.
-            // Let's preserve ID if possible, but SQLite ID must be unique.
-            // If we have pre-seeded characters in SQLite, we might conflict.
-            // Safe bet: Drop ID, rely on UUID.
-            uuid: c.uuid,
-            name: c.name,
-            category: c.category || '未分类',
-            tags: c.tags || [], // Will be stringified by batchInsert
-            description: c.description,
-            avatarUrl: (c as any).avatarUrl || '',
-            stats: (c as any).stats || {},
-            personality: (c as any).personality || ''
-        }));
-        
-        // We need to handle potential duplicates if SQLite already has seeded characters
-        // For migration, we usually assume target DB is empty OR we upsert.
-        // `batchInsert` does simple INSERT.
-        // Let's delete existing characters in SQLite before migration?
-        // Or checking one by one?
-        // Since this is "Migration", we assume it runs once on a fresh SQLite DB (mostly).
-        // But `initializeNewGame` might have run?
-        // Let's truncate characters table first to be safe?
-        // No, that might delete default characters.
-        // Let's just INSERT OR IGNORE? batchInsert uses INSERT.
-        
-        // Let's try to insert. If uuid constraint fails, it will throw.
-        // We should probably filter out existing UUIDs.
+        const rows = characters.map(c => {
+            const stats = (c as any).stats || {};
+            // Collect flat fields into stats if they exist
+            if ((c as any).initialPower) stats.initialPower = (c as any).initialPower;
+            if ((c as any).initialMaxHp) stats.initialMaxHp = (c as any).initialMaxHp;
+            if ((c as any).initialResidence) stats.initialResidence = (c as any).initialResidence;
+            if ((c as any).cost) stats.cost = (c as any).cost;
+            if ((c as any).damage) stats.damage = (c as any).damage;
+            if ((c as any).damageType) stats.damageType = (c as any).damageType;
+            if ((c as any).buffDetails) stats.buffDetails = (c as any).buffDetails;
+
+            return {
+                uuid: c.uuid,
+                name: c.name,
+                type: (c as any).type || 'character',
+                category: c.category || '未分类',
+                tags: c.tags || [], 
+                description: c.description,
+                avatarUrl: (c as any).avatarUrl || (c as any).avatar || '',
+                gender: (c as any).gender || '',
+                stats: stats,
+                personality: (c as any).personality || (c as any).creatorNotes || ''
+            };
+        });
         
         const existingUuids = (await dbService.exec('SELECT uuid FROM characters')).map(r => r.uuid);
         const newRows = rows.filter(r => !existingUuids.includes(r.uuid));
@@ -163,6 +158,9 @@ export async function migrateData(onProgress: (msg: string, progress: number) =>
             saveSlotId: c.saveSlotId,
             role: c.role,
             content: c.content || '',
+            thought_content: (c as any).thought_content || '',
+            illustrationUrl: (c as any).illustrationUrl || '',
+            illustrationPrompt: (c as any).illustrationPrompt || '',
             debugLog: c.debugLog, // Object, will be stringified
             timestamp: c.timestamp,
             turnCount: c.turnCount || 0,

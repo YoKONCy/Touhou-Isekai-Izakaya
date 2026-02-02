@@ -34,6 +34,9 @@ export const SCHEMA_SQL = [
     saveSlotId INTEGER NOT NULL,
     role TEXT NOT NULL, -- 'user' | 'assistant' | 'system'
     content TEXT,
+    thought_content TEXT,
+    illustrationUrl TEXT,
+    illustrationPrompt TEXT,
     debugLog TEXT, -- JSON String
     timestamp INTEGER NOT NULL,
     turnCount INTEGER NOT NULL,
@@ -138,6 +141,7 @@ export const SCHEMA_SQL = [
     tags TEXT, -- JSON array
     description TEXT,
     avatarUrl TEXT,
+    gender TEXT,
     referenceImageUrl TEXT,
     personality TEXT,
     stats TEXT -- JSON

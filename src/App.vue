@@ -242,11 +242,22 @@ onMounted(async () => {
   try {
     const dbInfo = await dbService.getDbInfo();
     if (dbInfo.type !== 'opfs') {
+        const diag = dbInfo.diagnostics || {};
+        const missing = [];
+        if (!diag.isSecureContext) missing.push('SecureContext');
+        if (!diag.hasSharedArrayBuffer) missing.push('SharedArrayBuffer (需 COOP/COEP)');
+        if (!diag.hasGetDirectory) missing.push('OPFS API (需更新 WebView)');
+        
         const message = dbInfo.type === 'memory-fallback' 
-            ? '警告：OPFS 数据库初始化失败，已回退到内存模式。刷新页面将丢失存档！'
-            : '警告：当前浏览器环境不支持持久化存储（OPFS），刷新页面将丢失存档。';
+            ? `警告：OPFS 初始化失败 (${missing.join(', ') || '未知原因'})。存档将无法持久化！`
+            : `警告：当前环境不支持 OPFS 持久化存储 (${missing.join(', ') || '未知原因'})。`;
+        
         toastStore.addToast(message, 'error', 15000);
         console.warn('Database is running in non-persistent mode:', dbInfo);
+        
+        if (diag.hasGetDirectory && !diag.hasSharedArrayBuffer) {
+            console.info('Tip: Try ensuring coi-serviceworker.js is active to enable SharedArrayBuffer.');
+        }
     }
   } catch(e) {
       console.error("Failed to check DB info:", e);

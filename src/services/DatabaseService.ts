@@ -57,7 +57,7 @@ export class DatabaseService {
     console.log('[DatabaseService] Worker initialized and ready.');
   }
 
-  public async getDbInfo(): Promise<{ type: string; sqliteVersion?: string }> {
+  public async getDbInfo(): Promise<{ type: string; sqliteVersion?: string; diagnostics?: any }> {
     return new Promise((resolve, reject) => {
         const id = this.generateId();
         this.pendingRequests.set(id, { resolve, reject });
@@ -145,11 +145,14 @@ export class DatabaseService {
   
   async addChatMessage(saveSlotId: number, msg: any): Promise<number> {
     await this.exec(
-      'INSERT INTO chats (saveSlotId, role, content, debugLog, timestamp, turnCount, snapshotId) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO chats (saveSlotId, role, content, thought_content, illustrationUrl, illustrationPrompt, debugLog, timestamp, turnCount, snapshotId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         saveSlotId, 
         msg.role, 
         msg.content, 
+        msg.thought_content || null,
+        msg.illustrationUrl || null,
+        msg.illustrationPrompt || null,
         JSON.stringify(msg.debugLog || {}), 
         msg.timestamp || Date.now(), 
         msg.turnCount || 0,
