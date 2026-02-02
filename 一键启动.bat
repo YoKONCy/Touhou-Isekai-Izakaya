@@ -56,6 +56,9 @@ echo Once started, visit the HTTPS URL in your browser (usually https://localhos
 echo Note: You may need to accept the self-signed certificate in your browser.
 echo.
 
+rem 临时忽略 SSL 验证，以允许 mkcert 插件在网络不佳时下载证书工具
+set NODE_TLS_REJECT_UNAUTHORIZED=0
+
 call npm run preview
 
 if %errorlevel% neq 0 (
