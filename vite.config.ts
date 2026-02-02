@@ -97,7 +97,6 @@ export default defineConfig({
   server: {
     host: '0.0.0.0', // Listen on all network interfaces
     port: 14791,
-    https: noHttps ? false : true,
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
@@ -106,7 +105,6 @@ export default defineConfig({
   preview: {
     host: '0.0.0.0',
     port: 14791,
-    https: noHttps ? false : true,
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
