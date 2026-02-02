@@ -6,7 +6,8 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     androidScheme: 'https',
-    hostname: 'localhost',
+    hostname: 'touhou-izakaya.app',
+    allowMixedContent: true,
     cleartext: true
   }
 };

@@ -112,9 +112,15 @@ self.onmessage = async (e: MessageEvent) => {
     let result;
     switch (type) {
       case 'EXEC':
+        // Automatically stringify objects in bind parameters
+        const bind = payload.bind ? payload.bind.map((val: any) => {
+            if (typeof val === 'object' && val !== null) return JSON.stringify(val);
+            return val;
+        }) : undefined;
+        
         result = db.exec({
           sql: payload.sql,
-          bind: payload.bind,
+          bind: bind,
           returnValue: 'resultRows',
           rowMode: 'object' // or 'array'
         });
@@ -147,7 +153,8 @@ self.onmessage = async (e: MessageEvent) => {
                 hasSharedArrayBuffer: !!(self as any).SharedArrayBuffer,
                 hasAtomics: !!(self as any).Atomics,
                 hasFileSystemHandle: !!(self as any).FileSystemHandle,
-                hasGetDirectory: !!(navigator?.storage?.getDirectory)
+                hasGetDirectory: !!(navigator?.storage?.getDirectory),
+                hasStorageManager: !!navigator?.storage
             }
         };
         break;

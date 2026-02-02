@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, nextTick, watch, computed } from 'vue';
-  import { useGameStore } from '@/stores/game';
+import { Capacitor } from '@capacitor/core';
+import { useGameStore } from '@/stores/game';
 import { useChatStore } from '@/stores/chat';
 import { useSettingsStore } from '@/stores/settings';
 import { useSaveStore } from '@/stores/save';
@@ -244,20 +245,32 @@ onMounted(async () => {
     if (dbInfo.type !== 'opfs') {
         const diag = dbInfo.diagnostics || {};
         const missing = [];
-        if (!diag.isSecureContext) missing.push('SecureContext');
-        if (!diag.hasSharedArrayBuffer) missing.push('SharedArrayBuffer (需 COOP/COEP)');
+        if (!diag.isSecureContext) missing.push('HTTPS环境');
+        if (!diag.hasSharedArrayBuffer) missing.push('共享内存 (需 COOP/COEP)');
         if (!diag.hasGetDirectory) missing.push('OPFS API (需更新 WebView)');
         
-        const message = dbInfo.type === 'memory-fallback' 
-            ? `警告：OPFS 初始化失败 (${missing.join(', ') || '未知原因'})。存档将无法持久化！`
-            : `警告：当前环境不支持 OPFS 持久化存储 (${missing.join(', ') || '未知原因'})。`;
+        let message = dbInfo.type === 'memory-fallback' 
+            ? `警告：数据库持久化失败 (${missing.join(', ') || '未知原因'})。`
+            : `提示：当前环境不支持 OPFS 持久化存储 (${missing.join(', ') || '未知原因'})。`;
         
-        toastStore.addToast(message, 'error', 15000);
-        console.warn('Database is running in non-persistent mode:', dbInfo);
+        message += ' 存档将无法在刷新后保留！';
         
-        if (diag.hasGetDirectory && !diag.hasSharedArrayBuffer) {
-            console.info('Tip: Try ensuring coi-serviceworker.js is active to enable SharedArrayBuffer.');
+        toastStore.addToast(message, 'error', 20000);
+        
+        // 更详细的诊断建议
+        if (!diag.hasGetDirectory) {
+            console.warn('OPFS Missing: If on Android, please update "Android System WebView" via Play Store. If on iOS, ensure iOS 15.2+.');
+            toastStore.addToast('建议：安卓用户请在应用商店更新 "Android System WebView"，或使用最新版 Chrome/Edge 浏览器。', 'info', 15000);
+        } else if (!diag.hasSharedArrayBuffer) {
+            console.warn('COOP/COEP Headers missing or blocked by browser/extension.');
+            if (Capacitor.isNativePlatform()) {
+                toastStore.addToast('检测到正在使用打包版本：如果多次刷新仍报错，请尝试在手机设置中清除应用缓存并重新打开。', 'info', 15000);
+            } else {
+                toastStore.addToast('建议：请检查是否开启了无痕模式，或某些扩展拦截了安全响应头。', 'info', 15000);
+            }
         }
+        
+        console.warn('Database is running in non-persistent mode:', dbInfo);
     }
   } catch(e) {
       console.error("Failed to check DB info:", e);
