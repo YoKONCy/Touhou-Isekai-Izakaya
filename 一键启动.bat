@@ -63,6 +63,21 @@ call npm run preview
 
 if %errorlevel% neq 0 (
     echo.
-    echo [INFO] Preview stopped.
-    pause
+    echo [WARNING] Preview failed to start with HTTPS.
+    echo This is usually caused by network issues downloading the SSL certificate tool.
+    echo.
+    set /p choice="Would you like to try starting in COMPATIBILITY MODE (HTTP instead of HTTPS)? (y/n): "
+    if /i "%choice%"=="y" (
+        echo.
+        echo Starting in Compatibility Mode (HTTP)...
+        echo Note: OPFS storage will ONLY work on "http://localhost:14791". 
+        echo Mobile access via IP will NOT have persistent storage.
+        echo.
+        set VITE_NO_HTTPS=true
+        call npm run preview
+    ) else (
+        echo.
+        echo [INFO] Preview stopped.
+        pause
+    )
 )

@@ -6,8 +6,12 @@ import { visualizer } from 'rollup-plugin-visualizer'
 import mkcert from 'vite-plugin-mkcert'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { env } from 'process'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+// 是否禁用 HTTPS (用于网络环境极差、无法下载 mkcert 证书工具的情况)
+const noHttps = env.VITE_NO_HTTPS === 'true'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -15,7 +19,8 @@ export default defineConfig({
   plugins: [
     vue(),
     tailwindcss(),
-    mkcert(),
+    // 仅在未禁用 HTTPS 时加载 mkcert
+    ...(noHttps ? [] : [mkcert()]),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
@@ -92,6 +97,7 @@ export default defineConfig({
   server: {
     host: '0.0.0.0', // Listen on all network interfaces
     port: 14791,
+    https: noHttps ? false : true,
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
@@ -100,6 +106,7 @@ export default defineConfig({
   preview: {
     host: '0.0.0.0',
     port: 14791,
+    https: noHttps ? false : true,
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
