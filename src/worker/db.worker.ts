@@ -22,6 +22,7 @@ const initPromise = (sqlite3InitModule as any)({
     
     // Diagnostic logging for OPFS requirements
     log('Diagnostic - isSecureContext:', self.isSecureContext);
+    log('Diagnostic - crossOriginIsolated:', (self as any).crossOriginIsolated);
     log('Diagnostic - SharedArrayBuffer:', !!(self as any).SharedArrayBuffer);
     log('Diagnostic - Atomics:', !!(self as any).Atomics);
     log('Diagnostic - FileSystemHandle:', !!(self as any).FileSystemHandle);
@@ -150,6 +151,7 @@ self.onmessage = async (e: MessageEvent) => {
             sqliteVersion: (self as any).sqlite3?.version?.libVersion,
             diagnostics: {
                 isSecureContext: self.isSecureContext,
+                crossOriginIsolated: (self as any).crossOriginIsolated,
                 hasSharedArrayBuffer: !!(self as any).SharedArrayBuffer,
                 hasAtomics: !!(self as any).Atomics,
                 hasFileSystemHandle: !!(self as any).FileSystemHandle,
