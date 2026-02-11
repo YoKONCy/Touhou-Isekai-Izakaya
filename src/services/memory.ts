@@ -307,8 +307,18 @@ ${JSON.stringify(actions)}
         signal
       });
 
-      const cleanedResponse = this.cleanJsonString(response || '{}');
-      const result = JSON.parse(cleanedResponse);
+      if (!response) throw new Error('Empty response from Memory LLM');
+
+      // 使用统一的清理逻辑
+      const content = this.cleanJsonString(response);
+
+      const result = JSON.parse(content);
+      
+      // Check for system error response from llm.ts
+      if (result.error) {
+        console.warn('Memory extraction received system error response:', result.message);
+        return;
+      }
       
       if (result.summary) {
         // [Fix] Prevent duplicates: Delete existing summary for this turn
@@ -803,7 +813,29 @@ ${JSON.stringify(actions)}
   }
 
   private cleanJsonString(str: string): string {
-    return str.replace(/```json/g, '').replace(/```/g, '').trim();
+    if (!str) return '';
+    
+    // 1. 移除 <think> 标签及其内容
+    let content = str.replace(/<(think|thinking)>[\s\S]*?<\/\1>/gi, '');
+    
+    // 2. 移除 Markdown 代码块标记
+    content = content.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+    
+    // 3. 提取最外层的 JSON 对象/数组
+    const jsonStart = Math.min(
+      content.indexOf('{') === -1 ? Infinity : content.indexOf('{'),
+      content.indexOf('[') === -1 ? Infinity : content.indexOf('[')
+    );
+    const jsonEnd = Math.max(
+      content.lastIndexOf('}'),
+      content.lastIndexOf(']')
+    );
+    
+    if (jsonStart !== Infinity && jsonEnd !== -1 && jsonEnd > jsonStart) {
+      content = content.substring(jsonStart, jsonEnd + 1);
+    }
+    
+    return content.trim();
   }
 
   private normalizeLocation(loc: string): string {
@@ -925,8 +957,11 @@ ${candidateList}
             modelType: 'memory'
          });
          
-         const cleaned = this.cleanJsonString(response || '[]');
-         const ids = JSON.parse(cleaned);
+         if (!response) return [];
+         
+         const content = this.cleanJsonString(response);
+
+         const ids = JSON.parse(content);
          return Array.isArray(ids) ? ids : [];
      } catch (e) {
          console.error('LLM 精炼失败', e);

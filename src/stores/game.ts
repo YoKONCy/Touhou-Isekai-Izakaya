@@ -80,7 +80,8 @@ export const useGameStore = defineStore('game', () => {
     players: [],
     status: 'idle',
     activeVote: null,
-    totalEnergy: 0
+    totalEnergy: 0,
+    isSharingEnergy: false
   });
 
   // Computed Property: "Me"
@@ -174,6 +175,10 @@ export const useGameStore = defineStore('game', () => {
 
   function setTotalEnergy(energy: number) {
     multiplayer.value.totalEnergy = energy;
+  }
+
+  function setEnergySharing(isSharing: boolean) {
+    multiplayer.value.isSharingEnergy = isSharing;
   }
 
   function updatePlayerEnergy(playerId: string, energy: number) {
@@ -1170,6 +1175,7 @@ export const useGameStore = defineStore('game', () => {
     setVote,
     updateVote,
     setTotalEnergy,
+    setEnergySharing,
     updatePlayerEnergy,
     setPlayerAvatar,
     saveCurrentStateToLastSnapshot,

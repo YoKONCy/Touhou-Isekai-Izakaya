@@ -1,5 +1,4 @@
-import OpenAI from 'openai';
-import { generateCompletion } from '@/services/llm';
+import { generateCompletion } from './llm';
 import { useSettingsStore } from '@/stores/settings';
 import { useChatStore } from '@/stores/chat';
 import { useGameStore } from '@/stores/game';
@@ -344,10 +343,12 @@ const MULTIPLAYER_RULES = `
    - **指令**: 使用 \`UPDATE_COMPANION\` 指令。
    - **参数**: \`targetName\` (玩家的角色名), \`field\`, \`value\`, \`op\`。
    - **逻辑**: 你无需知道复杂的 Identity Key，只需根据剧情中提到的名字（如 "玩家A", "玩家B"）来指定 targetName。系统会自动匹配。
-   - **可修改字段**: 与 **NPC 变量** 相同 (hp, max_hp, money, power, location, clothing, action, etc.)。
+   - **可修改字段**: 
+     - 数值/文本型: 与 **NPC 变量** 相同 (hp, max_hp, money, power, location, clothing, action, etc.)。
+     - 列表型 (物品/配方): 若客机获得物品或配方，**必须**使用 \`UPDATE_COMPANION\`，field 设为 \`items\` 或 \`recipes\`，op 设为 \`push\`，value 为完整的对象。
 `;
 
-const MULTIPLAYER_ACTION = `3. UPDATE_COMPANION: targetName (Character Name), field (same as NPC), op (add, subtract, set), value`;
+const MULTIPLAYER_ACTION = `3. UPDATE_COMPANION: targetName (Character Name), field (hp, money, items, etc.), op (add, subtract, set, push), value`;
 
 /**
  * GameMaster Logic Service (Instruction Mapper)
@@ -439,12 +440,6 @@ export class LogicService {
       console.warn('Logic LLM not configured, skipping logic processing.');
       return { thinking: '', actions: [], quick_replies: [], summary: '' };
     }
-
-    const openai = new OpenAI({
-      baseURL: config.baseUrl,
-      apiKey: config.apiKey,
-      dangerouslyAllowBrowser: true
-    });
 
     // Heuristic: Scan story for NPC names to include them in context
     // This ensures that if a pre-defined character appears, the Logic Model sees their initial stats
@@ -585,7 +580,6 @@ export class LogicService {
     }
 
     const messages = [
-      { role: 'system', content: finalSystemPrompt },
       { role: 'user', content: JSON.stringify({
           current_state: {
              player: this.sanitizePlayer(gameState.player),
@@ -600,14 +594,15 @@ export class LogicService {
     ];
 
     try {
-      const response = await openai.chat.completions.create({
-        model: config.model || 'gpt-3.5-turbo',
+      let content = await generateCompletion({
+        systemPrompt: finalSystemPrompt,
         messages: messages as any,
-        temperature: 0.1, // Low temp for logic
-        response_format: { type: "json_object" } // Force JSON if supported
-      }, { signal });
+        jsonMode: true,
+        modelType: 'logic',
+        temperature: 0.1,
+        signal
+      });
 
-      let content = response.choices[0]?.message?.content;
       if (!content) throw new Error('Empty response from Logic LLM');
 
       // 0. Strip CoT (Chain of Thought) tags like <think>...</think>

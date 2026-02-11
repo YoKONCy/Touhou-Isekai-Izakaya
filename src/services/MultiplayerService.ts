@@ -512,6 +512,17 @@ class MultiplayerService {
   }
 
   /**
+   * Toggle Energy Sharing (Host Only)
+   */
+  public toggleEnergySharing(isSharing: boolean) {
+    const gameStore = useGameStore();
+    if (!gameStore.multiplayer.isHost) return;
+    
+    (gameStore as any).setEnergySharing(isSharing);
+    this.send('SYNC_ENERGY_SHARING', { isSharing });
+  }
+
+  /**
    * Send Dice Roll result
    */
   public sendDiceRoll(sides: number, result: number) {
@@ -600,8 +611,9 @@ class MultiplayerService {
       console.error('[联机] 同步记忆失败:', e);
     }
     
-    // 4. Sync Total Energy
+    // 4. Sync Total Energy & Sharing Status
     this.send('SYNC_ENERGY', { totalEnergy: gameStore.multiplayer.totalEnergy });
+    this.send('SYNC_ENERGY_SHARING', { isSharing: gameStore.multiplayer.isSharingEnergy });
     
     // 5. Sync Active Vote (if any)
     if (this.activeVote && !this.activeVote.isEnded) {
@@ -1153,6 +1165,18 @@ class MultiplayerService {
             (gameStore as any).setTotalEnergy(msg.payload.totalEnergy);
           } else if (!gameStore.multiplayer.isHost) {
             console.warn(`[联机] 拦截到非房主发送的能源同步: 来自 ${senderId}`);
+          }
+          break;
+      }
+
+      case 'SYNC_ENERGY_SHARING': {
+          const senderId = msg.senderId;
+          const sender = gameStore.multiplayer.players.find(p => p.id === senderId);
+
+          if (!gameStore.multiplayer.isHost && sender?.isHost) {
+            (gameStore as any).setEnergySharing(msg.payload.isSharing);
+          } else if (!gameStore.multiplayer.isHost) {
+            console.warn(`[联机] 拦截到非房主发送的能源共享同步: 来自 ${senderId}`);
           }
           break;
       }

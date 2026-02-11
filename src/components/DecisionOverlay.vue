@@ -240,6 +240,14 @@ function handleRequestEnergy() {
   audioManager.playClick();
 }
 
+function handleToggleSharing() {
+  if (!gameStore.multiplayer.isHost) return;
+  const newValue = !gameStore.multiplayer.isSharingEnergy;
+  multiplayerService.toggleEnergySharing(newValue);
+  addLog(newValue ? '你开启了 API 能源池共享' : '你关闭了 API 能源池共享', newValue ? 'success' : 'warning');
+  audioManager.playClick();
+}
+
 // --- Dice Logic ---
 const isRolling = ref(false);
 const lastRollResult = ref<{ type: string, value: number } | null>(null);
@@ -543,7 +551,20 @@ const allReady = computed(() => {
                 <h3 class="text-sm font-bold text-yellow-700 flex items-center gap-2">
                   <Zap class="w-4 h-4" /> API 能源池
                 </h3>
-                <div class="flex gap-1">
+                <div class="flex items-center gap-2">
+                  <!-- Sharing Toggle (Host Only) -->
+                  <div v-if="gameStore.multiplayer.isHost" class="flex items-center gap-1.5 mr-1">
+                    <span class="text-[10px] font-bold text-yellow-700/60 uppercase">共享</span>
+                    <button 
+                      @click="handleToggleSharing"
+                      :class="['w-8 h-4 rounded-full transition-all relative border', 
+                               gameStore.multiplayer.isSharingEnergy ? 'bg-yellow-500 border-yellow-600' : 'bg-gray-200 border-gray-300']"
+                    >
+                      <div :class="['absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white shadow-sm transition-all', 
+                                   gameStore.multiplayer.isSharingEnergy ? 'left-[18px]' : 'left-0.5']"></div>
+                    </button>
+                  </div>
+                  
                   <button 
                     v-if="gameStore.multiplayer.isHost"
                     @click="handleRequestEnergy" 
@@ -581,7 +602,15 @@ const allReady = computed(() => {
                 <p v-if="totalEnergy < 0" class="text-[10px] text-red-500 font-bold italic animate-pulse">
                   能源已透支！请尽快贡献能源。
                 </p>
-                <p v-else class="text-[10px] text-gray-400 italic">能源池由所有玩家共同贡献。</p>
+                <div v-else class="flex justify-between items-center">
+                  <p class="text-[10px] text-gray-400 italic">能源池由所有玩家共同贡献。</p>
+                  <span v-if="gameStore.multiplayer.isSharingEnergy" class="text-[9px] font-bold text-yellow-600 bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/20 animate-pulse">
+                    已启用
+                  </span>
+                  <span v-else class="text-[9px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
+                    未启用
+                  </span>
+                </div>
               </div>
 
               <!-- Contribution View -->
@@ -637,21 +666,23 @@ const allReady = computed(() => {
                 <Users class="w-3 h-3" /> 房内成员 ({{ players.length }})
               </h4>
               <div class="space-y-2">
-                <div v-for="p in players" :key="p.id" class="flex items-center justify-between text-xs group">
-                  <div class="flex items-center gap-2">
-                    <div class="w-2 h-2 rounded-full" :class="p.status === 'ready' ? 'bg-green-500' : 'bg-gray-300'"></div>
-                    <span class="truncate max-w-[80px]">{{ p.name }}</span>
+                <div v-for="p in players" :key="p.id" class="flex items-center justify-between text-xs group min-h-[24px]">
+                  <div class="flex items-center gap-2 flex-1 min-w-0">
+                    <div class="w-2 h-2 rounded-full flex-shrink-0" :class="p.status === 'ready' ? 'bg-green-500' : 'bg-gray-300'"></div>
+                    <span class="truncate">{{ p.name }}</span>
                   </div>
-                  <div class="flex items-center gap-1">
-                    <span class="text-[10px] text-gray-400 px-1.5 py-0.5 bg-gray-100 rounded">{{ p.isHost ? '房主' : '客机' }}</span>
-                    <button 
-                      v-if="gameStore.multiplayer.isHost && !p.isHost"
-                      @click="handleKickPlayer(p.id, p.name)"
-                      class="p-1 text-gray-400 hover:text-touhou-red opacity-0 group-hover:opacity-100 transition-all"
-                      title="踢出玩家"
-                    >
-                      <UserMinus class="w-3 h-3" />
-                    </button>
+                  <div class="flex items-center gap-1 flex-shrink-0 ml-2">
+                    <span class="text-[10px] text-gray-400 px-1.5 py-0.5 bg-gray-100 rounded whitespace-nowrap">{{ p.isHost ? '房主' : '客机' }}</span>
+                    <div class="w-5 flex justify-center">
+                      <button 
+                        v-if="gameStore.multiplayer.isHost && !p.isHost"
+                        @click="handleKickPlayer(p.id, p.name)"
+                        class="p-1 text-gray-400 hover:text-touhou-red opacity-0 group-hover:opacity-100 transition-all"
+                        title="踢出玩家"
+                      >
+                        <UserMinus class="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -57,27 +57,50 @@ export async function generateCompletion(options: CompletionOptions): Promise<st
   const mpService = multiplayerService;
   const isMpHost = gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost;
   let useMpEnergy = false;
+  
+  // Use a final config object that can be overridden by multiplayer relay
+  const finalConfig = { ...config };
 
   if (isMpHost) {
     const currentEnergy = gameStore.multiplayer.totalEnergy || 0;
-    if (currentEnergy > 0) {
+    const isSharing = gameStore.multiplayer.isSharingEnergy;
+    
+    if (isSharing && currentEnergy > 0) {
       useMpEnergy = true;
-    } else {
+      
+      // Override config to use Multiplayer Relay API Pool
+      // The relay API is located at the same host as the WS server but under /api/v1
+      const relayBaseUrl = mpService.OFFICIAL_SERVER_URL
+        .replace('wss://', 'https://')
+        .replace('ws://', 'http://')
+        .replace('/ws', '/api/v1');
+      
+      finalConfig.baseUrl = relayBaseUrl;
+      // Key format expected by relay: room:<roomId>:<identityKey>
+      finalConfig.apiKey = `room:${gameStore.multiplayer.roomId}:${mpService.identityKey}`;
+      
+      console.log(`[LLM] 使用联机能源池 API (剩余能源: ${currentEnergy})`);
+    } else if (isSharing && currentEnergy <= 0) {
       console.log(`[LLM] API 能源已耗尽 (${currentEnergy})，自动回退到房主本地 API 余额。`);
+    } else {
+      console.log(`[LLM] 房主未开启共享能源，使用房主本地 API。`);
     }
   }
 
+  // Check if we should force JSON response format
+  const isJsonResponseRequired = options.jsonMode && !finalConfig.stream;
+
   const openai = new OpenAI({
-    baseURL: config.baseUrl,
-    apiKey: config.apiKey,
+    baseURL: finalConfig.baseUrl,
+    apiKey: finalConfig.apiKey,
     dangerouslyAllowBrowser: true,
     // timeout is handled by the client
-    timeout: Math.round(config.timeout || 300000)
+    timeout: Math.round(finalConfig.timeout || 300000)
   });
 
   try {
     const response = await openai.chat.completions.create({
-      model: config.model || 'gpt-3.5-turbo',
+      model: finalConfig.model || 'gpt-3.5-turbo',
       messages: [
         { role: 'system', content: options.systemPrompt },
         ...options.messages
@@ -85,17 +108,17 @@ export async function generateCompletion(options: CompletionOptions): Promise<st
       // FIX: Disable native JSON mode if stream is enabled (implies Thinking model), 
       // as Thinking models often don't support response_format: json_object.
       // We will handle JSON extraction manually below.
-      response_format: (options.jsonMode && !config.stream) ? { type: 'json_object' } : undefined,
-      temperature: options.temperature ?? config.temperature ?? 0.3,
-      top_p: config.top_p,
-      frequency_penalty: config.frequency_penalty,
-      presence_penalty: config.presence_penalty,
+      response_format: isJsonResponseRequired ? { type: 'json_object' } : undefined,
+      temperature: options.temperature ?? finalConfig.temperature ?? 0.3,
+      top_p: finalConfig.top_p,
+      frequency_penalty: finalConfig.frequency_penalty,
+      presence_penalty: finalConfig.presence_penalty,
       max_tokens: options.max_tokens,
-      stream: options.stream ?? config.stream ?? false,
+      stream: options.stream ?? finalConfig.stream ?? false,
     } as any, { signal: options.signal });
 
     let content = '';
-    const shouldStream = options.stream ?? config.stream;
+    const shouldStream = options.stream ?? finalConfig.stream;
     
     // Multiplayer Support: Broadcaster
     if (shouldStream) {
@@ -146,6 +169,20 @@ export async function generateCompletion(options: CompletionOptions): Promise<st
     return finalContent;
   } catch (error: any) {
     console.error('LLM Completion Failed:', error);
+    
+    // If JSON mode was required, return a structured JSON error instead of raw text
+          if (isJsonResponseRequired) {
+            const errorResponse = {
+              error: true,
+              message: error.message,
+              thinking: `LLM Request Failed: ${error.message}`,
+              actions: [],
+              quick_replies: [],
+              summary: `[请求失败: ${error.message}]`
+            };
+            return JSON.stringify(errorResponse);
+          }
+    
     throw error;
   }
 }

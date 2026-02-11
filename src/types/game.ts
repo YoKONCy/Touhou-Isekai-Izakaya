@@ -216,6 +216,7 @@ export interface MultiplayerState {
   error?: string;
   activeVote: MultiplayerVote | null;
   totalEnergy: number; // 房间总可用能源
+  isSharingEnergy: boolean; // 是否开启能源共享（由房主控制）
 }
 
 // Initial State Factory
