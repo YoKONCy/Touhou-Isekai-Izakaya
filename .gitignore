@@ -35,7 +35,8 @@ launcher/icon.ico
 launcher/resource.syso
 # 一键启动.exe (作为分发入口，不应忽略)
 
-# Relay Server Binaries (Do not ignore to allow distribution)
-!go/relay-server-win.exe
-!go/relay-server-linux
+# Relay Server Binaries
+go/relay-server.exe
+go/relay-server-win.exe
+go/relay-server-linux
 
