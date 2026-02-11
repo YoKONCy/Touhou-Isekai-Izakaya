@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { type GameState, INITIAL_GAME_STATE, type GameAction, type Quest, type QuestStatus, type Item, type PromiseState, type MultiplayerState, type MultiplayerPlayer } from '@/types/game';
+import { type GameState, INITIAL_GAME_STATE, type GameAction, type Quest, type QuestStatus, type Item, type PromiseState, type MultiplayerState, type MultiplayerPlayer, type PlayerStatus } from '@/types/game';
 import { type SpellCard } from '@/types/combat';
 import { useCharacterStore } from '@/stores/character';
 import { useSettingsStore } from '@/stores/settings';
@@ -101,6 +101,27 @@ export const useGameStore = defineStore('game', () => {
        const myKey = localStorage.getItem('mp_identity_key');
        if (myKey && state.value.multiplayer_companions && state.value.multiplayer_companions[myKey]) {
          return state.value.multiplayer_companions[myKey];
+       }
+
+       // 3.1 If not in companions yet (before persona submission), find myself in multiplayer.players
+       const myId = localStorage.getItem('mp_player_id');
+       if (myId) {
+         const playerInfo = multiplayer.value.players.find(p => p.id === myId);
+         if (playerInfo) {
+           // Create a partial PlayerStatus from MultiplayerPlayer info
+           return {
+             ...INITIAL_GAME_STATE.player,
+             name: playerInfo.name || '客机玩家',
+             identity: playerInfo.identity || '联机客机',
+             avatarUrl: playerInfo.avatarUrl || '',
+             hp: playerInfo.hp || 100,
+             max_hp: playerInfo.max_hp || 100,
+             mp: playerInfo.mp || 100,
+             max_mp: playerInfo.max_mp || 100,
+             power: playerInfo.power || '?',
+             isMe: true
+           } as PlayerStatus;
+         }
        }
     }
     
