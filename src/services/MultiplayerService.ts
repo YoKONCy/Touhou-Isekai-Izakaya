@@ -260,10 +260,22 @@ class MultiplayerService {
     
     this.ws.onmessage = async (event) => {
       try {
-        const msg = JSON.parse(event.data);
-        await this.handleMessage(msg);
+        const data = event.data;
+        if (typeof data !== 'string') return;
+
+        // 处理可能存在的“粘包”情况（多个 JSON 消息由换行符分隔）
+        const messages = data.split('\n').filter(line => line.trim() !== '');
+        
+        for (const rawMsg of messages) {
+          try {
+            const msg = JSON.parse(rawMsg);
+            await this.handleMessage(msg);
+          } catch (e) {
+            console.warn('[联机] 解析单条消息失败:', rawMsg, e);
+          }
+        }
       } catch (e) {
-        console.warn('[联机] 解析消息失败:', event.data, e);
+        console.warn('[联机] 解析消息流失败:', event.data, e);
       }
     };
   }
