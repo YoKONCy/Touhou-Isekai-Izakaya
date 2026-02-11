@@ -534,7 +534,7 @@ export class IzakayaScene {
       if (customer && customer.state === 'ordering') {
            customer.state = 'waiting_food';
            customer.order = this.generateRandomOrder();
-           console.log(`Order taken from ${customer.name}: ${customer.order.dishName}`);
+           console.log(`收到 ${customer.name} 的订单: ${customer.order.dishName}`);
 
            this.dispatchOrderEvent('add', customer);
       }

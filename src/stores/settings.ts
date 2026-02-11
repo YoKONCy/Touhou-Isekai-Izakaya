@@ -120,7 +120,7 @@ const DEFAULT_LLM_CONFIGS: Record<string, LLMConfig> = {
 export const useSettingsStore = defineStore('settings', () => {
   // Global Provider Settings (Default)
   const globalProvider = ref({
-    baseUrl: 'https://api.openai.com/v1',
+    baseUrl: '',
     apiKey: ''
   });
 

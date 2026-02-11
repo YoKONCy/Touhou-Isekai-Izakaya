@@ -526,6 +526,25 @@ class MultiplayerService {
   }
 
   /**
+   * Host: Kick a player
+   */
+  public kickPlayer(playerId: string) {
+    const gameStore = useGameStore();
+    if (!gameStore.multiplayer.isHost) return;
+    
+    // 1. Send kick notification to the target player
+    this.send('PLAYER_KICKED', { targetId: playerId });
+    
+    // 2. Locally remove the player (they will also be removed by others when host syncs player list)
+    gameStore.multiplayer.players = gameStore.multiplayer.players.filter(p => p.id !== playerId);
+    
+    // 3. Broadcast updated player list
+    this.syncPlayerList();
+    
+    console.log(`[联机] 房主踢出了玩家: ${playerId}`);
+  }
+
+  /**
    * Host: Broadcast LLM Stream Token to all clients
    */
   public sendLLMToken(token: string) {
@@ -667,7 +686,10 @@ class MultiplayerService {
 
     switch (msg.type) {
       case 'SYNC_CHAT_MESSAGE': {
-        if (!gameStore.multiplayer.isHost && msg.payload) {
+        const senderId = msg.senderId;
+        const sender = gameStore.multiplayer.players.find(p => p.id === senderId);
+
+        if (!gameStore.multiplayer.isHost && sender?.isHost && msg.payload) {
           const chatStore = (await import('@/stores/chat')).useChatStore();
           const { role, content, timestamp } = msg.payload;
           
@@ -681,7 +703,19 @@ class MultiplayerService {
           if (!exists) {
             chatStore.addMessage(role, content, timestamp);
             console.log(`[联机] 同步收到新消息: ${role}`);
+
+            // 如果收到助手消息，重置所有玩家的就绪状态和草稿
+            if (role === 'assistant') {
+              gameStore.multiplayer.players.forEach(p => {
+                p.status = 'idle';
+                p.draftContent = '';
+              });
+              // 发送事件通知 UI 组件重置本地状态
+              window.dispatchEvent(new CustomEvent('mp-reset-draft'));
+            }
           }
+        } else if (!gameStore.multiplayer.isHost && !sender?.isHost) {
+          console.warn(`[联机] 拦截到非房主发送的消息同步: 来自 ${senderId}`);
         }
         break;
       }
@@ -1017,8 +1051,13 @@ class MultiplayerService {
       }
 
       case 'VOTE_PROPOSAL': {
-          if (!gameStore.multiplayer.isHost) {
+          const senderId = msg.senderId;
+          const sender = gameStore.multiplayer.players.find(p => p.id === senderId);
+
+          if (!gameStore.multiplayer.isHost && sender?.isHost) {
             (gameStore as any).setVote(msg.payload);
+          } else if (!gameStore.multiplayer.isHost) {
+            console.warn(`[联机] 拦截到非房主发起的投票: 来自 ${senderId}`);
           }
           break;
       }
@@ -1075,12 +1114,17 @@ class MultiplayerService {
       }
       
       case 'VOTE_RESULT': {
-          if (!gameStore.multiplayer.isHost && gameStore.multiplayer.activeVote?.id === msg.payload.voteId) {
+          const senderId = msg.senderId;
+          const sender = gameStore.multiplayer.players.find(p => p.id === senderId);
+
+          if (!gameStore.multiplayer.isHost && sender?.isHost && gameStore.multiplayer.activeVote?.id === msg.payload.voteId) {
             const vote = gameStore.multiplayer.activeVote;
             if (vote) {
               vote.isEnded = true;
               vote.resultIndex = msg.payload.resultIndex;
             }
+          } else if (!gameStore.multiplayer.isHost && !sender?.isHost) {
+            console.warn(`[联机] 拦截到非房主发布的投票结果: 来自 ${senderId}`);
           }
           break;
       }
@@ -1102,10 +1146,40 @@ class MultiplayerService {
       }
 
       case 'SYNC_ENERGY': {
-          if (!gameStore.multiplayer.isHost) {
+          const senderId = msg.senderId;
+          const sender = gameStore.multiplayer.players.find(p => p.id === senderId);
+
+          if (!gameStore.multiplayer.isHost && sender?.isHost) {
             (gameStore as any).setTotalEnergy(msg.payload.totalEnergy);
+          } else if (!gameStore.multiplayer.isHost) {
+            console.warn(`[联机] 拦截到非房主发送的能源同步: 来自 ${senderId}`);
           }
           break;
+      }
+
+      case 'PLAYER_KICKED': {
+        const targetId = msg.payload?.targetId;
+        const senderId = msg.senderId;
+        const sender = gameStore.multiplayer.players.find(p => p.id === senderId);
+        
+        // 安全检查：只有房主有权踢人
+        if (!sender?.isHost) {
+          console.warn(`[联机] 拦截到非房主发送的踢人指令: 来自 ${senderId}`);
+          break;
+        }
+
+        if (targetId === this.identityKey) {
+          // I am being kicked!
+          const toastStore = useToastStore();
+          toastStore.addToast('你已被房主踢出房间', 'error');
+          this.disconnect();
+          
+          // Force back to main screen or show error
+          setTimeout(() => {
+            window.location.reload(); // Simple way to reset state
+          }, 2000);
+        }
+        break;
       }
 
       case 'DICE_ROLL': {

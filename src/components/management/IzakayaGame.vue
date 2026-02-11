@@ -236,7 +236,7 @@ const handleCustomerInteract = async (event: Event) => {
     const { customer, dialogType } = (event as CustomEvent).detail;
     
     if (dialogType === 'ordering') {
-        let dialogue = "Please... I'm hungry.";
+        let dialogue = "请... 我饿了。";
         
         if (customer.isSpecial) {
              // Use pre-generated or generate now
@@ -247,8 +247,8 @@ const handleCustomerInteract = async (event: Event) => {
                  customer.dialogue = dialogue; // Cache it
              }
         } else {
-            const commonLines = ["Menu, please!", "What's recommended?", "I'm starving!"];
-            dialogue = commonLines[Math.floor(Math.random() * commonLines.length)] || "Menu, please!";
+            const commonLines = ["麻烦给个菜单！", "有什么推荐吗？", "饿死我啦！"];
+            dialogue = commonLines[Math.floor(Math.random() * commonLines.length)] || "麻烦给个菜单！";
         }
 
         currentInteraction.value = {
@@ -272,7 +272,7 @@ const handleInteract = (e: Event) => {
   const customEvent = e as CustomEvent;
   const { tileName, x, y } = customEvent.detail;
   
-  let message = `Interacted with ${tileName} at (${x}, ${y})`;
+  let message = `交互对象: ${tileName} (${x}, ${y})`;
   let type: 'info' | 'success' | 'warning' | 'error' = 'info';
 
   if (tileName === 'COOKING_POT') {

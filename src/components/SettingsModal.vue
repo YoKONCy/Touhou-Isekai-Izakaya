@@ -381,6 +381,7 @@ function handleVolumeChangeTest() {
                     v-model="settingsStore.globalProvider.baseUrl" 
                     type="text" 
                     class="w-full bg-white/50 border border-izakaya-wood/20 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:border-touhou-red/50 focus:ring-1 focus:ring-touhou-red/20 transition-all font-mono text-sm text-izakaya-wood placeholder:text-izakaya-wood/30"
+                    placeholder="https://api.openai.com/v1"
                   >
                 </div>
                 <div>

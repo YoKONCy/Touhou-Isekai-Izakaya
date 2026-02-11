@@ -100,7 +100,7 @@ export async function generateMap(theme: string = "cozy wooden izakaya", context
   
   // Debug: Use default map if enabled
   if (settingsStore.useDefaultTilemap) {
-      console.log("[MapGenerator] Debug mode: Using default map data.");
+      console.log("[地图生成器] 调试模式: 使用默认地图数据。");
       return JSON.parse(JSON.stringify(DEFAULT_MAP_DATA));
   }
 
@@ -114,7 +114,7 @@ export async function generateMap(theme: string = "cozy wooden izakaya", context
         userContent += `\n\n**RENOVATION TASK**: Redesign the zones based on the new theme. Previous layout is irrelevant as we are rezoning.`;
     }
 
-    console.log(`[MapGenerator] Starting ZONE generation... Theme: "${theme}"`);
+    console.log(`[地图生成器] 开始生成区域... 主题: "${theme}"`);
 
     const response = await generateCompletion({
       modelType: 'misc', 
@@ -126,7 +126,7 @@ export async function generateMap(theme: string = "cozy wooden izakaya", context
       temperature: 0.7
     });
 
-    console.log("[MapGenerator] Raw LLM Response:", response);
+    console.log("[地图生成器] LLM 原始响应:", response);
 
     let jsonStr = response;
     const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/i) || response.match(/```\s*([\s\S]*?)\s*```/);
@@ -154,7 +154,7 @@ export async function generateMap(theme: string = "cozy wooden izakaya", context
         jsonStr = jsonStr.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
         data = JSON.parse(jsonStr);
     } catch (e) {
-        console.error("JSON Parse Error", e);
+        console.error("JSON 解析错误", e);
         throw e;
     }
 
@@ -163,7 +163,7 @@ export async function generateMap(theme: string = "cozy wooden izakaya", context
     }
 
     // --- POPULATE ZONES ---
-    console.log("[MapGenerator] Populating Ground Floor...");
+    console.log("[地图生成器] 正在填充一楼...");
     const populator1 = new ZonePopulator(data.layout); // Ground Floor
     data.layout = populator1.generate();
 
@@ -175,18 +175,18 @@ export async function generateMap(theme: string = "cozy wooden izakaya", context
     //     }
     // }
     
-    console.log("[MapGenerator] Map generated successfully.");
+    console.log("[地图生成器] 地图生成成功。");
 
     return data;
 
   } catch (error) {
-    console.error("Failed to generate map:", error);
+    console.error("地图生成失败:", error);
     
     if (throwOnError) {
         throw error;
     }
 
-    console.log("Using fallback map due to error.");
+    console.log("由于错误使用回退地图。");
     // Fallback map (Standard Tile Map)
     return JSON.parse(JSON.stringify(DEFAULT_MAP_DATA));
   }

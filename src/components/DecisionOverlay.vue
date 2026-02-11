@@ -6,7 +6,7 @@ import { audioManager } from '@/services/audio';
 import { 
   X, Send, Gavel, Users, MessageSquare, Scroll, 
   Dices, User, Activity, Zap, CheckCircle2, 
-  Clock, AlertCircle, Info, Vote
+  Clock, AlertCircle, Info, Vote, UserMinus
 } from 'lucide-vue-next';
 import _ from 'lodash';
 
@@ -211,6 +211,14 @@ function submitVoteCreation() {
   closeVoteCreation();
 }
 
+function handleKickPlayer(playerId: string, playerName: string) {
+  if (!gameStore.multiplayer.isHost) return;
+  if (confirm(`确定要踢出玩家 "${playerName}" 吗？`)) {
+    multiplayerService.kickPlayer(playerId);
+    audioManager.playClick();
+  }
+}
+
 
 // --- Energy Logic ---
 const totalEnergy = computed(() => gameStore.multiplayer.totalEnergy || 0);
@@ -276,8 +284,13 @@ const handleDiceEvent = (e: any) => {
   const player = gameStore.multiplayer.players.find(p => p.id === senderId);
   const playerName = player?.name || `玩家 ${senderId.substring(0,4)}`;
   
-  addLog(`${playerName} 投掷了 D${sides}，结果为：${result}`, 'roll');
+  addLog(`${playerName}投掷了 D${sides}，结果为：${result}`, 'roll');
   audioManager.playNotification();
+};
+
+const handleResetDraft = () => {
+  actionInput.value = '';
+  isReady.value = false;
 };
 
 // --- Event Listeners ---
@@ -286,6 +299,7 @@ onMounted(() => {
   window.addEventListener('mp-vote-started', handleVoteStarted);
   window.addEventListener('mp-vote-result', handleVoteResult);
   window.addEventListener('mp-dice-roll', handleDiceEvent);
+  window.addEventListener('mp-reset-draft', handleResetDraft);
   
   // Listen for other system events that might come via MultiplayerService
   addLog('已进入跑团决策系统', 'success');
@@ -296,6 +310,7 @@ onUnmounted(() => {
   window.removeEventListener('mp-vote-started', handleVoteStarted);
   window.removeEventListener('mp-vote-result', handleVoteResult);
   window.removeEventListener('mp-dice-roll', handleDiceEvent);
+  window.removeEventListener('mp-reset-draft', handleResetDraft);
 });
 
 // --- Computed ---
@@ -622,12 +637,22 @@ const allReady = computed(() => {
                 <Users class="w-3 h-3" /> 房内成员 ({{ players.length }})
               </h4>
               <div class="space-y-2">
-                <div v-for="p in players" :key="p.id" class="flex items-center justify-between text-xs">
+                <div v-for="p in players" :key="p.id" class="flex items-center justify-between text-xs group">
                   <div class="flex items-center gap-2">
                     <div class="w-2 h-2 rounded-full" :class="p.status === 'ready' ? 'bg-green-500' : 'bg-gray-300'"></div>
-                    <span class="truncate max-w-[100px]">{{ p.name }}</span>
+                    <span class="truncate max-w-[80px]">{{ p.name }}</span>
                   </div>
-                  <span class="text-[10px] text-gray-400 px-1.5 py-0.5 bg-gray-100 rounded">{{ p.isHost ? '房主' : '客机' }}</span>
+                  <div class="flex items-center gap-1">
+                    <span class="text-[10px] text-gray-400 px-1.5 py-0.5 bg-gray-100 rounded">{{ p.isHost ? '房主' : '客机' }}</span>
+                    <button 
+                      v-if="gameStore.multiplayer.isHost && !p.isHost"
+                      @click="handleKickPlayer(p.id, p.name)"
+                      class="p-1 text-gray-400 hover:text-touhou-red opacity-0 group-hover:opacity-100 transition-all"
+                      title="踢出玩家"
+                    >
+                      <UserMinus class="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </section>

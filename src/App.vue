@@ -238,53 +238,53 @@ watch(() => chatStore.messages.length, () => {
 });
 
 // Handle Jump to message
-watch(() => chatStore.jumpTargetId, async (newId) => {
-  if (newId === null) return;
+  watch(() => chatStore.jumpTargetId, async (newId) => {
+    if (newId === null) return;
 
-  console.log('[App] jumpTargetId changed to:', newId);
+    console.log('[App] 跳转目标ID变更:', newId);
 
-  // Give it a bit more time for DOM to stabilize, especially if messages were just loaded
-  await nextTick();
-  await new Promise(resolve => setTimeout(resolve, 100)); // Extra buffer for rendering
-  
-  // Find the message element
-  const selector = `[data-message-id="${newId}"]`;
-  let element = document.querySelector(selector);
-  
-  if (!element) {
-    // Try finding it by ID if it's on the component root
-    element = document.getElementById(`msg-${newId}`);
-  }
-
-  console.log('[App] Looking for element with selector:', selector);
-  console.log('[App] Element found:', !!element);
-
-  if (element && chatContainer.value) {
-    console.log('[App] Scrolling to element...');
+    // Give it a bit more time for DOM to stabilize, especially if messages were just loaded
+    await nextTick();
+    await new Promise(resolve => setTimeout(resolve, 100)); // Extra buffer for rendering
     
-    // Use a more robust scrolling method
-    const container = chatContainer.value;
-    const elementRect = element.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
-    const scrollTarget = elementRect.top - containerRect.top + container.scrollTop - (containerRect.height / 2) + (elementRect.height / 2);
-
-    container.scrollTo({
-      top: scrollTarget,
-      behavior: 'smooth'
-    });
+    // Find the message element
+    const selector = `[data-message-id="${newId}"]`;
+    let element = document.querySelector(selector);
     
-    // Add a temporary highlight effect
-    element.classList.add('highlight-message');
-    setTimeout(() => {
-      element.classList.remove('highlight-message');
-    }, 2000);
-  } else {
-    console.warn('[App] Could not scroll: element or chatContainer missing', { 
-      element: !!element, 
-      chatContainer: !!chatContainer.value 
-    });
-  }
-});
+    if (!element) {
+      // Try finding it by ID if it's on the component root
+      element = document.getElementById(`msg-${newId}`);
+    }
+
+    console.log('[App] 查找元素选择器:', selector);
+    console.log('[App] 元素是否找到:', !!element);
+
+    if (element && chatContainer.value) {
+      console.log('[App] 正在滚动至元素...');
+      
+      // Use a more robust scrolling method
+      const container = chatContainer.value;
+      const elementRect = element.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const scrollTarget = elementRect.top - containerRect.top + container.scrollTop - (containerRect.height / 2) + (elementRect.height / 2);
+
+      container.scrollTo({
+        top: scrollTarget,
+        behavior: 'smooth'
+      });
+      
+      // Add a temporary highlight effect
+      element.classList.add('highlight-message');
+      setTimeout(() => {
+        element.classList.remove('highlight-message');
+      }, 2000);
+    } else {
+      console.warn('[App] 无法滚动: 元素或聊天容器缺失', { 
+        element: !!element, 
+        chatContainer: !!chatContainer.value 
+      });
+    }
+  });
 
 onMounted(async () => {
   await settingsStore.loadSettings();
@@ -931,20 +931,22 @@ const mpAllReady = computed(() => {
                 <button
                     v-if="gameStore.state.system.combat?.isPending"
                     @click="userOpenCombat = true; audioManager.playChime()"
-                    class="group flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-touhou-red to-red-600 text-white rounded-lg shadow-lg text-sm"
+                    :disabled="gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost"
+                    class="group flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-touhou-red to-red-600 text-white rounded-lg shadow-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <span class="text-base animate-bounce">⚔️</span>
-                    <span class="font-display">进���战斗</span>
+                    <span class="font-display">{{ (gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost) ? '房主开启中...' : '进入战斗' }}</span>
                 </button>
 
                 <!-- Quest Trigger -->
                 <button
                     v-if="gameStore.state.system.pending_quest_trigger"
                     @click="userOpenQuest = true; audioManager.playPageFlip()"
-                    class="group flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-izakaya-wood to-stone-700 text-white rounded-lg shadow-lg text-sm"
+                    :disabled="gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost"
+                    class="group flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-izakaya-wood to-stone-700 text-white rounded-lg shadow-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <span class="text-base animate-pulse">📜</span>
-                    <span class="font-display">查看任务</span>
+                    <span class="font-display">{{ (gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost) ? '等待房主接受...' : '查看任务' }}</span>
                 </button>
               </div>
 
@@ -955,7 +957,8 @@ const mpAllReady = computed(() => {
                   v-for="(reply, idx) in gameStore.quickReplies"
                   :key="idx"
                   @click="handleQuickReply(reply)"
-                  class="px-3 py-1 bg-white/80 text-touhou-red font-display text-sm rounded-sm border border-touhou-red/20 truncate max-w-[45%]"
+                  :disabled="gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost"
+                  class="px-3 py-1 bg-white/80 text-touhou-red font-display text-sm rounded-sm border border-touhou-red/20 truncate max-w-[45%] disabled:opacity-50 disabled:cursor-not-allowed"
                   :title="reply"
                 >
                   {{ reply }}

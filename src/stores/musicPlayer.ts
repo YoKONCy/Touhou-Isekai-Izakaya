@@ -61,7 +61,7 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
         if (state.currentIndex !== undefined) currentIndex.value = state.currentIndex;
         if (state.mode) mode.value = state.mode;
       } catch (e) {
-        console.error('Failed to load music player state:', e);
+        console.error('加载音乐播放器状态失败:', e);
       }
     }
   }
@@ -88,7 +88,7 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
       duration.value = audio.duration;
     });
     audio.addEventListener('error', (e) => {
-      console.error('Audio playback error:', e);
+      console.error('音频播放错误:', e);
       next(); // Skip error track
     });
 

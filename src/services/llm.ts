@@ -43,11 +43,11 @@ export async function generateCompletion(options: CompletionOptions): Promise<st
     config = settingsStore.getEffectiveConfig(modelType);
   }
 
-  // 2. Final check for API Key
-  if (!config.apiKey) {
+  // 2. Final check for API Key and Base URL
+  if (!config.apiKey || !config.baseUrl) {
     const modelNumbers: Record<string, number> = { chat: 1, logic: 2, memory: 3, misc: 4, drawing: 5 };
     const num = modelNumbers[modelType] || '?';
-    const errorMsg = `模型 '${modelType}' (LLM #${num}) 未配置 API Key，且无有效备选模型。请在设置中检查配置。`;
+    const errorMsg = `模型 '${modelType}' (LLM #${num}) 未配置 ${!config.apiKey ? 'API Key' : 'API 地址'}，且无有效备选模型。请在设置中检查配置。`;
     console.error(`[LLM] ${errorMsg}`);
     throw new Error(errorMsg);
   }
@@ -56,13 +56,14 @@ export async function generateCompletion(options: CompletionOptions): Promise<st
   const gameStore = useGameStore();
   const mpService = multiplayerService;
   const isMpHost = gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost;
+  let useMpEnergy = false;
 
   if (isMpHost) {
     const currentEnergy = gameStore.multiplayer.totalEnergy || 0;
-    if (currentEnergy <= 0) {
-      const errorMsg = `API 能源已耗尽 (${currentEnergy})，请请求玩家贡献能源后再试。`;
-      console.warn(`[LLM] ${errorMsg}`);
-      throw new Error(errorMsg);
+    if (currentEnergy > 0) {
+      useMpEnergy = true;
+    } else {
+      console.log(`[LLM] API 能源已耗尽 (${currentEnergy})，自动回退到房主本地 API 余额。`);
     }
   }
 
@@ -127,7 +128,7 @@ export async function generateCompletion(options: CompletionOptions): Promise<st
       .trim();
 
     // Multiplayer Energy Deduction (Host Only)
-    if (isMpHost) {
+    if (useMpEnergy) {
       // Calculate approximate tokens (Prompt + Completion)
       const promptText = (options.systemPrompt || '') + (options.messages || []).map(m => m.content).join('');
       const totalTokens = estimateTokens(promptText + content);

@@ -170,7 +170,7 @@ export class MemoryService {
       }
       
     } catch (e) {
-      console.error('[MemoryService] Failed to update graph:', e);
+      console.error('[MemoryService] 更新记忆图谱失败:', e);
     }
   }
 
@@ -499,7 +499,7 @@ ${JSON.stringify(actions)}
         const logicResult = JSON.parse(assistantMsg.debugLog.logicOutput);
         actions = logicResult.actions || [];
       } catch (e) {
-        console.error('Failed to parse logic output:', e);
+        console.error('解析逻辑输出失败:', e);
       }
     }
 
@@ -570,7 +570,7 @@ ${JSON.stringify(actions)}
       
       return content.trim();
     } catch (error) {
-      console.error('Failed to get global memories:', error);
+      console.error('获取全局记忆失败:', error);
       return '';
     }
   }
@@ -587,7 +587,7 @@ ${JSON.stringify(actions)}
     const settingsStore = useSettingsStore();
     const enableRefinement = settingsStore.enableMemoryRefinement;
     
-    console.log('[Memory Retrieval] Refinement mode:', enableRefinement ? 'ENABLED' : 'DISABLED');
+    console.log('[记忆检索] 精炼模式:', enableRefinement ? '已启用' : '已禁用');
 
     // 1. 条件性包含设施变动记忆（支持多设施）
     try {
@@ -748,7 +748,7 @@ ${JSON.stringify(actions)}
         }
       }
     } catch (error) {
-      console.error('Failed to retrieve summary memories:', error);
+      console.error('检索摘要记忆失败:', error);
     }
 
     return result.join('\n');
@@ -827,12 +827,12 @@ ${JSON.stringify(actions)}
    */
   async syncOldFacilitiesToRegistry() {
     try {
-      console.log('[MemoryService] Starting old facility data sync...');
+      console.log('[记忆服务] 开始同步旧版设施数据...');
       const oldMemories = await dbService.getAllMemoriesAcrossSlots();
       const facilityMemories = oldMemories.filter(m => m.type === 'facility');
       
       if (facilityMemories.length === 0) {
-        console.log('[MemoryService] No old facility memories found.');
+        console.log('[记忆服务] 未发现旧版设施记忆。');
         return;
       }
 
@@ -879,9 +879,9 @@ ${JSON.stringify(actions)}
         }
       }
       
-      console.log(`[MemoryService] Old facility data sync completed. Migrated ${syncCount} facilities.`);
+      console.log(`[记忆服务] 旧版设施数据同步完成。已迁移 ${syncCount} 个设施。`);
     } catch (err) {
-      console.error('[MemoryService] Failed to sync old facilities:', err);
+      console.error('[记忆服务] 同步旧版设施失败:', err);
     }
   }
 
@@ -929,9 +929,9 @@ ${candidateList}
          const ids = JSON.parse(cleaned);
          return Array.isArray(ids) ? ids : [];
      } catch (e) {
-         console.error('LLM refinement failed', e);
+         console.error('LLM 精炼失败', e);
          return [];
-     }
+    }
   }
 }
 

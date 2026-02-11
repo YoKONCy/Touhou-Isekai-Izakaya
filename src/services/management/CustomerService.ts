@@ -71,10 +71,10 @@ export async function evaluateDish(
 
     return JSON.parse(response);
   } catch (error) {
-    console.error("Evaluation failed", error);
+    console.error("菜品评价失败", error);
     return {
       score: 50,
-      comment: "It's... okay.",
+      comment: "还可以吧。",
       payment: 100,
       reputation: 0,
       isDelicious: false
@@ -97,7 +97,7 @@ export async function generateCustomerDialogue(name: string, context: string): P
 
     return response.trim();
   } catch (error) {
-    console.error("Dialogue generation failed", error);
+    console.error("对话生成失败", error);
     return "...";
   }
 }

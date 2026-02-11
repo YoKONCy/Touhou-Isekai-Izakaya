@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"time"
@@ -68,8 +69,21 @@ func (c *Client) readPump() {
 			}
 			break
 		}
-		// Forward message to the room broadcast channel
-		c.room.broadcast <- message
+
+		// 解析消息并注入真实的 senderId，防止客户端伪造身份
+		var msg map[string]interface{}
+		if err := json.Unmarshal(message, &msg); err == nil {
+			msg["senderId"] = c.id
+			if updatedMessage, err := json.Marshal(msg); err == nil {
+				// 发送到房间的广播通道
+				c.room.broadcast <- MessageEnvelope{sender: c, data: updatedMessage}
+			} else {
+				c.room.broadcast <- MessageEnvelope{sender: c, data: message}
+			}
+		} else {
+			// 如果不是 JSON，原样转发（虽然目前设计都是 JSON）
+			c.room.broadcast <- MessageEnvelope{sender: c, data: message}
+		}
 	}
 }
 

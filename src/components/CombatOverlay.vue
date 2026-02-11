@@ -3158,7 +3158,7 @@ function processTurnStart() {
 async function processAllyTurn() {
     if (phase.value !== 'ally') return;
     
-    console.log('[Combat] Ally turn processing started');
+    console.log('[战斗] 盟友回合处理开始');
     
     try {
         await sleep(500);
@@ -3334,7 +3334,7 @@ async function processAllyTurn() {
 async function processEnemyTurn() {
     if (phase.value !== 'enemy') return;
     
-    console.log('[Combat] Enemy turn processing started');
+    console.log('[战斗] 敌人回合处理开始');
     
     try {
         // Simulate thinking
@@ -3481,7 +3481,7 @@ async function processEnemyTurn() {
         }
         
         if (!isGameOver.value) {
-            console.log('[Combat] Enemy turn finished, switching to player');
+            console.log('[战斗] 敌人回合结束，切换到玩家');
             phase.value = 'player';
             processTurnStart();
         }

@@ -276,7 +276,7 @@ export const useChatStore = defineStore('chat', () => {
                  [saveStore.currentSaveId]
              );
              if (initialSnapshotRes.length > 0) {
-                console.log('[ChatStore] Restoring from initial snapshot');
+                console.log('[聊天商店] 正在从初始快照恢复');
                 gameStore.setState(JSON.parse(initialSnapshotRes[0].gameState));
                 restored = true;
              }

@@ -54,7 +54,7 @@ export class DatabaseService {
 
   public async init(): Promise<void> {
     await this.exec('SELECT 1');
-    console.log('[DatabaseService] Worker initialized and ready.');
+    console.log('[数据库服务] Worker 已初始化就绪。');
   }
 
   public async getDbInfo(): Promise<{ type: string; sqliteVersion?: string; diagnostics?: any }> {

@@ -174,7 +174,7 @@ export const drawingService = {
     }
 
     const openai = new OpenAI({
-      baseURL: config.baseUrl || 'https://api.openai.com/v1',
+      baseURL: config.baseUrl,
       apiKey: config.apiKey,
       dangerouslyAllowBrowser: true
     });
@@ -254,7 +254,7 @@ ${storyText}
           sampler = v4SamplerMap[sampler] || 'k_euler_a';
       }
 
-      console.log(`[DrawingService] Generating image with model: ${model}, provider: NovelAI (isV4: ${isV4}, isV45: ${isV45}, sampler: ${sampler})`);
+      console.log(`[绘图服务] 正在使用模型生成图像: ${model}, 服务商: NovelAI (isV4: ${isV4}, isV45: ${isV45}, 采样器: ${sampler})`);
 
       // 1. Build Parameters
       let parameters: any = {};
@@ -324,7 +324,7 @@ ${storyText}
           model: body.model
       };
 
-      console.log('[DrawingService] Request Body:', JSON.stringify(requestBody, null, 2));
+      console.log('[绘图服务] 请求体:', JSON.stringify(requestBody, null, 2));
 
       let response;
       try {
@@ -337,7 +337,7 @@ ${storyText}
               body: JSON.stringify(requestBody)
           });
       } catch (e: any) {
-          console.error('[DrawingService] Fetch Error:', e);
+          console.error('[绘图服务] 获取响应失败:', e);
           if (e.name === 'TypeError' && e.message === 'Failed to fetch') {
               throw new Error("网络请求失败 (可能是 CORS 跨域问题)。如果您在浏览器中直接连接 NovelAI 官方接口，请务必使用 CORS 代理或反向代理地址。");
           }
@@ -346,7 +346,7 @@ ${storyText}
 
       if (!response.ok) {
           const errText = await response.text();
-          console.error(`[DrawingService] API Error (${response.status}):`, errText);
+          console.error(`[绘图服务] API 错误 (${response.status}):`, errText);
           let errorMsg = `NovelAI API Error (${response.status})`;
           try {
               const errJson = JSON.parse(errText);
@@ -719,7 +719,7 @@ ${storyText}
     const config = settingsStore.drawingConfig;
 
     if (!config.enabled) {
-      console.log('[DrawingService] Skipped: Feature disabled in settings');
+      console.log('[绘图服务] 已跳过：设置中禁用了该功能');
       return null;
     }
 

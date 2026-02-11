@@ -221,7 +221,7 @@ async function handleExport(save: any) {
       URL.revokeObjectURL(url);
     }, 100);
     
-    console.log('[SaveManager] Export triggered successfully');
+    console.log('[存档管理器] 导出触发成功');
   } catch (error: any) {
     console.error('Export failed:', error);
     alert(`导出存档失败: ${error.message || '未知错误'}`);

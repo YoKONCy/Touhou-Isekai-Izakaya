@@ -37,10 +37,10 @@ export function runCombatVerification() {
       console.log(`Buffed Damage (+50% Atk): ${buffedResult.damage}`);
       
       if (buffedResult.damage > baseResult.damage) {
-        console.log('%c✅ Attack Buff Verified', 'color: green');
+        console.log('%c✅ 攻击加成已验证', 'color: green');
       } else {
-        console.error('❌ Attack Buff Failed');
-      }
+          console.error('❌ 攻击加成验证失败');
+        }
   } catch (e) {
       console.warn('⚠️ Base Damage Test skipped due to store dependency (likely normal in test env):', e);
   }

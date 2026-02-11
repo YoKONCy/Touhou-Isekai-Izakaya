@@ -76,6 +76,11 @@ func main() {
 	// 2. 自动切换镜像源
 	stepHeader(2, 5, "网络优化", "Network Optimization")
 	fmt.Printf("  正在接入加速节点: %s%s%s\n", ColorCyan, TaoBaoRegistry, ColorReset)
+
+	// 清理旧版冗余配置（解决 npm 警告）
+	runCommandSilent(pkgManager, "config", "delete", "npm_config_sharp_binary_host")
+	runCommandSilent(pkgManager, "config", "delete", "npm_config_sharp_libvips_binary_host")
+
 	if err := runCommand(pkgManager, "config", "set", "registry", TaoBaoRegistry); err != nil {
 		fmt.Printf("  %s[✕]%s 配置失败，可能会影响下载速度。\n", ColorYellow, ColorReset)
 	} else {

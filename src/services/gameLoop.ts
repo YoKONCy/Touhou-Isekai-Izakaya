@@ -82,7 +82,7 @@ class GameLoopService {
         }
      }
      
-     console.log('[GameLoop] New Game Initialized. Pre-populated NPCs:', Object.keys(gameStore.state.npcs).length);
+     console.log('[游戏循环] 新游戏已初始化。预填充 NPC 数量:', Object.keys(gameStore.state.npcs).length);
   }
 
   async handleUserAction(userContent: string) {
@@ -92,12 +92,12 @@ class GameLoopService {
     // Scheme C: Prevent Guest from performing actions
     if (gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost) {
       toastStore.addToast('客机模式下仅供观察，无法进行操作', 'warning');
-      console.warn('[GameLoop] Action blocked: Guest mode is read-only');
+      console.warn('[游戏循环] 操作被阻止：客机模式仅为只读');
       return;
     }
 
     if (this.isProcessing.value || this.isBackgroundProcessing.value) {
-      console.warn('[GameLoop] handleUserAction ignored because already processing:', {
+      console.warn('[游戏循环] handleUserAction 被忽略，因为正在处理中:', {
         isProcessing: this.isProcessing.value,
         isBackgroundProcessing: this.isBackgroundProcessing.value
       });
@@ -247,13 +247,13 @@ class GameLoopService {
              try {
                  response = JSON.parse(response);
              } catch (e) {
-                 console.warn('[Game Loop] Failed to parse string response:', e);
+                 console.warn('[游戏循环] 无法解析字符串响应:', e);
              }
           }
 
           if (!response || !response.choices || response.choices.length === 0) {
-             console.error('[Game Loop] Invalid OpenAI response:', response);
-             throw new Error('OpenAI API returned no choices');
+             console.error('[游戏循环] 无效的 OpenAI 响应:', response);
+             throw new Error('OpenAI API 未返回任何选项 (choices)');
           }
 
           rawContent = response.choices[0]?.message?.content || '';
@@ -269,7 +269,7 @@ class GameLoopService {
         }
       } catch (error: any) {
         if (error.message === 'Operation aborted by user' || error.name === 'AbortError') {
-          console.log('[Game Loop] Story generation aborted');
+          console.log('[游戏循环] 剧情生成已中止');
           return; // Exit early without committing
         }
         throw error; // Re-throw other errors
@@ -279,7 +279,7 @@ class GameLoopService {
       let finalStory = rawContent;
       
       // DEBUG: Log LLM1 Response
-      console.log('【LLM1 Debug】Raw Response:', rawContent);
+      console.log('【LLM1 调试】原始响应:', rawContent);
 
       // Extract and strip COT content
       let thoughtContent = '';
@@ -354,7 +354,7 @@ class GameLoopService {
           finalStory = finalStory.replace(/<promise_trigger>[\s\S]*?<\/promise_trigger>/g, '').trim();
           this.streamedContent.value = finalStory;
         } catch (e) {
-          console.error('Failed to parse promise trigger:', e);
+          console.error('解析约定的触发器失败:', e);
         }
       }
 
@@ -367,7 +367,7 @@ class GameLoopService {
           finalStory = finalStory.replace(/<promise_update>[\s\S]*?<\/promise_update>/g, '').trim();
           this.streamedContent.value = finalStory;
         } catch (e) {
-          console.error('Failed to parse promise update:', e);
+          console.error('解析约定的更新失败:', e);
         }
       }
 
@@ -380,7 +380,7 @@ class GameLoopService {
           finalStory = finalStory.replace(/<management_trigger>[\s\S]*?<\/management_trigger>/g, '').trim();
           this.streamedContent.value = finalStory;
         } catch (e) {
-          console.error('Failed to parse management trigger:', e);
+          console.error('解析经营触发器失败:', e);
         }
       }
 
@@ -418,6 +418,14 @@ class GameLoopService {
           timestamp: Date.now(),
           turnCount: gameStore.state.system.turn_count
         });
+
+        // 房主端在发送广播后，也重置本地所有玩家的就绪状态和草稿
+        gameStore.multiplayer.players.forEach(p => {
+          p.status = 'idle';
+          p.draftContent = '';
+        });
+        // 房主端也发送重置事件给自己的 UI
+        window.dispatchEvent(new CustomEvent('mp-reset-draft'));
       }
       
       // Play notification sound

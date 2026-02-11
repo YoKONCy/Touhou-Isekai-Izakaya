@@ -18,48 +18,48 @@ const initPromise = (sqlite3InitModule as any)({
   }
 }).then((sqlite3: any) => {
   try {
-    log('Running SQLite3 version', sqlite3.version.libVersion);
+    log('运行 SQLite3 版本', sqlite3.version.libVersion);
     
     // Diagnostic logging for OPFS requirements
-    log('Diagnostic - isSecureContext:', self.isSecureContext);
-    log('Diagnostic - crossOriginIsolated:', (self as any).crossOriginIsolated);
-    log('Diagnostic - SharedArrayBuffer:', !!(self as any).SharedArrayBuffer);
-    log('Diagnostic - Atomics:', !!(self as any).Atomics);
-    log('Diagnostic - FileSystemHandle:', !!(self as any).FileSystemHandle);
-    log('Diagnostic - navigator.storage.getDirectory:', !!(navigator?.storage?.getDirectory));
+    log('诊断 - isSecureContext:', self.isSecureContext);
+    log('诊断 - crossOriginIsolated:', (self as any).crossOriginIsolated);
+    log('诊断 - SharedArrayBuffer:', !!(self as any).SharedArrayBuffer);
+    log('诊断 - Atomics:', !!(self as any).Atomics);
+    log('诊断 - FileSystemHandle:', !!(self as any).FileSystemHandle);
+    log('诊断 - navigator.storage.getDirectory:', !!(navigator?.storage?.getDirectory));
     
     // Check for OPFS support
     if ('opfs' in sqlite3) {
       try {
         db = new sqlite3.oo1.OpfsDb('/touhou_isekai.sqlite3');
-        log('OPFS Database opened successfully: /touhou_isekai.sqlite3');
+        log('OPFS 数据库打开成功: /touhou_isekai.sqlite3');
         (self as any).dbType = 'opfs';
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
-        error('Failed to open OPFS database, falling back to transient in-memory DB:', msg);
+        error('打开 OPFS 数据库失败，回退到临时内存数据库:', msg);
         db = new sqlite3.oo1.DB('/touhou_isekai_mem.sqlite3', 'ct');
         (self as any).dbType = 'memory-fallback';
       }
     } else {
-      error('OPFS is not available, falling back to transient in-memory DB.');
+      error('OPFS 不可用，回退到临时内存数据库。');
       db = new sqlite3.oo1.DB('/touhou_isekai_mem.sqlite3', 'ct');
       (self as any).dbType = 'memory';
     }
 
     // Apply Schema
-    log('Applying Schema...');
+    log('正在应用数据库 Schema...');
     db.transaction(() => {
         SCHEMA_SQL.forEach((sql, index) => {
             try {
                 db.exec(sql);
             } catch (e: unknown) {
                 const msg = e instanceof Error ? e.message : String(e);
-                error(`Schema Error at index ${index}:`, msg, 'SQL:', sql);
+                error(`Schema 错误 (索引 ${index}):`, msg, 'SQL:', sql);
                 throw e;
             }
         });
     });
-    log('Schema applied successfully.');
+    log('数据库 Schema 应用成功。');
     
     // Run Migrations for existing databases
     runMigrations(db);
@@ -67,13 +67,13 @@ const initPromise = (sqlite3InitModule as any)({
     return true;
   } catch (err: unknown) {
     const errorObj = err as Error;
-    error('Initialization failed:', errorObj.name, errorObj.message);
+    error('数据库初始化失败:', errorObj.name, errorObj.message);
     throw err;
   }
 });
 
 function runMigrations(db: any) {
-  log('Starting database migrations...');
+  log('开始数据库迁移...');
   try {
     // Helper to check and add column if missing
     const ensureColumn = (tableName: string, colName: string, typeDef: string) => {
@@ -83,9 +83,9 @@ function runMigrations(db: any) {
             rowMode: 'object'
         });
         if (!tableInfo.some((col: { name: string }) => col.name === colName)) {
-            log(`Migration: Adding "${colName}" column to "${tableName}" table...`);
+            log(`迁移: 正在添加列 "${colName}" 到表 "${tableName}"...`);
             db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${colName} ${typeDef}`);
-            log(`Migration: "${colName}" column added to "${tableName}" successfully.`);
+            log(`迁移: 列 "${colName}" 已成功添加到表 "${tableName}"。`);
         }
     };
 
@@ -102,9 +102,9 @@ function runMigrations(db: any) {
     ensureColumn('save_slots', 'playTime', 'INTEGER DEFAULT 0');
     ensureColumn('save_slots', 'isMultiplayer', 'BOOLEAN DEFAULT 0');
 
-    log('All database migrations completed.');
+    log('所有数据库迁移已完成。');
   } catch (e: any) {
-    error('Migration failed:', e.message);
+    error('迁移失败:', e.message);
   }
 }
 

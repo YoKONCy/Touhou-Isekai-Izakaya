@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 
@@ -8,6 +9,11 @@ import (
 )
 
 const MaxPlayers = 6
+
+type MessageEnvelope struct {
+	sender *Client
+	data   []byte
+}
 
 type Room struct {
 	id           string
@@ -19,7 +25,7 @@ type Room struct {
 	clients map[*Client]bool
 
 	// Inbound messages from the clients.
-	broadcast chan []byte
+	broadcast chan MessageEnvelope
 
 	// Register requests from the clients.
 	register chan *Client
@@ -36,7 +42,7 @@ func newRoom(id, name, password string, hub *Hub) *Room {
 		name:         name,
 		passwordHash: password,
 		hub:          hub,
-		broadcast:    make(chan []byte),
+		broadcast:    make(chan MessageEnvelope),
 		register:     make(chan *Client),
 		unregister:   make(chan *Client),
 		clients:      make(map[*Client]bool),
@@ -119,11 +125,37 @@ func (r *Room) run() {
 				}
 			}
 
-		case message := <-r.broadcast:
+		case envelope := <-r.broadcast:
+			// 解析消息，如果是房主发出的踢人指令，服务端直接执行断开操作
+			var msg struct {
+				Type    string `json:"type"`
+				Payload struct {
+					TargetId string `json:"targetId"`
+				} `json:"payload"`
+			}
+
+			if err := json.Unmarshal(envelope.data, &msg); err == nil {
+				if msg.Type == "PLAYER_KICKED" && envelope.sender.isHost {
+					targetId := msg.Payload.TargetId
+					log.Printf("[房间 %s] 房主 %s 请求踢出玩家: %s", r.id, envelope.sender.id, targetId)
+
+					// 寻找目标客户端并关闭连接
+					for client := range r.clients {
+						if client.id == targetId {
+							log.Printf("[房间 %s] 服务端强制断开被踢玩家连接: %s", r.id, targetId)
+							// 注意：这里不需要手动从 r.clients 删除，client.readPump 结束会触发 unregister
+							client.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "You have been kicked by the host"))
+							client.conn.Close()
+							break
+						}
+					}
+				}
+			}
+
 			// Fan-out to all clients
 			for client := range r.clients {
 				select {
-				case client.send <- message:
+				case client.send <- envelope.data:
 				default:
 					close(client.send)
 					delete(r.clients, client)

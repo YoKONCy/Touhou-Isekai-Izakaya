@@ -92,7 +92,7 @@ export const useSaveStore = defineStore('save', () => {
     // 如果是联机存档，标记为联机模式，但不激活连接状态，需手动开房
     const saveInfo = saves.value.find(s => s.id === id);
     if (saveInfo?.isMultiplayer) {
-      console.log('[SaveStore] Loading multiplayer save, ready for multiplayer mode.');
+      console.log('[SaveStore] 加载联机存档，准备进入联机模式。');
       gameStore.multiplayer.isMultiplayer = false; // 加载时不激活连接
       gameStore.multiplayer.isHost = false; 
     } else {
@@ -115,11 +115,11 @@ export const useSaveStore = defineStore('save', () => {
        const latestSnapshot = await dbService.getLatestSnapshot(id);
        
        if (!latestSnapshot) {
-          console.log('[SaveStore] Detected new/empty save. Initializing World State...');
+          console.log('[SaveStore] 检测到新/空存档。正在初始化世界状态...');
           await gameLoop.initializeNewGame();
           await chatStore.createInitialSnapshot();
        } else {
-          console.log('[SaveStore] Empty history but snapshot exists. Skipping initialization.');
+          console.log('[SaveStore] 历史记录为空但存在快照。跳过初始化。');
        }
     }
   }
