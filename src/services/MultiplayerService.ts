@@ -84,12 +84,15 @@ class MultiplayerService {
   /**
    * Create a room as Host
    */
-  public async createRoom(hostName: string, identity: string = '房主', persona: string = '', power: string = 'A', password?: string): Promise<string> {
+  public async createRoom(hostName: string, identity: string = '房主', persona: string = '', power: string = 'A', password?: string, roomName?: string): Promise<string> {
     const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     // Construct WebSocket URL
     let url = `${this.OFFICIAL_SERVER_URL}?action=create&room=${roomId}&host=true&id=${this.identityKey}&name=${encodeURIComponent(hostName)}`;
     if (password) {
       url += `&pass=${encodeURIComponent(password)}`;
+    }
+    if (roomName) {
+      url += `&roomName=${encodeURIComponent(roomName)}`;
     }
     
     // Generate Key if password provided

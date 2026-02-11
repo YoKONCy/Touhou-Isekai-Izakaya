@@ -57,7 +57,8 @@ var addr = flag.String("addr", ":8080", "http service address")
 func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	roomId := query.Get("room")
-	action := query.Get("action") // "create" or "join"
+	roomName := query.Get("roomName") // 获取房间名称
+	action := query.Get("action")     // "create" or "join"
 	isHost := query.Get("host") == "true"
 	password := query.Get("pass")
 	playerId := query.Get("id")
@@ -77,7 +78,11 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Only host can create room", http.StatusBadRequest)
 			return
 		}
-		room = hub.createRoom(roomId, password)
+		// 如果没有传 roomName，回退使用 roomId
+		if roomName == "" {
+			roomName = roomId
+		}
+		room = hub.createRoom(roomId, roomName, password)
 		if room == nil {
 			http.Error(w, "Room already exists", http.StatusConflict)
 			return

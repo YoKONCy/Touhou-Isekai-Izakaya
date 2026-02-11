@@ -11,6 +11,7 @@ const MaxPlayers = 6
 
 type Room struct {
 	id           string
+	name         string // 房间显示名称
 	passwordHash string
 	hub          *Hub
 
@@ -29,9 +30,10 @@ type Room struct {
 	host *Client
 }
 
-func newRoom(id, password string, hub *Hub) *Room {
+func newRoom(id, name, password string, hub *Hub) *Room {
 	return &Room{
 		id:           id,
+		name:         name,
 		passwordHash: password,
 		hub:          hub,
 		broadcast:    make(chan []byte),

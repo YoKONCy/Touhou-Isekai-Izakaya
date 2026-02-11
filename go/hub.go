@@ -22,16 +22,16 @@ func (h *Hub) getRoom(id string) *Room {
 	return h.rooms[id]
 }
 
-func (h *Hub) createRoom(id, password string) *Room {
+func (h *Hub) createRoom(id, name, password string) *Room {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	
+
 	if _, ok := h.rooms[id]; ok {
 		// Room already exists
-		return nil 
+		return nil
 	}
-	
-	room := newRoom(id, password, h)
+
+	room := newRoom(id, name, password, h)
 	h.rooms[id] = room
 	go room.run()
 	log.Printf("[中心] 房间已创建: %s", id)
@@ -41,7 +41,7 @@ func (h *Hub) createRoom(id, password string) *Room {
 func (h *Hub) removeRoom(id string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	
+
 	if _, ok := h.rooms[id]; ok {
 		delete(h.rooms, id)
 		log.Printf("[中心] 房间已移除: %s", id)
@@ -50,6 +50,7 @@ func (h *Hub) removeRoom(id string) {
 
 type RoomInfo struct {
 	ID          string `json:"id"`
+	Name        string `json:"name"`
 	HasPassword bool   `json:"hasPassword"`
 	PlayerCount int    `json:"playerCount"`
 	MaxPlayers  int    `json:"maxPlayers"`
@@ -63,6 +64,7 @@ func (h *Hub) listRooms() []RoomInfo {
 	for id, room := range h.rooms {
 		rooms = append(rooms, RoomInfo{
 			ID:          id,
+			Name:        room.name,
 			HasPassword: room.passwordHash != "",
 			PlayerCount: len(room.clients),
 			MaxPlayers:  MaxPlayers,

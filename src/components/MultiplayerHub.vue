@@ -80,6 +80,7 @@ interface Room {
 // 模拟房间列表数据 (此处未来应从服务器拉取)
 const publicRooms = ref<Room[]>([]);
 const isFetchingRooms = ref(false);
+const roomNameInput = ref(''); // 新增：房间名称输入
 
 const fetchRooms = async () => {
   if (!serverUrl.value) return;
@@ -96,7 +97,7 @@ const fetchRooms = async () => {
 
     publicRooms.value = filteredRooms.map((r: any) => ({
       id: r.id,
-      name: r.id, // 后端目前 ID 即名称
+      name: r.name || r.id, // 使用后端返回的房间名，如果没有则回退到 ID
       hasPassword: r.hasPassword,
       players: r.playerCount,
       maxPlayers: r.maxPlayers,
@@ -112,8 +113,8 @@ const fetchRooms = async () => {
 };
 
 // 初始拉取
-watch(serverUrl, () => {
-  if (activeTab.value === 'lobby' && lobbySubTab.value === 'join') {
+watch([activeTab, lobbySubTab, serverUrl], ([tab, subTab, url]) => {
+  if (tab === 'lobby' && subTab === 'join' && url) {
     fetchRooms();
   }
 }, { immediate: true });
@@ -263,7 +264,8 @@ const handleCreateRoom = async () => {
       hostPlayer.identity || '房主',
       hostPlayer.persona || '',
       hostPlayer.power as string || 'A',
-      passwordInput.value
+      passwordInput.value,
+      roomNameInput.value // 传入自定义房间名
     );
     gameStore.setRoomInfo(newRoomId, passwordInput.value);
     
@@ -558,7 +560,7 @@ const copyRoomId = () => {
                 <div class="p-4 bg-white border border-izakaya-wood/10 rounded-2xl space-y-4">
                   <div class="space-y-2">
                     <label class="block text-xs font-bold text-izakaya-wood">房间名称</label>
-                    <input type="text" placeholder="给你的房间起个名字" class="w-full px-4 py-2 bg-izakaya-wood/5 border border-izakaya-wood/10 rounded-xl text-xs outline-none focus:border-touhou-red transition-all">
+                    <input v-model="roomNameInput" type="text" placeholder="给你的房间起个名字" class="w-full px-4 py-2 bg-izakaya-wood/5 border border-izakaya-wood/10 rounded-xl text-xs outline-none focus:border-touhou-red transition-all">
                   </div>
                   <div class="space-y-2">
                     <label class="block text-xs font-bold text-izakaya-wood">房间密码 (可选)</label>
