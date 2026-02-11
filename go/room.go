@@ -79,7 +79,7 @@ func (r *Room) run() {
 			}
 
 			// Broadcast join event
-			msg := []byte(fmt.Sprintf(`{"type":"SYSTEM_EVENT","payload":{"event":"PLAYER_JOINED","id":"%s","isHost":%t,"count":%d}}`, client.id, client.isHost, len(r.clients)))
+			msg := []byte(fmt.Sprintf(`{"type":"SYSTEM_EVENT","payload":{"event":"PLAYER_JOINED","id":"%s","name":"%s","isHost":%t,"count":%d}}`, client.id, client.name, client.isHost, len(r.clients)))
 			for c := range r.clients {
 				select {
 				case c.send <- msg:

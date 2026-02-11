@@ -62,6 +62,8 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	password := query.Get("pass")
 	playerId := query.Get("id")
 
+	playerName := query.Get("name")
+
 	if roomId == "" {
 		http.Error(w, "Missing room ID", http.StatusBadRequest)
 		return
@@ -108,6 +110,7 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		send:   make(chan []byte, 256),
 		isHost: isHost,
 		id:     playerId,
+		name:   playerName,
 	}
 	client.room.register <- client
 

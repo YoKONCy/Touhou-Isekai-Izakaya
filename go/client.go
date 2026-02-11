@@ -44,6 +44,7 @@ type Client struct {
 	// Client Identity
 	isHost bool
 	id     string
+	name   string
 }
 
 // readPump pumps messages from the websocket connection to the hub.
