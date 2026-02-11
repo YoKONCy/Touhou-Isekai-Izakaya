@@ -80,6 +80,10 @@ func (r *Room) run() {
 				log.Printf("[房间 %s] 访客加入: %s", r.id, client.id)
 			}
 
+			// Send Room Info to the new client
+			roomInfoMsg := []byte(fmt.Sprintf(`{"type":"SYSTEM_EVENT","payload":{"event":"ROOM_INFO","id":"%s","name":"%s"}}`, r.id, r.name))
+			client.send <- roomInfoMsg
+
 			// Broadcast join event
 			msg := []byte(fmt.Sprintf(`{"type":"SYSTEM_EVENT","payload":{"event":"PLAYER_JOINED","id":"%s","name":"%s","isHost":%t,"count":%d}}`, client.id, client.name, client.isHost, len(r.clients)))
 			for c := range r.clients {

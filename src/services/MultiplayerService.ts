@@ -534,6 +534,50 @@ class MultiplayerService {
   }
 
   /**
+   * Host: Sync full state to a specific guest (usually upon join)
+   */
+  public async syncFullStateToGuest(targetGuestId: string) {
+    const gameStore = useGameStore();
+    if (!gameStore.multiplayer.isHost) return;
+    
+    console.log(`[联机] 开始向访客 ${targetGuestId} 同步全量状态...`);
+    
+    // 1. Sync Game State (Variables, NPCs, etc.)
+    this.send('SYNC_STATE', { state: gameStore.state });
+    
+    // 2. Sync Chat History (Last 50 messages)
+    const chatStore = (await import('@/stores/chat')).useChatStore();
+    const recentMessages = chatStore.messages.slice(-50);
+    this.send('SYNC_CHAT_HISTORY', { messages: recentMessages });
+    
+    // 3. Sync Memories (If any)
+    const dbService = (await import('@/services/DatabaseService')).dbService;
+    try {
+      const memories = await dbService.getMemories();
+      if (memories && memories.length > 0) {
+        // Batch send memories or send as one big blob?
+        // Let's send up to 20 recent memories for now to avoid huge payload
+        const recentMemories = memories.slice(0, 20);
+        this.send('SYNC_MEMORIES', { memories: recentMemories });
+      }
+    } catch (e) {
+      console.error('[联机] 同步记忆失败:', e);
+    }
+    
+    // 4. Sync Total Energy
+    this.send('SYNC_ENERGY', { totalEnergy: gameStore.multiplayer.totalEnergy });
+    
+    // 5. Sync Active Vote (if any)
+    if (this.activeVote && !this.activeVote.isEnded) {
+      this.send('VOTE_PROPOSAL', {
+         ...this.activeVote,
+         // We might need to scrub votes details if we want secret ballot, but usually open
+      });
+      this.send('SYNC_VOTES', { voteId: this.activeVote.id, votes: this.activeVote.votes });
+    }
+  }
+
+  /**
    * Handle incoming messages
    */
   private async handleMessage(msg: any) {
@@ -609,8 +653,52 @@ class MultiplayerService {
         // Guest receives state from Host
         if (!gameStore.multiplayer.isHost && msg.payload?.state) {
           gameStore.setState(msg.payload.state);
+          console.log('[联机] 已同步最新游戏状态');
         }
         break;
+
+      case 'SYNC_CHAT_HISTORY': {
+        if (!gameStore.multiplayer.isHost && msg.payload?.messages) {
+           const chatStore = (await import('@/stores/chat')).useChatStore();
+           // Merge or replace? For initial sync, replace is safer or append unique
+           // Assuming empty state on join, just set
+           // But better to check duplicates
+           const incoming = msg.payload.messages;
+           // We might want to clear existing if it's a fresh join?
+           // For now, let's just append ones we don't have
+           // actually, chatStore.setMessages(incoming) might be better if we trust host completely
+           // But user might have their own system messages.
+           // Let's use a merge strategy
+           incoming.forEach((m: any) => {
+             if (!chatStore.messages.find(existing => existing.id === m.id)) {
+               chatStore.addMessage(m.role, m.content, m.timestamp); // Need to ensure ID preservation?
+               // chatStore.addMessage generates new ID. 
+               // We should probably force set the messages array if possible or expose a bulk add
+               // For simplicity:
+             }
+           });
+           // Re-fetch store to update list (hacky)
+           chatStore.messages = incoming; // Direct overwrite for full sync context
+           console.log('[联机] 已同步聊天记录');
+        }
+        break;
+      }
+
+      case 'SYNC_MEMORIES': {
+        if (!gameStore.multiplayer.isHost && msg.payload?.memories) {
+          const dbService = (await import('@/services/DatabaseService')).dbService;
+          const memoryService = (await import('@/services/memory')).memoryService;
+          
+          for (const mem of msg.payload.memories) {
+             // Check if exists?
+             // Simple add
+             await dbService.addMemory(mem);
+             await memoryService.updateGraph(mem);
+          }
+          console.log('[联机] 已同步记忆库');
+        }
+        break;
+      }
 
       case 'PLAYER_DRAFT': {
           const senderId = msg.senderId;
@@ -835,7 +923,15 @@ class MultiplayerService {
         break;
 
       case 'SYSTEM_EVENT': {
-        if (msg.payload?.event === 'PLAYER_JOINED') {
+        if (msg.payload?.event === 'ROOM_INFO') {
+          const { id, name } = msg.payload;
+          if (id && name) {
+            console.log(`[联机] 收到房间信息: ${name} (${id})`);
+            // Update Store with correct room name
+            const currentPass = gameStore.multiplayer.roomPassword;
+            gameStore.setRoomInfo(id, currentPass, name);
+          }
+        } else if (msg.payload?.event === 'PLAYER_JOINED') {
           const { id, name, isHost } = msg.payload;
           const displayName = name || `玩家 ${id.substring(0,4)}`;
           toastStore.addToast(`${displayName} 加入了房间`, 'info');
@@ -850,6 +946,8 @@ class MultiplayerService {
           
           if (gameStore.multiplayer.isHost) {
              this.syncPlayerList();
+             // Trigger full state sync for the new player
+             this.syncFullStateToGuest(id);
           }
 
         } else if (msg.payload?.event === 'PLAYER_LEFT') {
