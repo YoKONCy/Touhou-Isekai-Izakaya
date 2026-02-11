@@ -833,12 +833,13 @@ class MultiplayerService {
 
       case 'SYSTEM_EVENT': {
         if (msg.payload?.event === 'PLAYER_JOINED') {
-          const { id, isHost } = msg.payload;
-          toastStore.addToast(`玩家 ${id.substring(0,4)} 加入了房间`, 'info');
+          const { id, name, isHost } = msg.payload;
+          const displayName = name || `玩家 ${id.substring(0,4)}`;
+          toastStore.addToast(`${displayName} 加入了房间`, 'info');
           
           (gameStore as any).addPlayer({
             id: id,
-            name: `Player ${id.substring(0,4)}`,
+            name: displayName,
             identity: isHost ? '房主' : '访客',
             isHost: isHost,
             isMe: id === this.identityKey
@@ -850,7 +851,11 @@ class MultiplayerService {
 
         } else if (msg.payload?.event === 'PLAYER_LEFT') {
           const { id } = msg.payload;
-          toastStore.addToast(`玩家 ${id.substring(0,4)} 离开了房间`, 'info');
+          // Try to find name from store before removing
+          const p = gameStore.multiplayer.players.find(p => p.id === id);
+          const displayName = p ? p.name : `玩家 ${id.substring(0,4)}`;
+          
+          toastStore.addToast(`${displayName} 离开了房间`, 'info');
           
           (gameStore as any).removePlayer(id);
           

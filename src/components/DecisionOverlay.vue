@@ -99,12 +99,10 @@ function sendChat() {
   // For Guest, the message will come back via 'mp-chat-message' from Host broadcast.
   if (gameStore.multiplayer.isHost) {
     const myPlayer = gameStore.multiplayer.players.find(p => p.isMe);
-    oocMessages.value.push({
-      senderId: multiplayerService.identityKey,
-      name: myPlayer?.name || '我',
-      content: chatInput.value,
-      timestamp: Date.now()
-    });
+    // Host will receive their own broadcast in handleChatMessage too, so we shouldn't push locally if we trust the broadcast loop.
+    // However, if we want instant feedback, we push locally. But then we must ignore the echo.
+    // For now, let's REMOVE local push for Host too, and rely purely on broadcast for consistency.
+    // If latency is an issue, we can optimize later with IDs.
   }
   
   chatInput.value = '';
@@ -113,6 +111,17 @@ function sendChat() {
 
 const handleChatMessage = (e: any) => {
   const { senderId, content, timestamp } = e.detail;
+  
+  // Check for duplicates (simple dedupe by content + sender + recent time)
+  // Or just rely on the fact that we removed local push.
+  const isDuplicate = oocMessages.value.some(m => 
+    m.senderId === senderId && 
+    m.content === content && 
+    Math.abs(m.timestamp - timestamp) < 1000
+  );
+  
+  if (isDuplicate) return;
+
   const player = gameStore.multiplayer.players.find(p => p.id === senderId);
   oocMessages.value.push({
     senderId,
