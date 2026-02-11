@@ -47,3 +47,26 @@ func (h *Hub) removeRoom(id string) {
 		log.Printf("[中心] 房间已移除: %s", id)
 	}
 }
+
+type RoomInfo struct {
+	ID          string `json:"id"`
+	HasPassword bool   `json:"hasPassword"`
+	PlayerCount int    `json:"playerCount"`
+	MaxPlayers  int    `json:"maxPlayers"`
+}
+
+func (h *Hub) listRooms() []RoomInfo {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	rooms := make([]RoomInfo, 0, len(h.rooms))
+	for id, room := range h.rooms {
+		rooms = append(rooms, RoomInfo{
+			ID:          id,
+			HasPassword: room.passwordHash != "",
+			PlayerCount: len(room.clients),
+			MaxPlayers:  MaxPlayers,
+		})
+	}
+	return rooms
+}

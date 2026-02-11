@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"log"
 	"net/http"
@@ -123,6 +124,15 @@ func main() {
 	http.HandleFunc("/ws", limiter.Limit(func(w http.ResponseWriter, r *http.Request) {
 		serveWs(hub, w, r)
 	}))
+
+	// 获取房间列表接口
+	http.HandleFunc("/rooms", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// 允许跨域
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		rooms := hub.listRooms()
+		json.NewEncoder(w).Encode(rooms)
+	})
 
 	// Simple health check
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
