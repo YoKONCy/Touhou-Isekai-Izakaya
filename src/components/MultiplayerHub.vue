@@ -84,11 +84,31 @@ const isFetchingRooms = ref(false);
 const fetchRooms = async () => {
   if (!serverUrl.value) return;
   isFetchingRooms.value = true;
-  // 模拟拉取过程
-  setTimeout(() => {
-    isFetchingRooms.value = false;
+  
+  publicRooms.value = [];
+  
+  try {
+    const rooms = await multiplayerService.fetchPublicRooms();
+    // 过滤掉当前房间，如果已经连接
+    const filteredRooms = gameStore.multiplayer.isMultiplayer 
+      ? rooms.filter((r: any) => r.id !== gameStore.multiplayer.roomId)
+      : rooms;
+
+    publicRooms.value = filteredRooms.map((r: any) => ({
+      id: r.id,
+      name: r.id, // 后端目前 ID 即名称
+      hasPassword: r.hasPassword,
+      players: r.playerCount,
+      maxPlayers: r.maxPlayers,
+      latency: '-', // 暂无延迟测试
+      host: '未知'
+    }));
+  } catch (e) {
+    console.error('[联机] 获取房间列表失败:', e);
     publicRooms.value = [];
-  }, 800);
+  } finally {
+    isFetchingRooms.value = false;
+  }
 };
 
 // 初始拉取

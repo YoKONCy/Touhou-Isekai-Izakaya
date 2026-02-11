@@ -48,6 +48,22 @@ class MultiplayerService {
     return DEFAULT_SERVER_URL;
   }
 
+  /**
+   * Fetch public rooms from the server
+   */
+  public async fetchPublicRooms(): Promise<any[]> {
+    try {
+      // WebSocket URL is wss://.../ws, we need https://.../rooms
+      const baseUrl = this.OFFICIAL_SERVER_URL.replace('wss://', 'https://').replace('ws://', 'http://').replace('/ws', '');
+      const response = await fetch(`${baseUrl}/rooms`);
+      if (!response.ok) throw new Error('Failed to fetch rooms');
+      return await response.json();
+    } catch (e) {
+      console.error('[联机] 获取房间列表失败:', e);
+      return [];
+    }
+  }
+
   public get identityKey(): string {
     if (typeof window === 'undefined') return '';
     let key = localStorage.getItem('mp_identity_key');
@@ -71,7 +87,7 @@ class MultiplayerService {
   public async createRoom(hostName: string, identity: string = '房主', persona: string = '', power: string = 'A', password?: string): Promise<string> {
     const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     // Construct WebSocket URL
-    let url = `${this.OFFICIAL_SERVER_URL}?action=create&room=${roomId}&host=true&id=${this.identityKey}`;
+    let url = `${this.OFFICIAL_SERVER_URL}?action=create&room=${roomId}&host=true&id=${this.identityKey}&name=${encodeURIComponent(hostName)}`;
     if (password) {
       url += `&pass=${encodeURIComponent(password)}`;
     }
@@ -121,7 +137,7 @@ class MultiplayerService {
    * Join a room as Guest
    */
   public async joinRoom(roomId: string, playerName: string, identity?: string, persona: string = '', power: string = 'E', password?: string): Promise<boolean> {
-    let url = `${this.OFFICIAL_SERVER_URL}?action=join&room=${roomId}&host=false&id=${this.identityKey}`;
+    let url = `${this.OFFICIAL_SERVER_URL}?action=join&room=${roomId}&host=false&id=${this.identityKey}&name=${encodeURIComponent(playerName)}`;
     if (password) {
       url += `&pass=${encodeURIComponent(password)}`;
     }

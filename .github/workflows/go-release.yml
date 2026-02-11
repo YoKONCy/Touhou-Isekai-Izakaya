@@ -1,0 +1,62 @@
+name: Go Backend Release
+
+on:
+  push:
+    tags:
+      - 'v*' # 当推送以 v 开头的 tag 时触发，例如 v1.0.0
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache-dependency-path: go/go.sum
+
+      - name: Build Linux Binary
+        run: |
+          cd go
+          GOOS=linux GOARCH=amd64 go build -o ../relay-server-linux .
+
+      - name: Build Windows Binary
+        run: |
+          cd go
+          GOOS=windows GOARCH=amd64 go build -o ../relay-server-windows.exe .
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            relay-server-linux
+            relay-server-windows.exe
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## 东方异世界居酒屋 - 联机中继服务器 (Go Backend)
+            
+            本版本由 GitHub Actions 自动编译生成。
+            
+            ### 包含产物：
+            - `relay-server-linux`: Linux (amd64) 可执行文件，适用于云服务器部署。
+            - `relay-server-windows.exe`: Windows (amd64) 可执行文件，适用于本地调试或 Windows 服务器。
+            
+            ### 更新说明：
+            - 修复了联机房间搜索不到的问题。
+            - 修复了客机端 OOC 聊天消息重复显示的 Bug。
+            - 优化了玩家加入时的系统通知，现在正确显示玩家名称而非 ID。
+            - 新增了获取公开房间列表的 API 接口。
+            
+            ### 部署建议：
+            1. Linux 环境请确保赋予执行权限：`chmod +x relay-server-linux`
+            2. 运行命令：`./relay-server-linux -addr :8080`
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

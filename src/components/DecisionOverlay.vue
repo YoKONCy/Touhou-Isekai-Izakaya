@@ -95,14 +95,17 @@ function sendChat() {
   if (!chatInput.value.trim()) return;
   multiplayerService.sendChat(chatInput.value);
   
-  // Local append for myself
-  const myPlayer = gameStore.multiplayer.players.find(p => p.isMe);
-  oocMessages.value.push({
-    senderId: multiplayerService.identityKey,
-    name: myPlayer?.name || '我',
-    content: chatInput.value,
-    timestamp: Date.now()
-  });
+  // Local append ONLY for Host. 
+  // For Guest, the message will come back via 'mp-chat-message' from Host broadcast.
+  if (gameStore.multiplayer.isHost) {
+    const myPlayer = gameStore.multiplayer.players.find(p => p.isMe);
+    oocMessages.value.push({
+      senderId: multiplayerService.identityKey,
+      name: myPlayer?.name || '我',
+      content: chatInput.value,
+      timestamp: Date.now()
+    });
+  }
   
   chatInput.value = '';
   audioManager.playSoftClick();
