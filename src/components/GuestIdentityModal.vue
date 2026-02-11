@@ -11,12 +11,23 @@ const props = defineProps<{
     identity: string;
     persona: string;
     power: string;
+    hp?: number;
+    mp?: number;
+    money?: number;
   };
 }>();
 
 const emit = defineEmits<{
   (e: 'close'): void;
-  (e: 'save', data: { name: string; identity: string; persona: string; power: string }): void;
+  (e: 'save', data: { 
+    name: string; 
+    identity: string; 
+    persona: string; 
+    power: string;
+    hp: number;
+    mp: number;
+    money: number;
+  }): void;
 }>();
 
 const activeTab = ref<'custom' | 'preset'>('custom');
@@ -25,13 +36,24 @@ const formData = ref({
   name: '',
   identity: '',
   persona: '',
-  power: 'E'
+  power: 'E',
+  hp: 100,
+  mp: 50,
+  money: 500
 });
 
 // Initialize form data when opened
 watch(() => props.isOpen, (newVal) => {
   if (newVal) {
-    formData.value = { ...props.initialData };
+    formData.value = { 
+      name: props.initialData.name,
+      identity: props.initialData.identity,
+      persona: props.initialData.persona,
+      power: props.initialData.power,
+      hp: props.initialData.hp ?? 100,
+      mp: props.initialData.mp ?? 50,
+      money: props.initialData.money ?? 500
+    };
   }
 }, { immediate: true });
 
@@ -45,6 +67,9 @@ const handleSelectPreset = (preset: any) => {
   // Map preset data to form data
   formData.value.identity = preset.stats.identity || preset.name;
   formData.value.power = preset.stats.power || 'E';
+  formData.value.hp = preset.stats.hp || 100;
+  formData.value.mp = preset.stats.mp || 50;
+  formData.value.money = preset.stats.money || 500;
   
   // Construct a persona description from the preset setting
   let personaDesc = preset.desc + '\n\n';
@@ -134,6 +159,46 @@ const RANKS = ['∞', 'OMEGA', 'UX', 'EX', 'US', 'SSS', 'SS', 'S+', 'S', 'A+', '
                       placeholder="简要描述您的背景故事、性格特征或外貌..." 
                       class="w-full h-48 px-4 py-3 bg-white/60 border border-izakaya-wood/10 rounded-xl text-sm outline-none focus:border-touhou-red transition-all resize-none font-serif-display leading-relaxed"
                    ></textarea>
+                </div>
+
+                <!-- 基础数值配置 -->
+                <div class="p-4 bg-izakaya-wood/5 rounded-2xl border border-izakaya-wood/10 space-y-4">
+                  <h4 class="text-xs font-bold text-izakaya-wood/60 uppercase tracking-wider flex items-center gap-2">
+                    <LayoutGrid class="w-3 h-3" />
+                    初始基础数值 (Base Stats)
+                  </h4>
+                  <div class="grid grid-cols-3 gap-4">
+                    <div class="space-y-1.5">
+                      <label class="text-[10px] font-bold text-izakaya-wood/40 flex items-center gap-1">
+                        生命值 (HP)
+                      </label>
+                      <input 
+                        v-model.number="formData.hp" 
+                        type="number" 
+                        class="w-full px-3 py-1.5 bg-white/80 border border-izakaya-wood/10 rounded-lg text-xs outline-none focus:border-touhou-red transition-all"
+                      >
+                    </div>
+                    <div class="space-y-1.5">
+                      <label class="text-[10px] font-bold text-izakaya-wood/40 flex items-center gap-1">
+                        灵力值 (MP)
+                      </label>
+                      <input 
+                        v-model.number="formData.mp" 
+                        type="number" 
+                        class="w-full px-3 py-1.5 bg-white/80 border border-izakaya-wood/10 rounded-lg text-xs outline-none focus:border-touhou-red transition-all"
+                      >
+                    </div>
+                    <div class="space-y-1.5">
+                      <label class="text-[10px] font-bold text-izakaya-wood/40 flex items-center gap-1">
+                        初始金钱 (Money)
+                      </label>
+                      <input 
+                        v-model.number="formData.money" 
+                        type="number" 
+                        class="w-full px-3 py-1.5 bg-white/80 border border-izakaya-wood/10 rounded-lg text-xs outline-none focus:border-touhou-red transition-all"
+                      >
+                    </div>
+                  </div>
                 </div>
 
                 <div class="space-y-2">

@@ -191,6 +191,7 @@ export interface MultiplayerPlayer {
   max_hp?: number;
   mp?: number;
   max_mp?: number;
+  money?: number;
 }
 
 export interface MultiplayerVote {

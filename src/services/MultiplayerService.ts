@@ -1,5 +1,9 @@
 import { useGameStore } from '@/stores/game';
 import { useToastStore } from '@/stores/toast';
+import { useChatStore } from '@/stores/chat';
+import { useSaveStore } from '@/stores/save';
+import { dbService } from './DatabaseService';
+import { memoryService } from './memory';
 import { cryptoService } from './CryptoService';
 import { audioManager } from './audio';
 
@@ -140,7 +144,15 @@ class MultiplayerService {
   /**
    * Join a room as Guest
    */
-  public async joinRoom(roomId: string, playerName: string, identity?: string, persona: string = '', power: string = 'E', password?: string): Promise<boolean> {
+  public async joinRoom(
+    roomId: string, 
+    playerName: string, 
+    identity: string = '异界访客', 
+    persona: string = '', 
+    power: string = 'E', 
+    password?: string,
+    initialStats?: { hp: number; mp: number; money: number }
+  ): Promise<boolean> {
     let url = `${this.OFFICIAL_SERVER_URL}?action=join&room=${roomId}&host=false&id=${this.identityKey}&name=${encodeURIComponent(playerName)}`;
     if (password) {
       url += `&pass=${encodeURIComponent(password)}`;
@@ -171,7 +183,8 @@ class MultiplayerService {
              identity: identity || '异界访客',
              persona: persona,
              power: power,
-             avatarUrl: '' // TODO: Add avatar support
+             avatarUrl: '', // TODO: Add avatar support
+             initialStats: initialStats // 发送自定义初始数值
           });
 
           // Initial Player List (Myself + others will come via events, but we don't know existing ones yet)
@@ -183,7 +196,8 @@ class MultiplayerService {
             persona: persona,
             power: power,
             isHost: false,
-            isMe: true
+            isMe: true,
+            ...initialStats // 本地预览也加上
           }]);
           
           resolve(true);
@@ -339,6 +353,7 @@ class MultiplayerService {
         stats.max_hp = gameStore.state.player.max_hp;
         stats.mp = gameStore.state.player.mp;
         stats.max_mp = gameStore.state.player.max_mp;
+        stats.money = gameStore.state.player.money;
       } else {
         // Guests use companions state
         const comp = gameStore.state.multiplayer_companions?.[p.id];
@@ -347,6 +362,7 @@ class MultiplayerService {
           stats.max_hp = comp.max_hp;
           stats.mp = comp.mp;
           stats.max_mp = comp.max_mp;
+          stats.money = comp.money;
         }
       }
 
@@ -589,14 +605,13 @@ class MultiplayerService {
     this.send('SYNC_STATE', { state: gameStore.state });
     
     // 2. Sync Chat History (Last 50 messages)
-    const chatStore = (await import('@/stores/chat')).useChatStore();
+    const chatStore = useChatStore();
     const recentMessages = chatStore.messages.slice(-50);
     this.send('SYNC_CHAT_HISTORY', { messages: recentMessages });
     
     // 3. Sync Memories (If any)
-    const dbService = (await import('@/services/DatabaseService')).dbService;
     try {
-      const saveStore = (await import('@/stores/save')).useSaveStore();
+      const saveStore = useSaveStore();
       const saveSlotId = saveStore.currentSaveId;
       if (saveSlotId) {
         const memories = await dbService.getAllMemories(saveSlotId);
@@ -702,7 +717,7 @@ class MultiplayerService {
         const sender = gameStore.multiplayer.players.find(p => p.id === senderId);
 
         if (!gameStore.multiplayer.isHost && sender?.isHost && msg.payload) {
-          const chatStore = (await import('@/stores/chat')).useChatStore();
+          const chatStore = useChatStore();
           const { role, content, timestamp } = msg.payload;
           
           // Check if this message already exists to avoid duplicates
@@ -742,7 +757,7 @@ class MultiplayerService {
 
       case 'SYNC_CHAT_HISTORY': {
         if (!gameStore.multiplayer.isHost && msg.payload?.messages) {
-           const chatStore = (await import('@/stores/chat')).useChatStore();
+           const chatStore = useChatStore();
            // Merge or replace? For initial sync, replace is safer or append unique
            // Assuming empty state on join, just set
            // But better to check duplicates
@@ -769,9 +784,6 @@ class MultiplayerService {
 
       case 'SYNC_MEMORIES': {
         if (!gameStore.multiplayer.isHost && msg.payload?.memories) {
-          const dbService = (await import('@/services/DatabaseService')).dbService;
-          const memoryService = (await import('@/services/memory')).memoryService;
-          
           for (const mem of msg.payload.memories) {
              // Check if exists?
              // Simple add
@@ -911,9 +923,11 @@ class MultiplayerService {
         
       case 'PLAYER_INFO': {
         if (gameStore.multiplayer.isHost) {
-           const { name, identity, avatarUrl, persona, power } = msg.payload;
-           const senderIdInfo = msg.senderId;
+           const { name, identity, avatarUrl, persona, power, initialStats } = msg.payload;
+           const senderIdInfo = msg.senderId || msg.payload.id;
            
+           if (!senderIdInfo) break;
+
            const existing = gameStore.multiplayer.players.find(p => p.id === senderIdInfo);
            if (existing) {
               existing.name = name || existing.name;
@@ -921,6 +935,13 @@ class MultiplayerService {
               existing.avatarUrl = avatarUrl || existing.avatarUrl;
               existing.persona = persona || existing.persona;
               existing.power = power || existing.power;
+              if (initialStats) {
+                existing.hp = initialStats.hp;
+                existing.max_hp = initialStats.hp;
+                existing.mp = initialStats.mp;
+                existing.max_mp = initialStats.mp;
+                existing.money = initialStats.money;
+              }
            } else {
               (gameStore as any).addPlayer({
                  id: senderIdInfo,
@@ -929,7 +950,10 @@ class MultiplayerService {
                  persona: persona,
                  power: power,
                  isHost: false,
-                 isMe: false
+                 isMe: false,
+                 hp: initialStats?.hp,
+                 mp: initialStats?.mp,
+                 money: initialStats?.money
               });
            }
 
@@ -940,19 +964,30 @@ class MultiplayerService {
           let companion = gameStore.state.multiplayer_companions[senderIdInfo];
           
           if (!companion) {
+             // 只有新玩家才应用初始数值
              companion = {
                 ...gameStore.state.player, 
                 id: senderIdInfo,
-                isMe: senderIdInfo === this.identityKey 
+                isMe: senderIdInfo === this.identityKey,
+                hp: initialStats?.hp ?? gameStore.state.player.hp,
+                max_hp: initialStats?.hp ?? gameStore.state.player.max_hp,
+                mp: initialStats?.mp ?? gameStore.state.player.mp,
+                max_mp: initialStats?.mp ?? gameStore.state.player.max_mp,
+                money: initialStats?.money ?? 0
              };
           }
           
+          // 无论是否是老玩家，都允许更新这些“人设”信息
           companion.name = name || companion.name;
           companion.identity = identity || companion.identity;
           companion.persona = persona || companion.persona;
           companion.power = power || companion.power;
           if (avatarUrl) companion.avatarUrl = avatarUrl;
           
+          // 如果是 Host，只有在 companion 还是“初始状态”或者这是个新 companion 时才应用 initialStats
+          // 这里我们已经通过 if (!companion) 处理了。
+          // 这样即使客机配置里写了 500 金钱，只要主机存档里他已经有 10000 了，就不会被覆写。
+
           gameStore.state.multiplayer_companions[senderIdInfo] = companion;
           
           this.syncPlayerList();
@@ -985,6 +1020,7 @@ class MultiplayerService {
                  max_hp: p.max_hp ?? gameStore.state.player.max_hp,
                  mp: p.mp ?? gameStore.state.player.mp,
                  max_mp: p.max_mp ?? gameStore.state.player.max_mp,
+                 money: p.money ?? 0,
                  isMe: false
                };
              } else {
@@ -999,6 +1035,7 @@ class MultiplayerService {
                  if (p.max_hp !== undefined) comp.max_hp = p.max_hp;
                  if (p.mp !== undefined) comp.mp = p.mp;
                  if (p.max_mp !== undefined) comp.max_mp = p.max_mp;
+                 if (p.money !== undefined) comp.money = p.money;
                }
              }
            });

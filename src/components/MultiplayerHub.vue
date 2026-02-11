@@ -131,7 +131,10 @@ const playerSetup = ref({
   name: localStorage.getItem('mp_player_name') || '',
   identity: localStorage.getItem('mp_player_identity') || '',
   persona: localStorage.getItem('mp_player_persona') || '',
-  power: localStorage.getItem('mp_player_power') || 'E'
+  power: localStorage.getItem('mp_player_power') || 'E',
+  hp: Number(localStorage.getItem('mp_player_hp')) || 100,
+  mp: Number(localStorage.getItem('mp_player_mp')) || 50,
+  money: Number(localStorage.getItem('mp_player_money')) || 500
 });
 
 // 监听玩家设置变化并保存
@@ -140,6 +143,9 @@ watch(playerSetup, (newVal) => {
   localStorage.setItem('mp_player_identity', newVal.identity);
   localStorage.setItem('mp_player_persona', newVal.persona);
   localStorage.setItem('mp_player_power', newVal.power);
+  localStorage.setItem('mp_player_hp', String(newVal.hp));
+  localStorage.setItem('mp_player_mp', String(newVal.mp));
+  localStorage.setItem('mp_player_money', String(newVal.money));
 }, { deep: true });
 
 const identityKey = ref(multiplayerService.identityKey);
@@ -171,6 +177,9 @@ const handleSaveIdentity = (data: any) => {
   playerSetup.value.identity = data.identity;
   playerSetup.value.persona = data.persona;
   playerSetup.value.power = data.power;
+  playerSetup.value.hp = data.hp;
+  playerSetup.value.mp = data.mp;
+  playerSetup.value.money = data.money;
   toastStore.addToast('身份配置已保存', 'success');
 };
 
@@ -208,7 +217,12 @@ const handleJoinRoom = async () => {
       playerSetup.value.identity,
       playerSetup.value.persona,
       playerSetup.value.power,
-      joinPasswordInput.value
+      joinPasswordInput.value,
+      {
+        hp: playerSetup.value.hp,
+        mp: playerSetup.value.mp,
+        money: playerSetup.value.money
+      }
     );
     if (success) {
       // 查找当前选中的公开房名称（如果有）
