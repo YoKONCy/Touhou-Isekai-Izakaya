@@ -196,7 +196,9 @@ const handleJoinRoom = async () => {
       joinPasswordInput.value
     );
     if (success) {
-      gameStore.setRoomInfo(roomIdInput.value, joinPasswordInput.value);
+      // 查找当前选中的公开房名称（如果有）
+      const selectedRoom = publicRooms.value.find(r => r.id === roomIdInput.value);
+      gameStore.setRoomInfo(roomIdInput.value, joinPasswordInput.value, selectedRoom?.name || roomIdInput.value);
       gameStore.setMultiplayer(true, false);
       
       // 更新本地人设到 me (Guest Side)
@@ -267,7 +269,7 @@ const handleCreateRoom = async () => {
       passwordInput.value,
       roomNameInput.value // 传入自定义房间名
     );
-    gameStore.setRoomInfo(newRoomId, passwordInput.value);
+    gameStore.setRoomInfo(newRoomId, passwordInput.value, roomNameInput.value || newRoomId);
     
     // Local preview update
     gameStore.updatePlayers([
@@ -625,7 +627,7 @@ const copyRoomId = () => {
 
                   <div class="flex items-center gap-2 bg-green-50/50 backdrop-blur-sm p-3 rounded-xl border border-green-100/50 shadow-inner group-hover:bg-white/90 transition-colors">
                     <div class="flex-1">
-                      <div class="text-[10px] text-green-600/50 uppercase font-bold tracking-tighter mb-0.5">ROOM ID</div>
+                      <div class="text-[10px] text-green-600/50 uppercase font-bold tracking-tighter mb-0.5">ROOM: {{ gameStore.multiplayer.roomName || 'UNNAMED' }}</div>
                       <code class="text-xl font-mono font-bold text-green-800 tracking-wider">{{ gameStore.multiplayer.roomId }}</code>
                     </div>
                     <button @click="copyRoomId" class="p-2.5 bg-white text-green-600 rounded-lg hover:text-green-700 hover:shadow-md transition-all active:scale-95 border border-green-100" title="复制 ID">

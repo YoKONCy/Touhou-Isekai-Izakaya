@@ -209,6 +209,7 @@ export interface MultiplayerState {
   isMultiplayer: boolean;
   isHost: boolean;
   roomId: string | null;
+  roomName?: string; // 新增：房间显示名称
   roomPassword?: string;
   players: MultiplayerPlayer[];
   status: 'idle' | 'connecting' | 'connected' | 'error';

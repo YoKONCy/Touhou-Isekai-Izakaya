@@ -334,6 +334,11 @@ const allReady = computed(() => {
           <div class="px-2 py-0.5 bg-white/20 rounded text-xs font-mono uppercase">
             {{ gameStore.multiplayer.isHost ? '房主端' : '客机端' }}
           </div>
+          <div v-if="gameStore.multiplayer.roomId" class="px-3 py-0.5 bg-touhou-red/40 border border-white/20 rounded-full text-xs flex items-center gap-1.5 ml-2">
+            <Users class="w-3 h-3" />
+            <span class="opacity-80">房间:</span>
+            <span class="font-bold">{{ gameStore.multiplayer.roomName || gameStore.multiplayer.roomId }}</span>
+          </div>
         </div>
         <button @click="emit('close')" class="p-1 hover:bg-white/20 rounded-full transition-colors">
           <X class="w-6 h-6" />

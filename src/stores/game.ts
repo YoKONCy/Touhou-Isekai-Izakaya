@@ -114,9 +114,12 @@ export const useGameStore = defineStore('game', () => {
     multiplayer.value.isHost = isHost;
   }
 
-  function setRoomInfo(roomId: string | null, password?: string) {
+  function setRoomInfo(roomId: string | null, password?: string, roomName?: string) {
     multiplayer.value.roomId = roomId;
     multiplayer.value.roomPassword = password;
+    if (roomName) {
+      multiplayer.value.roomName = roomName;
+    }
   }
 
   function updatePlayers(players: MultiplayerPlayer[]) {
