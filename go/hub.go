@@ -51,6 +51,7 @@ func (h *Hub) removeRoom(id string) {
 type RoomInfo struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
+	HostName    string `json:"hostName"`
 	HasPassword bool   `json:"hasPassword"`
 	PlayerCount int    `json:"playerCount"`
 	MaxPlayers  int    `json:"maxPlayers"`
@@ -62,9 +63,14 @@ func (h *Hub) listRooms() []RoomInfo {
 
 	rooms := make([]RoomInfo, 0, len(h.rooms))
 	for id, room := range h.rooms {
+		hostName := "未知"
+		if room.host != nil {
+			hostName = room.host.name
+		}
 		rooms = append(rooms, RoomInfo{
 			ID:          id,
 			Name:        room.name,
+			HostName:    hostName,
 			HasPassword: room.passwordHash != "",
 			PlayerCount: len(room.clients),
 			MaxPlayers:  MaxPlayers,

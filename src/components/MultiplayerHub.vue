@@ -89,7 +89,11 @@ const fetchRooms = async () => {
   publicRooms.value = [];
   
   try {
+    const startTime = Date.now();
     const rooms = await multiplayerService.fetchPublicRooms();
+    const endTime = Date.now();
+    const ping = endTime - startTime;
+
     // 过滤掉当前房间，如果已经连接
     const filteredRooms = gameStore.multiplayer.isMultiplayer 
       ? rooms.filter((r: any) => r.id !== gameStore.multiplayer.roomId)
@@ -101,8 +105,8 @@ const fetchRooms = async () => {
       hasPassword: r.hasPassword,
       players: r.playerCount,
       maxPlayers: r.maxPlayers,
-      latency: '-', // 暂无延迟测试
-      host: '未知'
+      latency: `${ping}ms`,
+      host: r.hostName || '未知'
     }));
   } catch (e) {
     console.error('[联机] 获取房间列表失败:', e);
