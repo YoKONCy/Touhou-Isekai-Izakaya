@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { X, ZoomIn, ZoomOut, Maximize2, MapPin, Users, Info, ChevronRight, ArrowLeft, MessageSquare, Send, Loader2 } from 'lucide-vue-next';
-import { ref, nextTick } from 'vue';
+import { ref, nextTick, onMounted, onUnmounted } from 'vue';
 import { generateCompletion } from '@/services/llm';
+
 
 interface LocationInfo {
   id: string;
@@ -38,6 +39,31 @@ const userInput = ref('');
 const isLoading = ref(false);
 const chatScrollContainer = ref<HTMLElement | null>(null);
 const selectedModelType = ref<'chat' | 'logic' | 'memory' | 'misc'>('chat');
+
+
+
+// 多人同步：处理远程 LLM Token
+function handleRemoteLLMToken(e: CustomEvent) {
+  const { token } = e.detail;
+  if (token && isChatOpen.value) {
+    // 寻找最后一个 assistant 消息，或者创建一个
+    const lastMsg = chatMessages.value[chatMessages.value.length - 1];
+    if (lastMsg && lastMsg.role === 'assistant') {
+      lastMsg.content += token;
+    } else {
+      chatMessages.value.push({ role: 'assistant', content: token });
+    }
+    scrollToBottom();
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('mp-llm-token', handleRemoteLLMToken as unknown as EventListener);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('mp-llm-token', handleRemoteLLMToken as unknown as EventListener);
+});
 
 const modelOptions = [
   { id: 'chat', name: 'LLM #1 (叙述者)' },

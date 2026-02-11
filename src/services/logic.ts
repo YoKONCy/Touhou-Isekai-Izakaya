@@ -11,7 +11,7 @@ import { useToastStore } from '@/stores/toast';
 import { resolveCharacterId } from './characterMapping';
 import { confirmState } from '@/utils/confirm';
 
-const LOGIC_SYSTEM_PROMPT = `
+const BASE_LOGIC_PROMPT = `
 你是一个《东方Project》RPG游戏的“Game Master”逻辑处理器。
 你的任务是分析游戏状态、用户行动和剧情叙述，然后输出一个包含状态更新的JSON对象。
 
@@ -33,6 +33,8 @@ const LOGIC_SYSTEM_PROMPT = `
     - **items**: 玩家持有的物品。每个物品包含 id, name, count, description, type, effects。
     - **spell_cards**: 玩家掌握的符卡。每个符卡包含 name, description, cost, damage, type, buffDetails 等。
     - **recipes**: 玩家掌握的配方。每个配方包含 id, name, description, practice, price, tags。
+
+{{multiplayer_rules}}
 
 2. **NPC 变量管理 (NPC Variables)**:
    - **数据持久化**: 即使角色离开了当前区域（进入“已知角色”列表），其好感度、服从度、关系、住所等长期变量也必须被保留。当角色重新进入场景时，你必须基于之前的数值进行更新，不得随意重置。
@@ -139,6 +141,7 @@ const LOGIC_SYSTEM_PROMPT = `
 9. **战斗力 (Power)**:
    - 必须使用以下等级，由高到低：
      ["∞", "OMEGA", "UX", "EX", "US", "SSS", "SS", "S+", "S", "A+", "A", "B+", "B", "C+", "C", "D+", "D", "E+", "E", "F+", "F", "F-"]
+   - 对应含义与强度参考:
    - 参考标准:
      - F级: 普通人类
      - B+级: 强者门槛
@@ -211,7 +214,8 @@ const LOGIC_SYSTEM_PROMPT = `
 # 可以进行的变量修改行为 (Supported Actions)
 1. UPDATE_PLAYER: field (hp, max_hp, mp, max_mp, money, power, reputation, identity, location, time, date, clothing, etc.), op (add, subtract, set), value
 2. UPDATE_NPC: npcId (UUID or Name), field (hp, max_hp, power, favorability, obedience, mood, relationship, addressing, clothing, posture, hands, mouth, face, chest, buttocks, residence, inner_thought, action), op (add, subtract, set), value
-3. INVENTORY: target (items, recipes, spell_cards, authorities), op (push, remove, set), value
+{{multiplayer_actions}}
+4. INVENTORY: target (items, recipes, spell_cards, authorities), op (push, remove, set), value
    - "items" target:
      - **操作类型说明 (Operation Types)**:
        - "push": **增量添加**。用于玩家新获得的物品（如捡起1个苹果）。会自动堆叠到现有物品上。
@@ -334,6 +338,16 @@ const LOGIC_SYSTEM_PROMPT = `
 6. **格式检查**: 确保输出的是合法的 JSON，不要被Markdown符号干扰。
 `;
 
+const MULTIPLAYER_RULES = `
+2. **队友变量 (Companions - Multiplayer Only)**:
+   - 你需要管理除主玩家(Host)以外的其他玩家(Companions)。
+   - **指令**: 使用 \`UPDATE_COMPANION\` 指令。
+   - **参数**: \`targetName\` (玩家的角色名), \`field\`, \`value\`, \`op\`。
+   - **逻辑**: 你无需知道复杂的 Identity Key，只需根据剧情中提到的名字（如 "玩家A", "玩家B"）来指定 targetName。系统会自动匹配。
+   - **可修改字段**: 与 **NPC 变量** 相同 (hp, max_hp, money, power, location, clothing, action, etc.)。
+`;
+
+const MULTIPLAYER_ACTION = `3. UPDATE_COMPANION: targetName (Character Name), field (same as NPC), op (add, subtract, set), value`;
 
 /**
  * GameMaster Logic Service (Instruction Mapper)
@@ -450,9 +464,9 @@ export class LogicService {
     
     // Strategy A: Check runtime NPCs
     for (const npc of allRuntimeNpcs) {
-        // @ts-ignore
+        // @ts-expect-error: TODO: fix type error
         if (npc.name && scanText.includes(npc.name)) {
-            // @ts-ignore
+            // @ts-expect-error: TODO: fix type error
             mentionedNpcMap.set(npc.id, npc);
         }
     }
@@ -558,7 +572,17 @@ export class LogicService {
    - 特性：极难变化。仅在“影响声望的重大公开事件”发生时才可变动。`;
     }
 
-    const finalSystemPrompt = LOGIC_SYSTEM_PROMPT.replace('{{difficulty_rules}}', difficultyRules);
+    let finalSystemPrompt = BASE_LOGIC_PROMPT.replace('{{difficulty_rules}}', difficultyRules);
+
+    // Inject Multiplayer Rules if active
+    const gameStore = useGameStore();
+    if (gameStore.multiplayer.isMultiplayer) {
+         finalSystemPrompt = finalSystemPrompt.replace('{{multiplayer_rules}}', MULTIPLAYER_RULES);
+         finalSystemPrompt = finalSystemPrompt.replace('{{multiplayer_actions}}', MULTIPLAYER_ACTION);
+    } else {
+         finalSystemPrompt = finalSystemPrompt.replace('{{multiplayer_rules}}', '');
+         finalSystemPrompt = finalSystemPrompt.replace('{{multiplayer_actions}}', '');
+    }
 
     const messages = [
       { role: 'system', content: finalSystemPrompt },

@@ -238,31 +238,51 @@ input::placeholder, textarea::placeholder {
   @apply text-stone-400; /* 增加对比度，原为 text-ink-light/50 太淡 */
 }
 
-/* Burning Effect */
-@keyframes burn-text {
-  0% { text-shadow: 0 0 2px #FFD700, 0 -2px 4px #FF8C00; color: #FFF; }
-  50% { text-shadow: 0 0 4px #FFD700, 0 -4px 8px #FF4500; color: #FFF; }
-  100% { text-shadow: 0 0 2px #FFD700, 0 -2px 4px #FF8C00; color: #FFF; }
+/* 
+  灵力链接风格 (Spiritual Link Style)
+  契合东方幻想乡的氛围，模拟符纸与灵力的结合
+*/
+
+.btn-spiritual-link {
+  @apply relative overflow-hidden transition-all duration-500;
+  background-color: var(--color-izakaya-paper);
+  border: 1px dashed var(--color-touhou-red);
+  box-shadow: 0 0 8px rgba(211, 47, 47, 0.1);
+  color: var(--color-touhou-red);
 }
 
-@keyframes burn-flame {
-  0% { transform: scale(1) rotate(-2deg); opacity: 0.8; }
-  50% { transform: scale(1.1) rotate(2deg); opacity: 1; }
-  100% { transform: scale(1) rotate(-2deg); opacity: 0.8; }
+.btn-spiritual-link::before {
+  content: '';
+  @apply absolute inset-0 opacity-10;
+  background-image: radial-gradient(circle at center, var(--color-touhou-red) 0%, transparent 80%);
+  animation: spiritual-breathing 4s infinite ease-in-out;
 }
 
-.text-burning {
-  animation: burn-text 2s ease-in-out infinite;
-  font-weight: bold;
+@keyframes spiritual-breathing {
+  0%, 100% { opacity: 0.05; transform: scale(0.95); }
+  50% { opacity: 0.15; transform: scale(1.05); }
 }
 
-.flame-particle {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  background: #FF4500;
-  border-radius: 50%;
-  filter: blur(2px);
-  animation: burn-flame 1s infinite alternate;
-  pointer-events: none;
+.btn-spiritual-link:hover {
+  @apply -translate-y-0.5;
+  border-style: solid;
+  box-shadow: 0 0 12px rgba(211, 47, 47, 0.2);
+}
+
+.spiritual-glow-text {
+  text-shadow: 0 0 6px rgba(211, 47, 47, 0.4);
+  @apply font-bold tracking-wider text-touhou-red;
+}
+
+.spiritual-pulse-dot {
+  @apply absolute rounded-full;
+  background-color: var(--color-spiritual-red);
+  box-shadow: 0 0 6px var(--color-spiritual-red);
+  animation: spiritual-pulse 2s infinite;
+}
+
+@keyframes spiritual-pulse {
+  0% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.5); }
+  70% { transform: scale(1.4); opacity: 0; box-shadow: 0 0 0 8px rgba(211, 47, 47, 0); }
+  100% { transform: scale(1); opacity: 0; box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); }
 }

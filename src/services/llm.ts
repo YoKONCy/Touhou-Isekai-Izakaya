@@ -1,5 +1,8 @@
 import OpenAI from 'openai';
 import { useSettingsStore } from '@/stores/settings';
+import { useGameStore } from '@/stores/game';
+import { multiplayerService } from './MultiplayerService';
+import { estimateTokens } from '@/utils/token';
 
 export interface ModelInfo {
   id: string;
@@ -49,6 +52,20 @@ export async function generateCompletion(options: CompletionOptions): Promise<st
     throw new Error(errorMsg);
   }
 
+  // 3. Multiplayer Energy Pre-check (Host Only)
+  const gameStore = useGameStore();
+  const mpService = multiplayerService;
+  const isMpHost = gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost;
+
+  if (isMpHost) {
+    const currentEnergy = gameStore.multiplayer.totalEnergy || 0;
+    if (currentEnergy <= 0) {
+      const errorMsg = `API 能源已耗尽 (${currentEnergy})，请请求玩家贡献能源后再试。`;
+      console.warn(`[LLM] ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+  }
+
   const openai = new OpenAI({
     baseURL: config.baseUrl,
     apiKey: config.apiKey,
@@ -78,24 +95,54 @@ export async function generateCompletion(options: CompletionOptions): Promise<st
 
     let content = '';
     const shouldStream = options.stream ?? config.stream;
+    
+    // Multiplayer Support: Broadcaster
     if (shouldStream) {
       for await (const chunk of (response as any)) {
         if (options.signal?.aborted) throw new Error('Operation aborted by user');
         const token = chunk.choices[0]?.delta?.content || '';
         content += token;
+        
         if (options.onStream) {
           options.onStream(token);
+        }
+
+        // Broadcast token to guests
+        if (isMpHost && token) {
+          mpService.sendLLMToken(token);
         }
       }
     } else {
       content = (response as any).choices[0]?.message?.content || '';
+      // Broadcast full content if not streaming (optional but good for consistency)
+      if (isMpHost && content) {
+         mpService.sendLLMToken(content);
+      }
     }
     
     // Strip CoT tags (both <think> and <thinking>)
-    return content
+    const finalContent = content
       .replace(/<(think|thinking)>[\s\S]*?<\/\1>/gi, '')
       .replace(/<(think|thinking)>[\s\S]*/gi, '') // Also strip unclosed tags
       .trim();
+
+    // Multiplayer Energy Deduction (Host Only)
+    if (isMpHost) {
+      // Calculate approximate tokens (Prompt + Completion)
+      const promptText = (options.systemPrompt || '') + (options.messages || []).map(m => m.content).join('');
+      const totalTokens = estimateTokens(promptText + content);
+      
+      // Calculation Rule: 1 Energy Unit ≈ 100 Tokens
+      // Example: 4000 tokens request = 40 Energy
+      const energyCost = Math.ceil(totalTokens / 100);
+      
+      if (energyCost > 0) {
+        console.log(`[LLM] Multiplayer Energy Deduction: ${energyCost} points (approx. ${totalTokens} tokens)`);
+        mpService.updateEnergy(-energyCost);
+      }
+    }
+
+    return finalContent;
   } catch (error: any) {
     console.error('LLM Completion Failed:', error);
     throw error;

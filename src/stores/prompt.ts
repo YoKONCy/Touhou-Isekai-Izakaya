@@ -261,6 +261,27 @@ const DEFAULT_BLOCKS: PromptBlock[] = [
     ]
   },
   {
+    id: 'multiplayer_rules',
+    name: '多人模式规则',
+    description: '多人联机时的特殊叙事规则（动态注入）。',
+    enabled: true,
+    configurable: false,
+    role: 'system',
+    content: `<multiplayer_narrative_rules>
+多人模式叙事规则:
+1. **多主角视点**: 当前场景有多名玩家角色参与。
+   - 请平衡对每位玩家的关注度，除非某人明显处于核心地位。
+   - 在描述中明确区分不同玩家的行动和反应。
+2. **身份识别**:
+   - 上下文中会标注 [玩家名] 或 [P1/P2...]。
+   - 请确保你的回应正确对应了发起行动的玩家。
+   - 避免混淆不同玩家的性别、外貌和设定。
+3. **互动反馈**:
+   - 当玩家之间进行互动时，请重点描写他们之间的氛围和化学反应。
+   - 如果玩家A对玩家B说话，请确保描述清晰地反映了这一对象关系。
+</multiplayer_narrative_rules>`
+  },
+  {
     id: 'experimental_system',
     name: '实验性系统规则',
     description: '用于测试新的系统级指令或临时补丁。',

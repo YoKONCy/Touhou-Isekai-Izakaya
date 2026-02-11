@@ -1490,7 +1490,7 @@ export class IzakayaScene {
         }
 
         // --- Layer 0: Floor (Base) ---
-        let floorSliceIndex = this.getVariant(x, y, 4);
+        const floorSliceIndex = this.getVariant(x, y, 4);
         const floorSlice = tm.getSlice('floor_pack', floorSliceIndex);
         if (floorSlice) {
             this.ctx.drawImage(floorSlice, px, py);
@@ -1834,7 +1834,7 @@ export class IzakayaScene {
         if (entity.type === 'furniture') {
             const f = entity as Furniture;
             let sliceIndex = -1;
-            let pack = 'props_pack';
+            const pack = 'props_pack';
 
             switch(f.furnitureType) {
                 case 'sink': sliceIndex = 0; break; 

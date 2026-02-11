@@ -18,7 +18,9 @@ import SummaryModal from '@/components/SummaryModal.vue';
 import HelpModal from '@/components/HelpModal.vue';
 import ToastContainer from '@/components/ToastContainer.vue';
 import NewPlayerGuide from '@/components/NewPlayerGuide.vue';
-import { Send, Settings as SettingsIcon, Save, Loader2, Square, Book, Database, Blocks, Brain, Hammer, Store, RefreshCw, HelpCircle, History } from 'lucide-vue-next';
+import MultiplayerHub from '@/components/MultiplayerHub.vue';
+import DecisionOverlay from '@/components/DecisionOverlay.vue';
+import { Send, Settings as SettingsIcon, Save, Loader2, Square, Book, Database, Blocks, Brain, Hammer, Store, RefreshCw, HelpCircle, History, Gavel, Network } from 'lucide-vue-next';
 import PromptBuilder from '@/components/PromptBuilder.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import { useConfirm } from '@/utils/confirm';
@@ -38,6 +40,7 @@ import { checkMigrationNeeded, migrateData } from '@/services/migration';
 import { dbService } from '@/services/DatabaseService';
 import { memoryService } from '@/services/memory';
 import { useToastStore } from '@/stores/toast';
+import { multiplayerService } from '@/services/MultiplayerService';
 
 const chatStore = useChatStore();
 const settingsStore = useSettingsStore();
@@ -79,6 +82,8 @@ const isLoadingFuture = ref(false);
 const isMemoryPanelOpen = ref(false);
 const isMapOpen = ref(false);
 const isHelpOpen = ref(false);
+const isMultiplayerHubOpen = ref(false);
+const isDecisionOverlayOpen = ref(false);
 const helpInitialSectionId = ref<string | undefined>(undefined);
 
 // Mobile navigation state
@@ -91,6 +96,46 @@ const migrationMessage = ref('');
 
 const userOpenCombat = ref(false);
 const userOpenQuest = ref(false);
+
+// Multiplayer Status Feedback
+const mpStatusMessage = ref('');
+const mpStatusVisible = ref(false);
+
+const isGuestProcessing = ref(false);
+const guestStage = ref<'preparing' | 'generating_story' | 'background_processing' | 'idle'>('idle');
+
+// Listen for global events for feedback
+onMounted(() => {
+  window.addEventListener('mp-story-generating', ((e: CustomEvent) => {
+    guestStage.value = e.detail?.stage || 'generating_story';
+    isGuestProcessing.value = true;
+  }) as EventListener);
+
+  window.addEventListener('mp-llm-token', (() => {
+    if (isGuestProcessing.value) {
+      guestStage.value = 'generating_story';
+    }
+  }) as EventListener);
+
+  window.addEventListener('mp-combat-popup', (() => {
+    // Combat popup usually means story is finished or in a specific stage
+  }) as EventListener);
+});
+
+// Watch gameLoop.isProcessing to reset guest processing if host
+watch(() => gameLoop.isProcessing.value, (val) => {
+  if (val && gameStore.multiplayer.isHost) {
+    isGuestProcessing.value = false;
+  }
+});
+
+// Watch messages to stop guest processing bubble
+watch(() => chatStore.messages.length, () => {
+  if (isGuestProcessing.value) {
+    isGuestProcessing.value = false;
+    guestStage.value = 'idle';
+  }
+});
 
 // Audio Unlock Logic
 const hasInteracted = ref(false);
@@ -446,6 +491,42 @@ async function handleRefresh() {
   }
 }
 
+async function handleMultiplayerSubmit(hostAction: string) {
+   isDecisionOverlayOpen.value = false;
+   audioManager.playClick();
+   
+   // Aggregate inputs
+   const guestInputs = multiplayerService.getPendingGuestInputs();
+   let combinedPrompt = "";
+   
+   const hostName = gameStore.state.player.name;
+   
+   // Add Host Action
+   if (hostAction.trim()) {
+      combinedPrompt += `[玩家:${hostName}] ${hostAction}\n`;
+   }
+   
+   // Add Guest Actions
+   for (const [playerId, input] of Object.entries(guestInputs)) {
+       const p = gameStore.multiplayer.players.find(x => x.id === playerId);
+       const name = p ? p.name : playerId.substring(0,4);
+       combinedPrompt += `[玩家:${name}] ${input}\n`;
+   }
+   
+   if (!combinedPrompt.trim()) return; 
+   
+   // Clear inputs
+   multiplayerService.clearPendingGuestInputs();
+   
+   // Broadcast status
+   if (gameStore.multiplayer.isHost) {
+      multiplayerService.send('STORY_GENERATING', { stage: 'preparing' });
+   }
+   
+   // Send to Game Loop
+   await gameLoop.handleUserAction(combinedPrompt);
+}
+
 function handleHelpAction(action: string) {
   switch (action) {
     case 'openSettings':
@@ -488,6 +569,10 @@ function handleHelpAction(action: string) {
         statusCardRef.value.handleOpenFacility();
       }
       break;
+    case 'openMultiplayer':
+      isMultiplayerHubOpen.value = true;
+      audioManager.playPageFlip();
+      break;
     case 'openMap':
       isMapOpen.value = true;
       audioManager.playPageFlip();
@@ -521,6 +606,15 @@ function handleMobilePanelSwitch(panel: 'chat' | 'status' | 'map' | 'characters'
     }, 100);
   }
 }
+
+// 联机全员就绪检测
+const mpReadyCount = computed(() => {
+  return gameStore.multiplayer.players.filter(p => p.status === 'ready').length;
+});
+const mpTotalPlayers = computed(() => gameStore.multiplayer.players.length);
+const mpAllReady = computed(() => {
+  return mpReadyCount.value >= mpTotalPlayers.value && mpTotalPlayers.value > 0;
+});
 </script>
 
 <template>
@@ -559,14 +653,27 @@ function handleMobilePanelSwitch(panel: 'chat' | 'status' | 'map' | 'characters'
       <div class="hidden md:flex items-center gap-2 relative z-10">
         <button 
           @click="isSaveManagerOpen = true; audioManager.playPageFlip()"
-          class="btn-touhou-ghost flex items-center gap-2"
-          title="切换/管理存档"
+          class="flex items-center gap-2 transition-all duration-300"
+          :class="[
+            gameStore.multiplayer.isMultiplayer 
+              ? 'px-3 py-1.5 rounded-lg btn-spiritual-link' 
+              : 'btn-touhou-ghost'
+          ]"
+          :title="gameStore.multiplayer.isMultiplayer ? '联机期间无法切换存档' : '切换/管理存档'"
         >
-          <Save class="w-5 h-5" />
+          <Save class="w-5 h-5" :class="{ 'text-touhou-red animate-pulse': gameStore.multiplayer.isMultiplayer }" />
           <span v-if="saveStore.currentSaveId" class="text-sm font-display font-medium max-w-[100px] truncate hidden md:inline-block">
             {{ saveStore.saves.find(s => s.id === saveStore.currentSaveId)?.name }}
           </span>
         </button>
+        <button 
+            @click="isMultiplayerHubOpen = true; audioManager.playPageFlip()" 
+            class="btn-touhou-ghost relative"
+            title="全能联机中心"
+          >
+            <Network class="w-5 h-5 text-touhou-red" />
+            <span class="absolute -top-1 -right-1 w-2 h-2 bg-touhou-red rounded-full animate-pulse shadow-sm"></span>
+          </button>
         <button @click="isCharEditorOpen = true; audioManager.playPageFlip()" class="btn-touhou-ghost" title="条目编辑器 (Lorebook)">
           <Book class="w-5 h-5" />
         </button>
@@ -587,11 +694,24 @@ function handleMobilePanelSwitch(panel: 'chat' | 'status' | 'map' | 'characters'
       <!-- Mobile: Save button only (other options in drawer) -->
       <div class="flex md:hidden items-center gap-1 relative z-10">
         <button
-          @click="isSaveManagerOpen = true; audioManager.playPageFlip()"
-          class="btn-touhou-ghost p-2"
-          title="存档"
+          @click="isMultiplayerHubOpen = true; audioManager.playPageFlip()"
+          class="btn-touhou-ghost p-2 relative"
+          title="联机"
         >
-          <Save class="w-5 h-5" />
+          <Network class="w-5 h-5 text-touhou-red" />
+          <span class="absolute top-1 right-1 w-2 h-2 bg-touhou-red rounded-full animate-pulse shadow-sm"></span>
+        </button>
+        <button
+          @click="isSaveManagerOpen = true; audioManager.playPageFlip()"
+          class="p-2 transition-all duration-300"
+          :class="[
+            gameStore.multiplayer.isMultiplayer 
+              ? 'rounded-lg btn-spiritual-link' 
+              : 'btn-touhou-ghost'
+          ]"
+          :title="gameStore.multiplayer.isMultiplayer ? '联机期间无法切换存档' : '存档'"
+        >
+          <Save class="w-5 h-5" :class="{ 'text-touhou-red animate-pulse': gameStore.multiplayer.isMultiplayer }" />
         </button>
       </div>
     </header>
@@ -603,12 +723,22 @@ function handleMobilePanelSwitch(panel: 'chat' | 'status' | 'map' | 'characters'
     <MemoryPanel :is-open="isMemoryPanelOpen" @close="isMemoryPanelOpen = false" />
     <HelpModal :is-open="isHelpOpen" :initial-section-id="helpInitialSectionId" @close="isHelpOpen = false" @action="handleHelpAction" />
     <SummaryModal :is-open="isSummaryModalOpen" @close="isSummaryModalOpen = false" :turn-count="summaryTurnCount" />
+    <MultiplayerHub :is-open="isMultiplayerHubOpen" @close="isMultiplayerHubOpen = false" />
+    <DecisionOverlay :is-open="isDecisionOverlayOpen" @close="isDecisionOverlayOpen = false" @submit="handleMultiplayerSubmit" />
     <PromptBuilder :is-open="isPromptBuilderOpen" @close="isPromptBuilderOpen = false" />
     <MapPanel :is-open="isMapOpen" @close="isMapOpen = false" />
     <ConfirmDialog />
     <CombatOverlay :visible="userOpenCombat" @close="userOpenCombat = false" />
     <IzakayaGame v-if="gameStore.state.system.management?.isActive" @close="handleManagementClose" />
     <QuestOfferModal :visible="userOpenQuest" @close="userOpenQuest = false" />
+
+    <!-- Multiplayer Feedback Toast (Non-blocking) -->
+    <div v-if="mpStatusVisible" class="fixed top-24 left-1/2 -translate-x-1/2 z-[70] animate-fade-in-down pointer-events-none">
+       <div class="bg-izakaya-paper/90 backdrop-blur border border-izakaya-wood/30 px-6 py-3 rounded-full shadow-xl flex items-center gap-3">
+          <Loader2 class="w-4 h-4 animate-spin text-touhou-red" />
+          <span class="font-display text-izakaya-wood">{{ mpStatusMessage }}</span>
+       </div>
+    </div>
 
     <!-- Main Content -->
     <div class="flex-1 flex overflow-hidden relative z-10">
@@ -678,27 +808,8 @@ function handleMobilePanelSwitch(panel: 'chat' | 'status' | 'map' | 'characters'
           </div>
           <ChatBubble v-for="msg in chatStore.messages" :key="msg.id" :message="msg" :data-message-id="msg.id" />
           
-          <!-- Load Future Button -->
-          <div v-if="chatStore.hasMoreFuture" class="flex flex-col items-center gap-3 py-4 border-t border-izakaya-wood/5 mt-4">
-            <button 
-              @click="handleLoadFuture" 
-              class="px-6 py-2 bg-touhou-red/5 hover:bg-touhou-red/10 text-touhou-red text-sm rounded-full transition-all flex items-center gap-2 border border-touhou-red/20 shadow-sm"
-              :disabled="isLoadingFuture"
-            >
-              <Loader2 v-if="isLoadingFuture" class="w-4 h-4 animate-spin" />
-              <History v-else class="w-4 h-4 rotate-180" />
-              {{ isLoadingFuture ? '加载中...' : '加载后续对话' }}
-            </button>
-            <button 
-              @click="handleJumpToPresent" 
-              class="text-xs text-izakaya-wood/40 hover:text-touhou-red transition-colors flex items-center gap-1"
-            >
-              直接回到现在 <RefreshCw class="w-3 h-3" />
-            </button>
-          </div>
-          
-          <!-- Loading Indicator / Stream Buffer -->
-          <div v-if="gameLoop.isProcessing.value" class="flex gap-4 mb-6 px-4 group/message">
+          <!-- Loading Indicator / Stream Buffer (Host & Guest Sync) -->
+          <div v-if="gameLoop.isProcessing.value || isGuestProcessing" class="flex gap-4 mb-6 px-4 group/message">
              <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-md border-2 border-white/50 relative overflow-hidden bg-touhou-red text-white">
                 <Loader2 class="w-6 h-6 animate-spin relative z-10" />
              </div>
@@ -709,12 +820,14 @@ function handleMobilePanelSwitch(panel: 'chat' | 'status' | 'map' | 'characters'
                   <div class="absolute inset-0 pointer-events-none opacity-10 bg-texture-rice-paper rounded-2xl"></div>
                   
                   <div class="relative z-10 min-w-[60px]">
-                       <div v-if="gameLoop.currentStage.value === 'preparing'" class="text-sm text-izakaya-wood/60 animate-pulse flex items-center gap-2">
+                       <!-- Stage: Preparing -->
+                       <div v-if="(gameLoop.isProcessing.value && gameLoop.currentStage.value === 'preparing') || (isGuestProcessing && guestStage === 'preparing')" class="text-sm text-izakaya-wood/60 animate-pulse flex items-center gap-2">
                          <Loader2 class="w-3 h-3 animate-spin" />
                          <span>正在构建上下文...</span>
                        </div>
-                       <div v-else-if="gameLoop.currentStage.value === 'generating_story'">
-                           <div v-if="smoothContent" 
+                       <!-- Stage: Generating -->
+                       <div v-else-if="(gameLoop.isProcessing.value && gameLoop.currentStage.value === 'generating_story') || (isGuestProcessing && guestStage === 'generating_story')">
+                           <div v-if="gameLoop.isProcessing.value && smoothContent" 
                                 class="prose prose-stone max-w-none dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-pre:my-2 break-words text-base typing-effect"
                                 v-html="parseMarkdown(smoothContent)">
                            </div>
@@ -722,7 +835,8 @@ function handleMobilePanelSwitch(panel: 'chat' | 'status' | 'map' | 'characters'
                              <span class="animate-bounce">✍️</span> 正在撰写物语...
                            </div>
                        </div>
-                       <div v-else-if="gameLoop.currentStage.value === 'background_processing'" class="text-sm text-blue-500 flex items-center gap-2">
+                       <!-- Stage: Background Processing -->
+                       <div v-else-if="(gameLoop.isProcessing.value && gameLoop.currentStage.value === 'background_processing') || (isGuestProcessing && guestStage === 'background_processing')" class="text-sm text-blue-500 flex items-center gap-2">
                           <Brain class="w-3 h-3 animate-pulse" />
                           <span>正在处理游戏逻辑...</span>
                        </div>
@@ -801,41 +915,61 @@ function handleMobilePanelSwitch(panel: 'chat' | 'status' | 'map' | 'characters'
 
               <div class="flex items-end gap-2">
                 <!-- Textarea Wrapper -->
-                <div class="relative flex-1">
-                  <textarea
-                    v-model="userInput"
-                    @focus="isInputFocused = true"
-                    @blur="isInputFocused = false"
-                    :disabled="gameLoop.isProcessing.value || gameLoop.isBackgroundProcessing.value"
-                    :placeholder="gameLoop.isBackgroundProcessing.value ? '处理中...' : '输入行动...'"
-                    rows="1"
-                    class="w-full px-3 py-2 bg-white/80 border border-izakaya-wood/20 rounded-lg focus:outline-none focus:border-touhou-red/50 resize-none font-serif-display text-base"
-                  ></textarea>
+                <div class="relative flex-1 flex items-end gap-2">
+                  <template v-if="gameStore.multiplayer.isMultiplayer">
+        <button 
+                  @click="isDecisionOverlayOpen = true; audioManager.playPageFlip()"
+                  :class="['w-full py-3 rounded-lg shadow-md transition-all flex items-center justify-center gap-2 font-display', 
+                           mpAllReady ? 'bg-green-600 text-white' : 'bg-touhou-red text-white hover:bg-touhou-red-dark']"
+                >
+                  <Gavel v-if="!mpAllReady" class="w-5 h-5" />
+                  <CheckCircle2 v-else class="w-5 h-5 animate-pulse" />
+                  <span>跑团决策系统</span>
+                  <div v-if="mpTotalPlayers > 0" class="px-2 py-0.5 bg-black/20 rounded-full text-xs font-mono">
+                    {{ mpReadyCount }}/{{ mpTotalPlayers }}
+                  </div>
+                </button>
+                  </template>
+                  <template v-else>
+                    <div class="relative flex-1">
+                      <textarea
+                        v-model="userInput"
+                        @focus="isInputFocused = true"
+                        @blur="isInputFocused = false"
+                        :disabled="gameLoop.isProcessing.value || gameLoop.isBackgroundProcessing.value"
+                        :placeholder="gameLoop.isBackgroundProcessing.value ? '处理中...' : '输入行动...'"
+                        rows="1"
+                        class="w-full px-3 py-2 bg-white/80 border border-izakaya-wood/20 rounded-lg focus:outline-none focus:border-touhou-red/50 resize-none font-serif-display text-base"
+                      ></textarea>
+                    </div>
+                  </template>
                 </div>
 
                 <!-- Send Button -->
-                <button
-                  v-if="!gameLoop.isProcessing.value && !gameLoop.isBackgroundProcessing.value"
-                  @click="handleSend"
-                  class="p-2.5 bg-touhou-red text-white rounded-full shadow-md disabled:opacity-50"
-                  :disabled="!userInput.trim()"
-                >
-                  <Send class="w-5 h-5" />
-                </button>
-                <button
-                  v-else-if="gameLoop.isProcessing.value"
-                  @click="handleAbort"
-                  class="p-2.5 bg-touhou-red-dark text-white rounded-full shadow-md"
-                >
-                  <Square class="w-5 h-5" />
-                </button>
-                <button
-                  v-else
-                  disabled
-                  class="p-2.5 bg-blue-500 text-white rounded-full shadow-md opacity-75"
-                >
-                  <Brain class="w-5 h-5 animate-pulse" />
-                </button>
+                <template v-if="!gameStore.multiplayer.isMultiplayer">
+                  <button
+                    v-if="!gameLoop.isProcessing.value && !gameLoop.isBackgroundProcessing.value"
+                    @click="handleSend"
+                    class="p-2.5 bg-touhou-red text-white rounded-full shadow-md disabled:opacity-50"
+                    :disabled="!userInput.trim()"
+                  >
+                    <Send class="w-5 h-5" />
+                  </button>
+                  <button
+                    v-else-if="gameLoop.isProcessing.value"
+                    @click="handleAbort"
+                    class="p-2.5 bg-touhou-red-dark text-white rounded-full shadow-md"
+                  >
+                    <Square class="w-5 h-5" />
+                  </button>
+                  <button
+                    v-else
+                    disabled
+                    class="p-2.5 bg-blue-500 text-white rounded-full shadow-md opacity-75"
+                  >
+                    <Brain class="w-5 h-5 animate-pulse" />
+                  </button>
+                </template>
               </div>
             </div>
           </div>
@@ -1000,22 +1134,36 @@ function handleMobilePanelSwitch(panel: 'chat' | 'status' | 'map' | 'characters'
 
             <div class="flex items-end gap-3">
               <!-- Textarea Wrapper -->
-              <div class="relative group h-14 flex-1">
-                <textarea 
-                  v-model="userInput"
-                  @focus="isInputFocused = true"
-                  @blur="isInputFocused = false"
-                  @keydown="handleInputKeydown"
-                  :disabled="gameLoop.isProcessing.value || gameLoop.isBackgroundProcessing.value"
-                  :placeholder="gameLoop.isBackgroundProcessing.value ? '正在后台处理，请稍等...' : '在此书写你的行动...'"
-                  class="absolute bottom-0 left-0 w-full rounded-none px-2 py-3 focus:outline-none resize-none transition-all duration-300 ease-out origin-bottom font-serif-display text-xl text-ink placeholder:text-ink-light/40 leading-relaxed"
-                  :class="[
-                    (isInputFocused || userInput) ? 'h-40 bg-izakaya-paper shadow-[-4px_-4px_15px_rgba(0,0,0,0.1)] rounded-t-lg border-2 border-izakaya-wood/30 z-30' : 'h-14 bg-white/50 border-b-2 border-izakaya-wood/30 z-10'
-                  ]"
-                ></textarea>
-                
+              <div class="relative group h-14 flex-1 flex items-end gap-3">
+                <template v-if="gameStore.multiplayer.isMultiplayer">
+                  <button 
+                    @click="isDecisionOverlayOpen = true; audioManager.playPageFlip()"
+                    class="w-full h-14 bg-touhou-red hover:bg-touhou-red-dark text-white rounded-lg shadow-md transition-all flex items-center justify-center gap-3 font-display border-4 border-white/20 active:scale-[0.98]"
+                  >
+                    <Gavel class="w-6 h-6" />
+                    <span class="text-xl tracking-widest">跑团决策系统</span>
+                  </button>
+                </template>
+                <template v-else>
+                  <div class="relative flex-1">
+                    <textarea 
+                      v-model="userInput"
+                      @focus="isInputFocused = true"
+                      @blur="isInputFocused = false"
+                      @keydown="handleInputKeydown"
+                      :disabled="gameLoop.isProcessing.value || gameLoop.isBackgroundProcessing.value"
+                      :placeholder="gameLoop.isBackgroundProcessing.value ? '正在后台处理，请稍等...' : '在此书写你的行动...'"
+                      class="absolute bottom-0 left-0 w-full rounded-none px-2 py-3 focus:outline-none resize-none transition-all duration-300 ease-out origin-bottom font-serif-display text-xl text-ink placeholder:text-ink-light/40 leading-relaxed"
+                      :class="[
+                        (isInputFocused || userInput) ? 'h-40 bg-izakaya-paper shadow-[-4px_-4px_15px_rgba(0,0,0,0.1)] rounded-t-lg border-2 border-izakaya-wood/30 z-30' : 'h-14 bg-white/50 border-b-2 border-izakaya-wood/30 z-10'
+                      ]"
+                    ></textarea>
+                  </div>
+                </template>
+
                 <!-- Ink Stone / Send Button Container -->
                 <div 
+                  v-if="!gameStore.multiplayer.isMultiplayer"
                   class="absolute right-2 bottom-1.5 z-40 flex gap-2 transition-opacity duration-300"
                   :class="{ 'opacity-25 hover:opacity-100': userInput.trim().length > 0 }"
                 >

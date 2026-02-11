@@ -1,5 +1,7 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
+
+title Touhou Isekai Izakaya - Starter
 
 echo ======================================================
 echo          Touhou Isekai Izakaya - Starter
@@ -7,7 +9,7 @@ echo ======================================================
 echo.
 
 rem 1. Check Node.js
-echo [1/4] Checking environment...
+echo Step 1/4: Checking environment...
 node -v >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] Node.js not found!
@@ -17,14 +19,14 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo Node.js version: 
+echo Node.js version:
 node -v
 echo npm version:
 call npm -v
 echo.
 
 rem 2. Install dependencies
-echo [2/4] Installing/Checking dependencies (npm install)...
+echo Step 2/4: Installing/Checking dependencies (npm install)...
 echo This ensures all required packages are present.
 echo.
 call npm install
@@ -38,7 +40,7 @@ if %errorlevel% neq 0 (
 echo.
 
 rem 3. Build Project
-echo [3/4] Building project (npm run build)...
+echo Step 3/4: Building project (npm run build)...
 echo This ensures all components are compiled and ready.
 echo.
 call npm run build
@@ -51,9 +53,8 @@ if %errorlevel% neq 0 (
 echo.
 
 rem 4. Start Preview Server
-echo [4/4] Starting preview server (npm run preview)...
+echo Step 4/4: Starting preview server (npm run preview)...
 echo Once started, visit the HTTPS URL in your browser (usually https://localhost:14791)
-echo Note: You may need to accept the self-signed certificate in your browser.
 echo.
 
 rem 临时忽略 SSL 验证，以允许 mkcert 插件在网络不佳时下载证书工具
@@ -67,7 +68,7 @@ if %errorlevel% neq 0 (
     echo This is usually caused by network issues downloading the SSL certificate tool.
     echo.
     set /p choice="Would you like to try starting in COMPATIBILITY MODE (HTTP instead of HTTPS)? (y/n): "
-    if /i "%choice%"=="y" (
+    if /i "!choice!"=="y" (
         echo.
         echo Starting in Compatibility Mode (HTTP)...
         echo Note: OPFS storage will ONLY work on "http://localhost:14791". 

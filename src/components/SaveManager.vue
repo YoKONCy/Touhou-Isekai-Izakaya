@@ -38,14 +38,21 @@ const showMigrationButton = ref(false);
 
 const saves = computed(() => saveStore.saves);
 const currentSaveId = computed(() => saveStore.currentSaveId);
+const isGuest = computed(() => gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost);
+const isMultiplayerActive = computed(() => gameStore.multiplayer.isMultiplayer);
+
+const singlePlayerSaves = computed(() => saves.value.filter(s => !s.isMultiplayer));
+const multiplayerSaves = computed(() => saves.value.filter(s => s.isMultiplayer));
 
 const isCreating = ref(false);
+const isCreatingMultiplayer = ref(false);
 const newSaveName = ref('');
 const editingId = ref<number | null>(null);
 const editName = ref('');
 
 const showWizard = ref(false);
 const tempSaveName = ref('');
+const tempIsMultiplayer = ref(false);
 
 watch(() => props.isOpen, async (val) => {
   if (val) {
@@ -87,6 +94,7 @@ async function handleManualMigration() {
 async function handleCreate() {
   if (!newSaveName.value.trim()) return;
   tempSaveName.value = newSaveName.value.trim();
+  tempIsMultiplayer.value = isCreatingMultiplayer.value;
   showWizard.value = true;
   // We don't close SaveManager yet, just overlay Wizard
 }
@@ -94,10 +102,11 @@ async function handleCreate() {
 async function onWizardComplete(data: any) {
   showWizard.value = false;
   isCreating.value = false;
+  isCreatingMultiplayer.value = false;
   newSaveName.value = '';
   
   // 1. Create Save
-  const id = await saveStore.createSave(tempSaveName.value);
+  const id = await saveStore.createSave(tempSaveName.value, tempIsMultiplayer.value);
   
   // 2. Switch to it (Resets state)
   await saveStore.switchSave(id);
@@ -328,24 +337,55 @@ function formatTime(timestamp: number) {
         <!-- Content -->
         <div class="relative z-10 p-4 md:p-6 overflow-y-auto flex-1 space-y-6 custom-scrollbar bg-stone-100/50 dark:bg-stone-800/50 overscroll-contain" style="-webkit-overflow-scrolling: touch;">
           
+          <!-- Guest Mode Status -->
+          <div v-if="isGuest" class="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-6 flex flex-col items-center justify-center text-center space-y-4 animate-fade-in">
+            <div class="w-16 h-16 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400">
+              <RefreshCw class="w-8 h-8 animate-spin-slow" />
+            </div>
+            <div>
+              <h3 class="text-lg font-bold text-blue-900 dark:text-blue-100">当前处于远程联机模式</h3>
+              <p class="text-sm text-blue-700/70 dark:text-blue-300/70 mt-1">您正在作为客机参与其他玩家的世界，本地存档已暂时卸载。</p>
+            </div>
+            <div class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-lg shadow-blue-600/20">
+              状态：已连接 (远程)
+            </div>
+            <p class="text-[10px] text-blue-400 uppercase tracking-widest font-bold">Remote Multiplayer Session</p>
+          </div>
+
           <!-- Create New -->
-          <div v-if="!isCreating" class="flex justify-end gap-3">
+          <div v-if="!isCreating && !isGuest" class="flex flex-wrap justify-end gap-3">
+            <div v-if="isMultiplayerActive" class="flex-1 flex items-center px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-700 dark:text-amber-400 font-medium">
+              <span>⚠️ 联机进行中，无法创建、切换或修改本地存档</span>
+            </div>
             <button 
               @click="triggerImport"
-              class="flex items-center gap-2 px-4 py-2.5 bg-stone-200 hover:bg-stone-300 dark:bg-stone-700 dark:hover:bg-stone-600 text-izakaya-wood dark:text-stone-200 rounded-lg transition-all shadow hover:shadow-lg hover:-translate-y-0.5 text-sm font-bold font-display"
+              :disabled="isMultiplayerActive"
+              class="flex items-center gap-2 px-4 py-2 bg-stone-200 hover:bg-stone-300 dark:bg-stone-700 dark:hover:bg-stone-600 text-izakaya-wood dark:text-stone-200 rounded-lg transition-all shadow hover:shadow-lg text-xs font-bold font-display disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Download class="w-4 h-4" /> 导入存档
+              <Download class="w-3.5 h-3.5" /> 导入存档
             </button>
             <button 
-              @click="isCreating = true"
-              class="flex items-center gap-2 px-5 py-2.5 bg-touhou-red hover:bg-red-700 text-white rounded-lg transition-all shadow hover:shadow-lg hover:-translate-y-0.5 text-sm font-bold font-display"
+              @click="isCreating = true; isCreatingMultiplayer = false"
+              :disabled="isMultiplayerActive"
+              class="flex items-center gap-2 px-4 py-2 bg-stone-700 hover:bg-stone-800 text-white rounded-lg transition-all shadow hover:shadow-lg text-xs font-bold font-display disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Plus class="w-4 h-4" /> 新建存档
+              <Plus class="w-3.5 h-3.5" /> 新建单机
+            </button>
+            <button 
+              @click="isCreating = true; isCreatingMultiplayer = true"
+              :disabled="isMultiplayerActive"
+              class="flex items-center gap-2 px-4 py-2 bg-touhou-red hover:bg-red-700 text-white rounded-lg transition-all shadow hover:shadow-lg text-xs font-bold font-display disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Plus class="w-3.5 h-3.5" /> 新建联机
             </button>
           </div>
 
-          <div v-else class="bg-white/80 dark:bg-stone-800/80 p-5 rounded-xl border border-izakaya-wood/20 animate-in fade-in slide-in-from-top-2 shadow-sm">
-            <label class="block text-sm font-bold text-izakaya-wood dark:text-stone-300 mb-2">新存档名称</label>
+          <div v-else class="bg-white/80 dark:bg-stone-800/80 p-5 rounded-xl border-2 animate-in fade-in slide-in-from-top-2 shadow-sm" :class="isCreatingMultiplayer ? 'border-touhou-red' : 'border-stone-400'">
+            <div class="flex items-center gap-2 mb-3">
+              <span v-if="isCreatingMultiplayer" class="px-2 py-0.5 bg-touhou-red text-white text-[10px] rounded-full font-bold uppercase">联机存档 (房主)</span>
+              <span v-else class="px-2 py-0.5 bg-stone-500 text-white text-[10px] rounded-full font-bold uppercase">单机存档</span>
+              <label class="text-sm font-bold text-izakaya-wood dark:text-stone-300">新存档名称</label>
+            </div>
             <div class="flex gap-3">
               <input 
                 v-model="newSaveName"
@@ -372,84 +412,185 @@ function formatTime(timestamp: number) {
           </div>
 
           <!-- Save List -->
-          <div class="space-y-4">
-            <div
-              v-for="save in saves"
-              :key="save.id"
-              class="group relative flex flex-col md:flex-row md:items-center justify-between p-4 rounded-xl border-2 transition-all duration-300 gap-3"
-              :class="[
-                save.id === currentSaveId 
-                  ? 'border-touhou-red bg-red-50/80 dark:bg-red-900/20 shadow-md transform scale-[1.01]' 
-                  : 'border-transparent bg-white/80 dark:bg-stone-800/80 hover:border-izakaya-wood/20 shadow-sm hover:shadow-md'
-              ]"
-            >
-              <!-- Info -->
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 mb-1.5">
-                  <span v-if="save.id === currentSaveId" class="px-2 py-0.5 bg-touhou-red text-white text-[10px] rounded-full font-bold uppercase tracking-wider shadow-sm">Current</span>
-                  
-                  <div v-if="editingId === save.id" class="flex items-center gap-2 flex-1">
-                    <input 
-                      v-model="editName"
-                      @keydown.enter="saveEdit(save.id)"
-                      @blur="saveEdit(save.id)"
-                      class="flex-1 bg-white dark:bg-stone-900 dark:text-stone-100 text-stone-900 dark:border-stone-700 border border-izakaya-wood/30 rounded px-2 py-1 text-sm font-bold"
-                      autoFocus
-                    />
+          <div v-if="!isGuest" class="space-y-8">
+            <!-- Multiplayer Saves -->
+            <div v-if="multiplayerSaves.length > 0" class="space-y-4">
+              <h3 class="text-xs font-bold text-touhou-red uppercase tracking-widest flex items-center gap-2 px-1">
+                <span class="w-2 h-2 rounded-full bg-touhou-red animate-pulse"></span>
+                联机存档 (房主视角)
+              </h3>
+              <div class="space-y-4">
+                <div
+                  v-for="save in multiplayerSaves"
+                  :key="save.id"
+                  class="group relative flex flex-col md:flex-row md:items-center justify-between p-4 rounded-xl border-2 transition-all duration-300 gap-3"
+                  :class="[
+                    save.id === currentSaveId 
+                      ? 'border-touhou-red bg-red-50/80 dark:bg-red-900/20 shadow-md transform scale-[1.01]' 
+                      : 'border-izakaya-wood/10 bg-white/80 dark:bg-stone-800/80 hover:border-touhou-red/30 shadow-sm hover:shadow-md'
+                  ]"
+                >
+                  <!-- Info -->
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-1.5">
+                      <span v-if="save.id === currentSaveId" class="px-2 py-0.5 bg-izakaya-wood text-white text-[10px] rounded-full font-bold uppercase tracking-wider shadow-sm">Current</span>
+                      <span class="px-2 py-0.5 bg-touhou-red/10 text-touhou-red border border-touhou-red/20 text-[10px] rounded-full font-bold uppercase tracking-wider">Multiplayer</span>
+                      
+                      <div v-if="editingId === save.id" class="flex items-center gap-2 flex-1">
+                        <input 
+                          v-model="editName"
+                          @keydown.enter="saveEdit(save.id)"
+                          @blur="saveEdit(save.id)"
+                          class="flex-1 bg-white dark:bg-stone-900 dark:text-stone-100 text-stone-900 dark:border-stone-700 border border-izakaya-wood/30 rounded px-2 py-1 text-sm font-bold"
+                          autoFocus
+                        />
+                      </div>
+                      <h3 v-else class="font-bold text-lg font-display text-izakaya-wood dark:text-stone-100 truncate cursor-pointer hover:text-touhou-red transition-colors" @click="startEdit(save)">
+                        {{ save.name }}
+                      </h3>
+                    </div>
+                    
+                    <div class="text-xs font-serif text-izakaya-wood/60 dark:text-stone-400 flex items-center gap-4">
+                      <span class="flex items-center gap-1"><span class="text-base">📍</span> {{ save.location || '未知地点' }}</span>
+                      <span class="flex items-center gap-1"><span class="text-base">🕒</span> {{ formatTime(save.lastPlayed) }}</span>
+                    </div>
                   </div>
-                  <h3 v-else class="font-bold text-lg font-display text-izakaya-wood dark:text-stone-100 truncate cursor-pointer hover:text-touhou-red transition-colors" @click="startEdit(save)">
-                    {{ save.name }}
-                  </h3>
-                </div>
-                
-                <div class="text-xs font-serif text-izakaya-wood/60 dark:text-stone-400 flex items-center gap-4">
-                  <span class="flex items-center gap-1"><span class="text-base">📍</span> {{ save.location || '未知地点' }}</span>
-                  <span class="flex items-center gap-1"><span class="text-base">🕒</span> {{ formatTime(save.lastPlayed) }}</span>
-                </div>
-              </div>
 
-              <!-- Actions - always visible on mobile, hover on desktop -->
-              <div class="flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity focus-within:opacity-100 flex-shrink-0">
-                <button 
-                  v-if="editingId !== save.id"
-                  @click="handleExport(save)"
-                  class="p-2 text-izakaya-wood/40 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors"
-                  title="导出存档"
-                >
-                  <Upload class="w-4 h-4" />
-                </button>
+                  <!-- Actions -->
+                  <div class="flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity focus-within:opacity-100 flex-shrink-0">
+                    <button 
+                      v-if="editingId !== save.id"
+                      @click="handleExport(save)"
+                      class="p-2 text-izakaya-wood/40 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors"
+                      title="导出存档"
+                    >
+                      <Upload class="w-4 h-4" />
+                    </button>
 
-                <button 
-                  v-if="editingId !== save.id"
-                  @click="startEdit(save)"
-                  class="p-2 text-izakaya-wood/40 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-                  title="重命名"
-                >
-                  <Edit2 class="w-4 h-4" />
-                </button>
-                
-                <button 
-                  @click.stop="handleDelete(save.id)"
-                  class="p-2 text-izakaya-wood/40 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                  title="删除存档"
-                >
-                  <Trash2 class="w-4 h-4" />
-                </button>
+                    <button 
+                      v-if="editingId !== save.id"
+                      @click="startEdit(save)"
+                      :disabled="isMultiplayerActive"
+                      class="p-2 text-izakaya-wood/40 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="重命名"
+                    >
+                      <Edit2 class="w-4 h-4" />
+                    </button>
+                    
+                    <button 
+                      @click.stop="handleDelete(save.id)"
+                      :disabled="isMultiplayerActive"
+                      class="p-2 text-izakaya-wood/40 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="删除存档"
+                    >
+                      <Trash2 class="w-4 h-4" />
+                    </button>
 
-                <div class="w-px h-6 bg-izakaya-wood/10 dark:bg-stone-700 mx-1"></div>
+                    <div class="w-px h-6 bg-izakaya-wood/10 dark:bg-stone-700 mx-1"></div>
 
-                <button 
-                  v-if="save.id !== currentSaveId"
-                  @click="handleSwitch(save.id)"
-                  class="flex items-center gap-1 px-4 py-1.5 bg-white dark:bg-stone-700 border border-izakaya-wood/10 dark:border-stone-600 hover:border-touhou-red hover:text-touhou-red dark:hover:border-touhou-red dark:hover:text-red-400 rounded-lg text-xs font-bold transition-all shadow-sm hover:shadow hover:-translate-y-0.5"
-                >
-                  <Play class="w-3 h-3 fill-current" /> 读取
-                </button>
-                <div v-else class="flex items-center gap-1 px-4 py-1.5 bg-red-100/50 dark:bg-red-900/30 text-touhou-red dark:text-red-400 rounded-lg text-xs font-bold cursor-default border border-red-200/50 dark:border-red-900/50">
-                  <Check class="w-3 h-3" /> 进行中
+                    <button 
+                      v-if="save.id !== currentSaveId"
+                      @click="handleSwitch(save.id)"
+                      :disabled="isMultiplayerActive"
+                      class="flex items-center gap-1 px-4 py-1.5 bg-white dark:bg-stone-700 border border-izakaya-wood/10 dark:border-stone-600 hover:border-touhou-red hover:text-touhou-red dark:hover:border-touhou-red dark:hover:text-red-400 rounded-lg text-xs font-bold transition-all shadow-sm hover:shadow hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:border-izakaya-wood/10"
+                    >
+                      <Play class="w-3 h-3 fill-current" /> 读取
+                    </button>
+                    <div v-else class="flex items-center gap-1 px-4 py-1.5 bg-red-100/50 dark:bg-red-900/30 text-touhou-red dark:text-red-400 rounded-lg text-xs font-bold cursor-default border border-red-200/50 dark:border-red-900/50">
+                      <Check class="w-3 h-3" /> 进行中
+                    </div>
+                  </div>
                 </div>
               </div>
+            </div>
 
+            <!-- Single Player Saves -->
+            <div class="space-y-4">
+              <h3 v-if="multiplayerSaves.length > 0" class="text-xs font-bold text-stone-500 uppercase tracking-widest px-1">
+                单机存档
+              </h3>
+              <div class="space-y-4">
+                <div
+                  v-for="save in singlePlayerSaves"
+                  :key="save.id"
+                  class="group relative flex flex-col md:flex-row md:items-center justify-between p-4 rounded-xl border-2 transition-all duration-300 gap-3"
+                  :class="[
+                    save.id === currentSaveId 
+                      ? 'border-izakaya-wood bg-izakaya-wood/5 dark:bg-stone-800 shadow-md transform scale-[1.01]' 
+                      : 'border-izakaya-wood/10 bg-white/80 dark:bg-stone-800/80 hover:border-izakaya-wood/30 shadow-sm hover:shadow-md'
+                  ]"
+                >
+                  <!-- Info -->
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-1.5">
+                      <span v-if="save.id === currentSaveId" class="px-2 py-0.5 bg-touhou-red text-white text-[10px] rounded-full font-bold uppercase tracking-wider shadow-sm">Current</span>
+                      
+                      <div v-if="editingId === save.id" class="flex items-center gap-2 flex-1">
+                        <input 
+                          v-model="editName"
+                          @keydown.enter="saveEdit(save.id)"
+                          @blur="saveEdit(save.id)"
+                          class="flex-1 bg-white dark:bg-stone-900 dark:text-stone-100 text-stone-900 dark:border-stone-700 border border-izakaya-wood/30 rounded px-2 py-1 text-sm font-bold"
+                          autoFocus
+                        />
+                      </div>
+                      <h3 v-else class="font-bold text-lg font-display text-izakaya-wood dark:text-stone-100 truncate cursor-pointer hover:text-touhou-red transition-colors" @click="startEdit(save)">
+                        {{ save.name }}
+                      </h3>
+                    </div>
+                    
+                    <div class="text-xs font-serif text-izakaya-wood/60 dark:text-stone-400 flex items-center gap-4">
+                      <span class="flex items-center gap-1"><span class="text-base">📍</span> {{ save.location || '未知地点' }}</span>
+                      <span class="flex items-center gap-1"><span class="text-base">🕒</span> {{ formatTime(save.lastPlayed) }}</span>
+                    </div>
+                  </div>
+
+                  <!-- Actions -->
+                  <div class="flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity focus-within:opacity-100 flex-shrink-0">
+                    <button 
+                      v-if="editingId !== save.id"
+                      @click="handleExport(save)"
+                      class="p-2 text-izakaya-wood/40 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors"
+                      title="导出存档"
+                    >
+                      <Upload class="w-4 h-4" />
+                    </button>
+
+                    <button 
+                      v-if="editingId !== save.id"
+                      @click="startEdit(save)"
+                      :disabled="isMultiplayerActive"
+                      class="p-2 text-izakaya-wood/40 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="重命名"
+                    >
+                      <Edit2 class="w-4 h-4" />
+                    </button>
+                    
+                    <button 
+                      @click.stop="handleDelete(save.id)"
+                      :disabled="isMultiplayerActive"
+                      class="p-2 text-izakaya-wood/40 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="删除存档"
+                    >
+                      <Trash2 class="w-4 h-4" />
+                    </button>
+
+                    <div class="w-px h-6 bg-izakaya-wood/10 dark:bg-stone-700 mx-1"></div>
+
+                    <button 
+                      v-if="save.id !== currentSaveId"
+                      @click="handleSwitch(save.id)"
+                      :disabled="isMultiplayerActive"
+                      class="flex items-center gap-1 px-4 py-1.5 bg-white dark:bg-stone-700 border border-izakaya-wood/10 dark:border-stone-600 hover:border-touhou-red hover:text-touhou-red dark:hover:border-touhou-red dark:hover:text-red-400 rounded-lg text-xs font-bold transition-all shadow-sm hover:shadow hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:border-izakaya-wood/10"
+                    >
+                      <Play class="w-3 h-3 fill-current" /> 读取
+                    </button>
+                    <div v-else class="flex items-center gap-1 px-4 py-1.5 bg-red-100/50 dark:bg-red-900/30 text-touhou-red dark:text-red-400 rounded-lg text-xs font-bold cursor-default border border-red-200/50 dark:border-red-900/50">
+                      <Check class="w-3 h-3" /> 进行中
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 

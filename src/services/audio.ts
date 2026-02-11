@@ -351,6 +351,32 @@ class AudioManager {
     this.playSoftClick();
   }
 
+  // Sound: Notification chime
+  public playNotification() {
+    this.playChime();
+  }
+
+  // Sound: Success fanfare (simple chime sequence)
+  public playSuccess() {
+    this.init();
+    if (!this.ctx || !this.sfxGain) return;
+
+    const now = this.ctx.currentTime;
+    [523.25, 659.25, 783.99].forEach((freq, i) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.connect(gain);
+      gain.connect(this.sfxGain!);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + i * 0.1);
+      gain.gain.setValueAtTime(0, now + i * 0.1);
+      gain.gain.linearRampToValueAtTime(0.1, now + i * 0.1 + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.4);
+      osc.start(now + i * 0.1);
+      osc.stop(now + i * 0.1 + 0.4);
+    });
+  }
+
   // Sound: Soft click for minor interactions
   public playSoftClick() {
     this.init();

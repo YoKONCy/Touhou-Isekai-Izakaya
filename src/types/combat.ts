@@ -35,6 +35,7 @@ export interface Combatant {
   name: string;
   team: 'player' | 'enemy';
   isPlayer: boolean; // True if this is the main character controlled by UI
+  ownerId?: string; // ID of the player who controls this combatant (for multiplayer)
   
   hp: number;
   maxHp: number;

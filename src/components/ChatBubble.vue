@@ -161,7 +161,7 @@ async function handleRegenerateMemory() {
     <div class="relative flex flex-col min-w-[200px]" :class="{ 'items-end': isUser, 'max-w-[80%]': !isEditing, 'max-w-full': isEditing }">
       <!-- Sender Name -->
       <div class="text-xs mb-1 px-1 opacity-70 font-display flex items-center gap-2" :class="{ 'flex-row-reverse': isUser }">
-        <span class="font-bold">{{ message.role === 'user' ? (gameStore.state.player.name || '你') : (message.role === 'system' ? '系统' : 'Storyteller') }}</span>
+        <span class="font-bold">{{ message.role === 'user' ? (gameStore.me.name || '你') : (message.role === 'system' ? '系统' : 'Storyteller') }}</span>
         <div class="flex items-center gap-1.5" :class="{ 'flex-row-reverse': isUser }">
           <span class="text-[10px] opacity-50">{{ new Date(message.timestamp).toLocaleTimeString() }}</span>
           <span v-if="message.turnCount" class="text-[10px] px-2 py-0.5 rounded-full bg-touhou-red/10 text-touhou-red border border-touhou-red/20 font-bold tracking-tight flex items-center gap-1 shadow-sm">

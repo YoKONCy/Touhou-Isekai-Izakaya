@@ -25,7 +25,8 @@ export const SCHEMA_SQL = [
     location TEXT,
     gameDate TEXT,
     gameTime TEXT,
-    playTime INTEGER DEFAULT 0
+    playTime INTEGER DEFAULT 0,
+    isMultiplayer BOOLEAN DEFAULT 0
   );`,
 
   // 3. Chats (Dialogue History)

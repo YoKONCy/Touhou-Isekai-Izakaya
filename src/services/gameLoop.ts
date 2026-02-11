@@ -18,6 +18,8 @@ import { PRESET_SPELLCARDS } from '@/data/spellcards';
 import { CHARACTER_NAME_TO_ID_MAP, resolveCharacterId } from '@/services/characterMapping';
 import { getBuffByName } from '@/data/buff';
 
+import { multiplayerService } from '@/services/MultiplayerService';
+
 export type GameLoopStage = 'idle' | 'preparing' | 'generating_story' | 'background_processing' | 'committing';
 
 class GameLoopService {
@@ -84,6 +86,16 @@ class GameLoopService {
   }
 
   async handleUserAction(userContent: string) {
+    const gameStore = useGameStore();
+    const toastStore = useToastStore();
+
+    // Scheme C: Prevent Guest from performing actions
+    if (gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost) {
+      toastStore.addToast('客机模式下仅供观察，无法进行操作', 'warning');
+      console.warn('[GameLoop] Action blocked: Guest mode is read-only');
+      return;
+    }
+
     if (this.isProcessing.value || this.isBackgroundProcessing.value) {
       console.warn('[GameLoop] handleUserAction ignored because already processing:', {
         isProcessing: this.isProcessing.value,
@@ -118,11 +130,36 @@ class GameLoopService {
       const settingsStore = useSettingsStore();
       const currentSaveSlotId = settingsStore.currentSaveSlotId || 1;
       
-      const retrievedMemories = await memoryService.retrieve(currentSaveSlotId, userContent, gameStore.state.system.turn_count);
+      // Scheme B: Multiplayer Input Aggregation (Host Side)
+      let finalUserContent = userContent;
+      
+      if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost) {
+          const guestInputs = multiplayerService.getPendingGuestInputs();
+          const guestKeys = Object.keys(guestInputs);
+          
+          if (guestKeys.length > 0) {
+              const hostName = gameStore.state.player.name || 'Host';
+              let aggregatedContent = `[${hostName} (Host)]: ${userContent}\n`;
+              
+              for (const key of guestKeys) {
+                  const companion = gameStore.state.multiplayer_companions?.[key];
+                  const name = companion?.name || `Guest(${key.substring(0,4)})`;
+                  aggregatedContent += `[${name}]: ${guestInputs[key]}\n`;
+              }
+              
+              finalUserContent = aggregatedContent;
+              console.log('[GameLoop] Aggregated Multiplayer Input:\n', finalUserContent);
+              
+              // Clear pending inputs after consuming
+              multiplayerService.clearPendingGuestInputs();
+          }
+      }
+
+      const retrievedMemories = await memoryService.retrieve(currentSaveSlotId, finalUserContent, gameStore.state.system.turn_count);
 
       // 1. Prepare Context
       this.currentStage.value = 'preparing';
-      const promptContext = await promptService.build(userContent, retrievedMemories);
+      const promptContext = await promptService.build(finalUserContent, retrievedMemories);
       
       // DEBUG: Log Context Composition
       console.log('[Prompt Debug] Context Composition:', promptContext.sections.map(s => `${s.id}: ${s.tokenCount} tokens`).join(', '));
@@ -172,6 +209,11 @@ class GameLoopService {
 
       this.streamedContent.value = '';
       let rawContent = '';
+
+      // Host Side: Broadcast starting generation to Guests
+      if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost) {
+        multiplayerService.send('STORY_GENERATING', { stage: 'generating_story' });
+      }
 
       try {
         if (completionOptions.stream) {
@@ -336,7 +378,7 @@ class GameLoopService {
       const toastStore = useToastStore();
       
       // A. Add User Message
-      await chatStore.addMessage('user', userContent);
+      await chatStore.addMessage('user', finalUserContent);
       
       // B. Add Assistant Message (without debug info for now)
       const assistantMsgId = await chatStore.addMessage('assistant', finalStory);
@@ -465,7 +507,7 @@ class GameLoopService {
       // 4. Background Processing: LLM #2 & LLM #3 (Non-blocking)
       // CRITICAL: Only proceed if we have a valid story and not aborted
       if (!this.abortController?.signal.aborted && finalStory.trim()) {
-        this.processBackgroundTasks(userContent, finalStory, currentSaveSlotId, assistantMsgId, this.abortController?.signal);
+        this.processBackgroundTasks(finalUserContent, finalStory, currentSaveSlotId, assistantMsgId, this.abortController?.signal);
       } else {
         console.log('[GameLoop] Skipping background processing: aborted or empty story.');
         this.currentStage.value = 'idle';
@@ -633,6 +675,13 @@ class GameLoopService {
         },
         signal
       ).catch(err => console.error('Memory Extraction Failed:', err));
+
+      // Scheme C: Sync Host State to Relay Server
+      if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost) {
+        multiplayerService.syncHostState(gameStore.state).catch(err => {
+          console.error('[GameLoop] Multiplayer Sync Failed:', err);
+        });
+      }
 
     } catch (error) {
       console.error('Background processing failed:', error);

@@ -18,6 +18,7 @@ export interface SaveSlot {
   gameDate?: string;
   gameTime?: string;
   playTime?: number;
+  isMultiplayer?: boolean;
 }
 
 export const useSaveStore = defineStore('save', () => {
@@ -60,8 +61,8 @@ export const useSaveStore = defineStore('save', () => {
     }
   }
 
-  async function createSave(name: string) {
-    const id = await dbService.createSaveSlot(name);
+  async function createSave(name: string, isMultiplayer: boolean = false) {
+    const id = await dbService.createSaveSlot(name, '新游戏', '未知', isMultiplayer);
     
     await loadSaves();
     return id;
@@ -87,6 +88,18 @@ export const useSaveStore = defineStore('save', () => {
     
     // 4.1 Sync Location from loaded state
     const gameStore = useGameStore();
+    
+    // 如果是联机存档，标记为联机模式，但不激活连接状态，需手动开房
+    const saveInfo = saves.value.find(s => s.id === id);
+    if (saveInfo?.isMultiplayer) {
+      console.log('[SaveStore] Loading multiplayer save, ready for multiplayer mode.');
+      gameStore.multiplayer.isMultiplayer = false; // 加载时不激活连接
+      gameStore.multiplayer.isHost = false; 
+    } else {
+      gameStore.multiplayer.isMultiplayer = false;
+      gameStore.multiplayer.isHost = false;
+    }
+
     if (gameStore.state.player.location) {
        await dbService.updateSaveSlot(id, { location: gameStore.state.player.location });
        // Update local cache
@@ -131,6 +144,11 @@ export const useSaveStore = defineStore('save', () => {
     await loadSaves();
   }
 
+  async function convertToMultiplayer(id: number) {
+    await dbService.updateSaveSlot(id, { isMultiplayer: 1 });
+    await loadSaves();
+  }
+
   async function exportSave(id: number): Promise<Blob> {
     const numericId = Number(id);
     return await dbService.exportSave(numericId);
@@ -161,6 +179,7 @@ export const useSaveStore = defineStore('save', () => {
     renameSave,
     deleteSave,
     exportSave,
-    importSave
+    importSave,
+    convertToMultiplayer
   };
 });

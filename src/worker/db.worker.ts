@@ -3,8 +3,8 @@ import { SCHEMA_SQL } from './schema';
 
 let db: any = null;
 
-const log = (...args: any[]) => console.log('[DB Worker]', ...args);
-const error = (...args: any[]) => console.error('[DB Worker]', ...args);
+const log = (...args: unknown[]) => console.log('[DB Worker]', ...args);
+const error = (...args: unknown[]) => console.error('[DB Worker]', ...args);
 
 // Initialize SQLite
 const initPromise = (sqlite3InitModule as any)({
@@ -34,8 +34,9 @@ const initPromise = (sqlite3InitModule as any)({
         db = new sqlite3.oo1.OpfsDb('/touhou_isekai.sqlite3');
         log('OPFS Database opened successfully: /touhou_isekai.sqlite3');
         (self as any).dbType = 'opfs';
-      } catch (e: any) {
-        error('Failed to open OPFS database, falling back to transient in-memory DB:', e.message);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        error('Failed to open OPFS database, falling back to transient in-memory DB:', msg);
         db = new sqlite3.oo1.DB('/touhou_isekai_mem.sqlite3', 'ct');
         (self as any).dbType = 'memory-fallback';
       }
@@ -51,8 +52,9 @@ const initPromise = (sqlite3InitModule as any)({
         SCHEMA_SQL.forEach((sql, index) => {
             try {
                 db.exec(sql);
-            } catch (e: any) {
-                error(`Schema Error at index ${index}:`, e.message, 'SQL:', sql);
+            } catch (e: unknown) {
+                const msg = e instanceof Error ? e.message : String(e);
+                error(`Schema Error at index ${index}:`, msg, 'SQL:', sql);
                 throw e;
             }
         });
@@ -63,8 +65,9 @@ const initPromise = (sqlite3InitModule as any)({
     runMigrations(db);
     
     return true;
-  } catch (err: any) {
-    error('Initialization failed:', err.name, err.message);
+  } catch (err: unknown) {
+    const errorObj = err as Error;
+    error('Initialization failed:', errorObj.name, errorObj.message);
     throw err;
   }
 });
@@ -79,7 +82,7 @@ function runMigrations(db: any) {
             returnValue: 'resultRows',
             rowMode: 'object'
         });
-        if (!tableInfo.some((col: any) => col.name === colName)) {
+        if (!tableInfo.some((col: { name: string }) => col.name === colName)) {
             log(`Migration: Adding "${colName}" column to "${tableName}" table...`);
             db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${colName} ${typeDef}`);
             log(`Migration: "${colName}" column added to "${tableName}" successfully.`);
@@ -97,6 +100,7 @@ function runMigrations(db: any) {
 
     // 3. Save slots table migrations
     ensureColumn('save_slots', 'playTime', 'INTEGER DEFAULT 0');
+    ensureColumn('save_slots', 'isMultiplayer', 'BOOLEAN DEFAULT 0');
 
     log('All database migrations completed.');
   } catch (e: any) {
@@ -219,9 +223,17 @@ function exportSave(db: any, saveSlotId: number) {
   const saveSlots = getRows('SELECT * FROM save_slots WHERE id = ?', [saveSlotId]);
   if (saveSlots.length === 0) throw new Error("Save not found");
   
+  const rawSave = saveSlots[0];
+  const saveSlotData = {
+    ...rawSave,
+    id: undefined,
+    isMultiplayer: Boolean(rawSave.isMultiplayer)
+  };
+  
   const chats = getRows('SELECT * FROM chats WHERE saveSlotId = ?', [saveSlotId]);
   const memories = getRows('SELECT * FROM memories WHERE saveSlotId = ?', [saveSlotId]);
   const snapshots = getRows('SELECT * FROM snapshots WHERE saveSlotId = ?', [saveSlotId]);
+  const facilities = getRows('SELECT * FROM facilities WHERE saveSlotId = ?', [saveSlotId]);
   const characters = getRows('SELECT * FROM characters'); // Global characters
 
   // Optimize snapshots
@@ -253,11 +265,12 @@ function exportSave(db: any, saveSlotId: number) {
   return {
     version: 2,
     timestamp: Date.now(),
-    saveSlot: { ...saveSlots[0], id: undefined },
+    saveSlot: saveSlotData,
     chats,
     memories,
     snapshots: optimizedSnapshots,
-    characters
+    characters,
+    facilities
   };
 }
 
@@ -275,13 +288,14 @@ function importSaveWithCorrectOrder(db: any, jsonContent: string) {
 
     // 1. Create Save Slot
     exec(
-      'INSERT INTO save_slots (name, summary, lastPlayed, location, playTime) VALUES (?, ?, ?, ?, ?)',
+      'INSERT INTO save_slots (name, summary, lastPlayed, location, playTime, isMultiplayer) VALUES (?, ?, ?, ?, ?, ?)',
       [
         `${data.saveSlot.name} (导入)`,
         data.saveSlot.summary,
         Date.now(),
         data.saveSlot.location,
-        data.saveSlot.playTime || 0
+        data.saveSlot.playTime || 0,
+        data.saveSlot.isMultiplayer ? 1 : 0
       ]
     );
     newSaveId = exec('SELECT last_insert_rowid() as id')[0].id;
@@ -434,13 +448,40 @@ function importSaveWithCorrectOrder(db: any, jsonContent: string) {
             );
         }
     }
+
+    // 7. Import Facilities
+    if (Array.isArray(data.facilities)) {
+        for (const fac of data.facilities) {
+            const fields = ['id', 'saveSlotId', 'name', 'location', 'description', 'status', 'sub_locations', 'staff', 'is_player_owned', 'created_at', 'updated_at'];
+            const placeholders = fields.map(() => '?').join(', ');
+            
+            const values = [
+                fac.id,
+                newSaveId,
+                fac.name,
+                fac.location || '',
+                fac.description || '',
+                fac.status || '正常',
+                fac.sub_locations || '[]',
+                fac.staff || '[]',
+                fac.is_player_owned || 0,
+                fac.created_at || Date.now(),
+                fac.updated_at || Date.now()
+            ];
+
+            exec(
+                `INSERT INTO facilities (${fields.join(', ')}) VALUES (${placeholders})`,
+                values
+            );
+        }
+    }
   });
 
   return { newSaveId };
 }
 
-// @ts-ignore
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// @ts-expect-error: TODO: fix type error
+ 
 function importGlobalData(db: any, gameData: any) {
   // Implementation for global data import if needed
   return true;

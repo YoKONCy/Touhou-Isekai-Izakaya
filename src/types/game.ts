@@ -21,6 +21,8 @@ export interface Recipe {
 
 export interface PlayerStatus {
   name: string;
+  id?: string; // Identity Key for multiplayer companions
+  isMe?: boolean; // Flag to identify the local player in companions list
   // Stats (Flattened)
   hp: number;
   max_hp: number;
@@ -164,6 +166,55 @@ export interface GameState {
   npcs: Record<string, NPCStatus>;
   system: GameSystemState;
   flags: Record<string, any>; // Generic story flags
+
+  // Multiplayer Companions (Guest Players)
+  // Map of IdentityKey -> PlayerStatus
+  // Only populated in Host's save or synced to Guests
+  multiplayer_companions?: Record<string, PlayerStatus>;
+}
+
+export interface MultiplayerPlayer {
+  id: string;
+  name: string;
+  avatarUrl?: string;
+  identity: string;
+  persona?: string;
+  power?: string;
+  isHost: boolean;
+  isMe: boolean;
+  status?: 'idle' | 'drafting' | 'ready';
+  draftContent?: string;
+  energy?: number; // 玩家贡献的 API 能源 (积分)
+  lastDiceRollTurn?: number; // 玩家最后一次投骰子的回合数
+  // Stats for Multiplayer Display
+  hp?: number;
+  max_hp?: number;
+  mp?: number;
+  max_mp?: number;
+}
+
+export interface MultiplayerVote {
+  id: string;
+  proposal: string;
+  options: string[];
+  votes: Record<string, number>; // playerId -> optionIndex
+  totalPlayers: number;
+  endTime: number;
+  initiatorId: string;
+  isEnded: boolean;
+  resultIndex?: number;
+}
+
+export interface MultiplayerState {
+  isMultiplayer: boolean;
+  isHost: boolean;
+  roomId: string | null;
+  roomPassword?: string;
+  players: MultiplayerPlayer[];
+  status: 'idle' | 'connecting' | 'connected' | 'error';
+  error?: string;
+  activeVote: MultiplayerVote | null;
+  totalEnergy: number; // 房间总可用能源
 }
 
 // Initial State Factory
@@ -210,7 +261,8 @@ export const INITIAL_GAME_STATE: GameState = {
     pending_quest_trigger: null,
     difficulty: 'normal'
   },
-  flags: {}
+  flags: {},
+  multiplayer_companions: {}
 };
 
 // --- Logic Action Types ---
@@ -218,10 +270,12 @@ export const INITIAL_GAME_STATE: GameState = {
 export type ActionOperation = 'add' | 'subtract' | 'set' | 'push' | 'remove' | 'add_chars' | 'remove_chars';
 
 export interface GameAction {
-  type: 'UPDATE_PLAYER' | 'UPDATE_NPC' | 'INVENTORY' | 'SCENE' | 'MINIGAME';
+  type: 'UPDATE_PLAYER' | 'UPDATE_NPC' | 'UPDATE_COMPANION' | 'INVENTORY' | 'SCENE' | 'MINIGAME';
   // Target fields
   target?: string; // For INVENTORY: 'items' | 'spell_cards' | 'authorities'
   npcId?: string;  // For UPDATE_NPC
+  targetKey?: string; // For UPDATE_COMPANION (Identity Key)
+  targetName?: string; // For UPDATE_COMPANION (Character Name)
   field?: string;  // Field to update (e.g., 'hp', 'money', 'mood')
   
   // Operation (Optional for SCENE)

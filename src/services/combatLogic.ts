@@ -52,7 +52,7 @@ export interface DamageResult {
 import { applyStatModifiers, applyLifecycleHook, checkMechanic } from './combatModifiers';
 
 export function getEffectiveStats(combatant: Combatant) {
-  let dodgeMod = 0;
+  const dodgeMod = 0;
   let atkMod = 1.0;
   let defMod = 1.0; 
 

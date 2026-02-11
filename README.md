@@ -71,9 +71,10 @@
 | Section | Description | Link |
 |:-------:|:------------|:----:|
 | 🎯 | **Overview** - 项目概述与核心特色 | [Jump](#-overview) |
-| � | **AI Agent** - 智能体架构解析 | [Jump](#-ai-agent-architecture) |
-| � | **Memory System** - 独特的长记忆机制 | [Jump](#-long-term-memory) |
+| 🤖 | **AI Agent** - 智能体架构解析 | [Jump](#-ai-agent-architecture) |
+| 🧠 | **Memory System** - 独特的长记忆机制 | [Jump](#-long-term-memory) |
 | 🏗️ | **Architecture** - 系统架构与技术栈 | [Jump](#️-architecture) |
+| 🌐 | **Multiplayer** - 全能联机中心 | [Jump](#-multiplayer-hub) |
 | ⚔️ | **Combat System** - 策略弹幕战斗 | [Jump](#-combat-system) |
 | 🚀 | **Quick Start** - 快速开始指南 | [Jump](#-quick-start) |
 | 🖼️ | **AI Drawing** - AI 绘图与隐私说明 | [Jump](#-ai-drawing-privacy) |
@@ -338,6 +339,33 @@ graph TD
 
 <br/>
 
+## 🌐 Multiplayer Hub
+
+> 跨越维度的连接——在幻想乡与你的伙伴并肩作战。
+
+<div align="center">
+  <img src="./src/assets/github_cover/multiplayer.webp" width="100%" alt="Multiplayer Hub Cover" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);" />
+</div>
+
+### 📡 核心功能
+
+- **实时联机同步**: 基于 WebSocket 的高性能数据同步，支持多人同屏互动。
+- **全能联机中心**: 
+    - **大厅浏览**: 实时查看公开房间列表。
+    - **快速加入**: 通过房间 ID 一键进入伙伴的世界。
+    - **私人空间**: 支持设置房间密码，保护隐私。
+- **端到端安全加密**: 所有玩家间的通信均经过 AES-GCM 高强度加密，确保聊天内容与游戏数据仅在玩家间可见。
+- **灵活的服务器选择**:
+    - **官方中继**: 极速连接，无需配置（仅作为数据转发，不存储任何内容）。
+    - **自定义服务器**: 支持玩家部署自己的中继节点，彻底掌握数据。
+
+<br/>
+
+<!-- 动态分隔线 -->
+<img src="https://user-images.githubusercontent.com/73097560/115834477-dbab4500-a447-11eb-908a-139a6edaec5c.gif" width="100%">
+
+<br/>
+
 ## 🚀 Quick Start
  
  ### 前置要求 (Prerequisites)
@@ -429,6 +457,13 @@ graph TD
 - 所有的角色、世界观版权归原作者 **ZUN** 所有。
 - 本项目遵循《东方Project》的二次创作通过准则。
 - 游戏内素材（立绘、音乐）均为 AI 生成或来源于网络开源/同人授权，仅供学习交流使用。
+
+### 🌐 联机服务特别声明 (Multiplayer Service)
+本项目提供的官方联机中继服务（Relay Server）遵循以下隐私与合规原则：
+1. **数据不存储**：官方中继服务器仅作为数据转发节点，**不存储任何** 玩家之间的聊天内容、游戏数据或存档。
+2. **端到端加密**：所有敏感通信均支持端到端加密（需设置房间密码），确保即使是服务器运维人员也无法解析您的对话内容。
+3. **内容监管**：由于技术上无法解密和存储数据，开发者无法对玩家在私密房间内的言论进行实时监控。请玩家自觉遵守当地法律法规，严禁发送非法、违规内容。
+4. **服务免责**：中继服务为非盈利性质的技术交流设施，不保证 100% 的稳定性与可用性。
 
 <br/>
 

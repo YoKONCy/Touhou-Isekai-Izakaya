@@ -58,6 +58,29 @@ export class PromptService {
       this.addSection(ctx, 'system_root', '核心规则', 'system', finalContent);
     };
 
+    // 1.5 Multiplayer Rules (Dynamic) - Move to front for higher priority
+    this.blockHandlers['multiplayer_rules'] = async (ctx, content) => {
+      const gameStore = useGameStore();
+      if (gameStore.multiplayer.isMultiplayer) {
+         // Construct a list of current players for context
+         let playerListInfo = "当前房间玩家列表:\n";
+         
+         // Host
+         const hostName = gameStore.state.player.name || '房主';
+         playerListInfo += `- [Host] ${hostName} (你当前服务的对象)\n`;
+         
+         // Companions
+         if (gameStore.state.multiplayer_companions) {
+            Object.values(gameStore.state.multiplayer_companions).forEach((comp: any) => {
+               playerListInfo += `- [Guest] ${comp.name}\n`;
+            });
+         }
+         
+         const finalContent = `${content}\n\n${playerListInfo}`;
+         this.addSection(ctx, 'multiplayer_rules', '多人模式规则', 'system', finalContent);
+      }
+    };
+
     // 2. Narrative Perspective (Selectable Options)
     this.blockHandlers['narrative_perspective'] = async (ctx) => {
       const promptStore = usePromptStore();

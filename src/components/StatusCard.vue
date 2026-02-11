@@ -19,7 +19,7 @@ const emit = defineEmits<{
   (e: 'open-summary', turnCount: number): void;
 }>();
 
-const player = computed(() => gameStore.state.player);
+const player = computed(() => gameStore.me);
 
 // Player Config Modal
 const showPlayerConfig = ref(false);

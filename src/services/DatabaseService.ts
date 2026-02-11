@@ -103,14 +103,18 @@ export class DatabaseService {
   // --- Save Slots ---
   
   async getSaveSlots(): Promise<any[]> {
-    return this.exec('SELECT * FROM save_slots ORDER BY lastPlayed DESC');
+    const rows = await this.exec('SELECT * FROM save_slots ORDER BY lastPlayed DESC');
+    return rows.map(row => ({
+      ...row,
+      isMultiplayer: Boolean(row.isMultiplayer)
+    }));
   }
 
-  async createSaveSlot(name: string, summary: string = '新游戏', location: string = '未知'): Promise<number> {
+  async createSaveSlot(name: string, summary: string = '新游戏', location: string = '未知', isMultiplayer: boolean = false): Promise<number> {
     const now = Date.now();
     await this.exec(
-      'INSERT INTO save_slots (name, summary, lastPlayed, location, playTime) VALUES (?, ?, ?, ?, ?)',
-      [name, summary, now, location, 0]
+      'INSERT INTO save_slots (name, summary, lastPlayed, location, playTime, isMultiplayer) VALUES (?, ?, ?, ?, ?, ?)',
+      [name, summary, now, location, 0, isMultiplayer ? 1 : 0]
     );
     // Get the ID of the last inserted row
     const res = await this.exec('SELECT last_insert_rowid() as id');

@@ -109,7 +109,7 @@ export class MemoryGraphService {
     }
 
     let currentActivations = new Map<number, number>(startNodes);
-    let finalActivations = new Map<number, number>(startNodes);
+    const finalActivations = new Map<number, number>(startNodes);
 
     for (let step = 0; step < PEDSA_CONFIG.maxSteps; step++) {
       const nextActivations = new Map<number, number>();

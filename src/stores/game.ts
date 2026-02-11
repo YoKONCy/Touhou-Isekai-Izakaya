@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { type GameState, INITIAL_GAME_STATE, type GameAction, type Quest, type QuestStatus, type Item, type PromiseState } from '@/types/game';
+import { type GameState, INITIAL_GAME_STATE, type GameAction, type Quest, type QuestStatus, type Item, type PromiseState, type MultiplayerState, type MultiplayerPlayer } from '@/types/game';
 import { type SpellCard } from '@/types/combat';
 import { useCharacterStore } from '@/stores/character';
 import { useSettingsStore } from '@/stores/settings';
@@ -71,6 +71,93 @@ const VALID_PLAYER_FIELDS = new Set([
 export const useGameStore = defineStore('game', () => {
   const state = ref<GameState>(_.cloneDeep(INITIAL_GAME_STATE));
   const quickReplies = computed(() => state.value.system.quick_replies || []); // Current round quick replies, derived from state
+
+  // 联机相关状态
+  const multiplayer = ref<MultiplayerState>({
+    isMultiplayer: false,
+    isHost: false,
+    roomId: null,
+    players: [],
+    status: 'idle',
+    activeVote: null,
+    totalEnergy: 0
+  });
+
+  // Computed Property: "Me"
+  // Returns the correct PlayerStatus object based on multiplayer role
+  const me = computed(() => {
+    // 1. If singleplayer, I am the main player
+    if (!multiplayer.value.isMultiplayer) {
+      return state.value.player;
+    }
+
+    // 2. If Host, I am also the main player (but might have updated info from MultiplayerHub)
+    if (multiplayer.value.isHost) {
+      return state.value.player;
+    }
+    
+    // 3. If Guest, try to find myself in companions list using Identity Key
+    if (typeof window !== 'undefined') {
+       const myKey = localStorage.getItem('mp_identity_key');
+       if (myKey && state.value.multiplayer_companions && state.value.multiplayer_companions[myKey]) {
+         return state.value.multiplayer_companions[myKey];
+       }
+    }
+    
+    // Fallback: Return main player (read-only view of host) if not found
+    // This happens before I have submitted my persona
+    return state.value.player;
+  });
+
+  function setMultiplayer(isMultiplayer: boolean, isHost: boolean = false) {
+    multiplayer.value.isMultiplayer = isMultiplayer;
+    multiplayer.value.isHost = isHost;
+  }
+
+  function setRoomInfo(roomId: string | null, password?: string) {
+    multiplayer.value.roomId = roomId;
+    multiplayer.value.roomPassword = password;
+  }
+
+  function updatePlayers(players: MultiplayerPlayer[]) {
+    multiplayer.value.players = players;
+  }
+
+  function addPlayer(player: MultiplayerPlayer) {
+    if (!multiplayer.value.players.find(p => p.id === player.id)) {
+      multiplayer.value.players.push(player);
+    }
+  }
+
+  function removePlayer(playerId: string) {
+    multiplayer.value.players = multiplayer.value.players.filter(p => p.id !== playerId);
+  }
+
+  function setMultiplayerStatus(status: MultiplayerState['status'], error?: string) {
+    multiplayer.value.status = status;
+    multiplayer.value.error = error;
+  }
+
+  function setVote(vote: any) {
+    multiplayer.value.activeVote = vote;
+  }
+
+  function updateVote(votes: Record<string, number>) {
+    if (multiplayer.value.activeVote) {
+      multiplayer.value.activeVote.votes = votes;
+    }
+  }
+
+  function setTotalEnergy(energy: number) {
+    multiplayer.value.totalEnergy = energy;
+  }
+
+  function updatePlayerEnergy(playerId: string, energy: number) {
+    const player = multiplayer.value.players.find(p => p.id === playerId);
+    if (player) {
+      player.energy = energy;
+    }
+  }
 
   function updateState(newState: Partial<GameState>) {
     state.value = _.merge({}, state.value, newState);
@@ -534,6 +621,90 @@ export const useGameStore = defineStore('game', () => {
         }
         break;
 
+      case 'UPDATE_COMPANION':
+        if ((action.targetKey || action.targetName) && action.field) {
+           let targetKey = action.targetKey;
+
+           // Ensure companions map exists
+           if (!state.value.multiplayer_companions) {
+              state.value.multiplayer_companions = {};
+           }
+
+           // Resolve targetName to targetKey if Key is missing
+           if (!targetKey && action.targetName) {
+               const nameToFind = action.targetName.trim();
+               // Try exact match first
+               const foundEntry = Object.entries(state.value.multiplayer_companions).find(([_, comp]) => 
+                   comp.name === nameToFind
+               );
+               
+               if (foundEntry) {
+                   targetKey = foundEntry[0];
+               } else {
+                   // Try fuzzy match (contains)
+                   const fuzzyEntry = Object.entries(state.value.multiplayer_companions).find(([_, comp]) => 
+                       comp.name.includes(nameToFind) || nameToFind.includes(comp.name)
+                   );
+                   if (fuzzyEntry) {
+                       targetKey = fuzzyEntry[0];
+                   }
+               }
+               
+               if (!targetKey) {
+                  console.warn(`[GameStore] UPDATE_COMPANION: Could not find companion with name '${action.targetName}'`);
+                  // Option: Create a placeholder? No, better to ignore invalid updates to avoid ghost players.
+                  // But if it's a critical update, maybe we should log it.
+                  return;
+               }
+           }
+           
+           // If companion doesn't exist (and we have a valid key), log warning but try to create a placeholder?
+           // No, we should assume companions are synced. But for robustness, we create if missing.
+           if (targetKey && !state.value.multiplayer_companions[targetKey]) {
+              console.warn(`[GameStore] UPDATE_COMPANION: Companion ${targetKey} not found. Creating placeholder.`);
+              // Initialize with minimal data
+              state.value.multiplayer_companions[targetKey] = {
+                 name: action.targetName || 'Unknown Companion',
+                 hp: 500, max_hp: 500, mp: 1000, max_mp: 1000,
+                 money: 0, power: 'D+', reputation: 0,
+                 identity: '异界来客', persona: '', clothing: '',
+                 location: '', residence: '', time: '', date: '',
+                 combatLevel: 1, combatExp: 0, skillPoints: 0, unlockedTalents: [],
+                 authorities: [], items: [], recipes: [], spell_cards: []
+              };
+           }
+           
+           const companion = state.value.multiplayer_companions[targetKey!];
+           if (companion) {
+               // Use NPC mapping for companions too as they share similar fields (except player specific ones)
+               // Or use PLAYER_FIELD_MAPPING? Let's use PLAYER_FIELD_MAPPING since they are players.
+               const targetField = PLAYER_FIELD_MAPPING[action.field] || action.field;
+               
+               const currentVal = _.get(companion, targetField);
+               let newVal = currentVal;
+               
+               // Strict Numeric Handling (Same as Player)
+               const STRICT_NUMERIC_FIELDS = new Set(['hp', 'max_hp', 'mp', 'max_mp', 'money', 'combatLevel', 'combatExp', 'reputation']);
+               
+               if (STRICT_NUMERIC_FIELDS.has(targetField)) {
+                  const val = Number(action.value);
+                  if (isNaN(val)) return;
+                  
+                  const currentNum = Number(currentVal) || 0;
+                  if (action.op === 'add') newVal = currentNum + val;
+                  else if (action.op === 'subtract') newVal = currentNum - val;
+                  else if (action.op === 'set') newVal = val;
+               } else {
+                  if (action.op === 'add') newVal = (currentVal as number || 0) + action.value;
+                  if (action.op === 'subtract') newVal = (currentVal as number || 0) - action.value;
+                  if (action.op === 'set') newVal = action.value;
+               }
+               
+               _.set(companion, targetField, newVal);
+           }
+        }
+        break;
+
       case 'INVENTORY':
         if (action.target) {
           if (action.target === 'items') {
@@ -625,7 +796,7 @@ export const useGameStore = defineStore('game', () => {
              }
              
              if (action.op === 'remove') {
-                let val = action.value; // string ID or Name or Object
+                const val = action.value; // string ID or Name or Object
                 let countToRemove = 1;
                 let idToCheck = '';
 
@@ -850,7 +1021,7 @@ export const useGameStore = defineStore('game', () => {
 
              // Resolve UUID using centralized service
              const resolvedId = resolveCharacterId(charId, charStore.characters, state.value.npcs);
-             let staticChar = charStore.characters.find(c => c.uuid === resolvedId);
+             const staticChar = charStore.characters.find(c => c.uuid === resolvedId);
              
              // If resolveCharacterId returns the original input (fallback), try to find staticChar by other means or assume it's a new ID
              if (resolvedId === charId && !staticChar) {
@@ -896,15 +1067,18 @@ export const useGameStore = defineStore('game', () => {
              }
              
              // If we have detailed data from LLM, merge it in!
-             // We need to map Chinese keys if present in the object
-             if (Object.keys(charData).length > 0) {
-                const mappedData: any = {};
-                for (const [key, val] of Object.entries(charData)) {
-                   const mappedKey = NPC_FIELD_MAPPING[key] || key;
-                   mappedData[mappedKey] = val;
-                }
-                _.merge(state.value.npcs[charId], mappedData);
-             }
+    // We need to map Chinese keys if present in the object
+    if (Object.keys(charData).length > 0) {
+       const mappedData: any = {};
+       for (const [key, val] of Object.entries(charData)) {
+          const mappedKey = NPC_FIELD_MAPPING[key] || key;
+          mappedData[mappedKey] = val;
+       }
+       const npc = state.value.npcs[charId];
+       if (npc) {
+           _.merge(npc, mappedData);
+       }
+    }
           }
         }
 
@@ -953,6 +1127,7 @@ export const useGameStore = defineStore('game', () => {
   return {
     state,
     quickReplies,
+    me,
     updateState,
     setState,
     resetState,
@@ -968,7 +1143,19 @@ export const useGameStore = defineStore('game', () => {
     unlockTalent,
     addPromise,
     updatePromise,
+    setVote,
+    updateVote,
+    setTotalEnergy,
+    updatePlayerEnergy,
     setPlayerAvatar,
-    saveCurrentStateToLastSnapshot
+    saveCurrentStateToLastSnapshot,
+    // 联机相关
+    multiplayer,
+    setMultiplayer,
+    setRoomInfo,
+    updatePlayers,
+    addPlayer,
+    removePlayer,
+    setMultiplayerStatus
   };
 });

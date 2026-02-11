@@ -194,7 +194,7 @@ export class ZonePopulator {
             const searchVisited = new Set<string>(group.map(p => `${p.x},${p.y}`));
             
             // Allow searching through walls to find path
-            let foundPath: Point[] = [];
+            const foundPath: Point[] = [];
             
             // Map to reconstruct path
             const parentMap = new Map<string, Point>();
@@ -857,7 +857,7 @@ export class ZonePopulator {
             if (zone.type === 'B') {
                 // Determine Density
                 // User Request: Only ONE bed per room.
-                let bedCount = 1;
+                const bedCount = 1;
                 // if (zoneSize > 30) bedCount = Math.floor(zoneSize / 15); // Disabled for now based on user feedback
                 
                 // 1. Place Beds (2x3)
@@ -1118,7 +1118,7 @@ export class ZonePopulator {
 
     private decorateWalls() {
         // Decorate Top and Bottom walls
-        for (let y of [0, this.height - 1]) {
+        for (const y of [0, this.height - 1]) {
             let startX = -1;
             for (let x = 0; x < this.width; x++) {
                 const char = this.resultMap[y]?.[x];
@@ -1137,7 +1137,7 @@ export class ZonePopulator {
         }
 
         // Decorate Left and Right walls
-        for (let x of [0, this.width - 1]) {
+        for (const x of [0, this.width - 1]) {
             let startY = -1;
             for (let y = 0; y < this.height; y++) {
                 const char = this.resultMap[y]?.[x];

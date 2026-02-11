@@ -27,17 +27,24 @@
              </p>
            </div>
 
+           <!-- Multiplayer Host Note -->
+           <div v-if="gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost" class="mb-4 p-2 bg-blue-50/10 border border-blue-500/30 rounded text-xs text-blue-300">
+              <span class="font-bold">联机提示：</span> 等待房主开启战斗...
+           </div>
+
            <div class="flex justify-center gap-4">
               <button @click="startCombat" 
-                class="group relative px-8 py-3 bg-touhou-red hover:bg-red-700 text-white rounded-lg font-bold font-display shadow-lg hover:shadow-touhou-red/40 transform hover:-translate-y-0.5 transition-all overflow-hidden">
+                :disabled="gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost"
+                class="group relative px-8 py-3 bg-touhou-red hover:bg-red-700 text-white rounded-lg font-bold font-display shadow-lg hover:shadow-touhou-red/40 transform hover:-translate-y-0.5 transition-all overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed">
                 <div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
                 <span class="relative flex items-center gap-2">
-                  <span>⚔️</span> 符卡展开
+                  <span>⚔️</span> {{ (gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost) ? '等待房主' : '符卡展开' }}
                 </span>
               </button>
               
               <button @click="skipCombat" 
-                class="group px-8 py-3 bg-stone-200 dark:bg-stone-700 hover:bg-stone-300 dark:hover:bg-stone-600 text-izakaya-wood dark:text-stone-200 rounded-lg font-bold font-display shadow transition-all flex items-center gap-2">
+                :disabled="gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost"
+                class="group px-8 py-3 bg-stone-200 dark:bg-stone-700 hover:bg-stone-300 dark:hover:bg-stone-600 text-izakaya-wood dark:text-stone-200 rounded-lg font-bold font-display shadow transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 <span>🕊️</span> 
                 <span>避战</span>
               </button>
@@ -846,8 +853,8 @@
                </div>
                <div class="text-sm text-gray-400 font-mono mt-1 tracking-widest uppercase">
                   Phase: {{ phase === 'player' ? 'PLAYER ACTION' : 'ENEMY TURN' }} 
-                  <span v-if="selectionMode" class="text-red-500 font-bold animate-pulse ml-4">>> SELECT TARGET <<</span>
-                  <span v-if="isActing" class="text-yellow-500 font-bold animate-pulse ml-4">>> EXECUTING... <<</span>
+                  <span v-if="selectionMode" class="text-red-500 font-bold animate-pulse ml-4">&gt;&gt; SELECT TARGET &lt;&lt;</span>
+                  <span v-if="isActing" class="text-yellow-500 font-bold animate-pulse ml-4">&gt;&gt; EXECUTING... &lt;&lt;</span>
                </div>
                
                <!-- Message Carousel/Log HUD -->
@@ -866,6 +873,11 @@
                   </div>
                   
                   <transition-group name="log-fade" tag="div" class="flex flex-col gap-1">
+                     <!-- 正在输入的流式文本 -->
+                     <div v-if="streamingNarrative" class="text-sm font-mono text-shadow-sm flex gap-2 items-start text-blue-300 animate-pulse">
+                        <span class="font-bold whitespace-nowrap drop-shadow-md">[NARRATOR]</span>
+                        <span class="drop-shadow-md leading-tight">{{ streamingNarrative }}<span class="inline-block w-1 h-4 bg-blue-400 animate-blink ml-1"></span></span>
+                     </div>
                      <div v-for="log in (isLogExpanded ? combatLogs : combatLogs.slice(0, 5))" :key="log.id" class="text-sm font-mono text-shadow-sm flex gap-2 items-start">
                         <span class="text-yellow-400 font-bold whitespace-nowrap drop-shadow-md">TURN {{ log.turn }}</span>
                         <span class="text-white/90 drop-shadow-md leading-tight">{{ log.content }}</span>
@@ -1119,22 +1131,38 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, reactive, onUnmounted, onMounted } from 'vue';
-import { Zap, Shield, MessageSquare, Send } from 'lucide-vue-next';
-import type { Combatant, SpellCard, Buff, BuffEffect } from '@/types/combat';
-import type { Item } from '@/types/game';
-import { calculateDamage, processPersuasion, calculatePPointGain, getBaseDamage, getEffectiveStats } from '@/services/combatLogic';
-import { applyLifecycleHook, applyStatModifiers } from '@/services/combatModifiers';
-import { useGameStore } from '@/stores/game';
-import { useToastStore } from '@/stores/toast';
-import { gameLoop } from '@/services/gameLoop';
-import { audioManager } from '@/services/audio';
-import { findBattleSprite } from '@/services/characterMapping';
-import defaultSprite from '@/assets/images/battle_sprites/其他角色.png';
+  import { Zap, Shield, MessageSquare, Send } from 'lucide-vue-next';
+  import type { Combatant, SpellCard, Buff, BuffEffect } from '@/types/combat';
+  import type { Item } from '@/types/game';
+  import { calculateDamage, processPersuasion, calculatePPointGain, getBaseDamage, getEffectiveStats } from '@/services/combatLogic';
+  import { applyLifecycleHook, applyStatModifiers } from '@/services/combatModifiers';
+  import { useGameStore } from '@/stores/game';
+  import { useToastStore } from '@/stores/toast';
+  import { gameLoop } from '@/services/gameLoop';
+  import { audioManager } from '@/services/audio';
+  import { findBattleSprite } from '@/services/characterMapping';
+  import defaultSprite from '@/assets/images/battle_sprites/其他角色.png';
+  import { multiplayerService } from '@/services/MultiplayerService';
 
-const gameStore = useGameStore();
-const props = defineProps<{
-    visible?: boolean;
-}>();
+  const gameStore = useGameStore();
+  
+  // Watch for combat active state to sync (Host only)
+  watch(() => gameStore.state.system.combat?.isActive, () => {
+      if (gameStore.multiplayer.isHost && gameStore.multiplayer.isMultiplayer) {
+          multiplayerService.syncHostState(gameStore.state);
+      }
+  });
+  
+  // Watch for combat turn changes to sync (Host only)
+  watch(() => gameStore.state.system.combat?.turn, () => {
+       if (gameStore.multiplayer.isHost && gameStore.multiplayer.isMultiplayer) {
+          multiplayerService.syncHostState(gameStore.state);
+      }
+  });
+
+  const props = defineProps<{
+      visible?: boolean;
+  }>();
 const emit = defineEmits(['close', 'combat-end']);
 
 // --- BGM Management ---
@@ -1146,7 +1174,7 @@ const backgroundImages = import.meta.glob('/src/assets/images/battle_bg/*.{jpg,p
 const currentBackground = computed(() => {
     // Attempt to match current location
     const location = gameStore.state.player?.location;
-    console.log('[CombatOverlay] Background Check - Location:', location);
+    console.log('[战斗界面] 背景检查 - 位置:', location);
     
     if (location) {
         // Try exact match first (ignoring extension)
@@ -1155,14 +1183,14 @@ const currentBackground = computed(() => {
              return filename === location;
         });
         if (exactMatch) {
-            console.log('[CombatOverlay] Found match:', exactMatch);
+            console.log('[战斗界面] 找到匹配背景:', exactMatch);
             return backgroundImages[exactMatch];
         }
     }
     
     // Fallback: Hakurei Shrine
     const fallback = Object.keys(backgroundImages).find(path => path.includes('博丽神社'));
-    console.log('[CombatOverlay] Fallback to:', fallback);
+    console.log('[战斗界面] 回退至背景:', fallback);
     return fallback ? backgroundImages[fallback] : '';
 });
 
@@ -1196,7 +1224,7 @@ function playCombatBgm() {
         }
     }
   } else {
-      console.warn('No BGM found for style:', styleKey);
+      console.warn('[战斗界面] 未找到对应风格的 BGM:', styleKey);
       // Fallback to '常规' if specific style not found
       if (styleKey !== '常规') {
          const fallbackFiles = Object.keys(bgmFiles).filter(path => path.includes('常规'));
@@ -1219,7 +1247,389 @@ onUnmounted(() => {
 
 onMounted(() => {
     // [Optimization] Logic moved to GameStore.setState to handle refresh state sanitization centrally.
+    window.addEventListener('mp-combat-action', handleRemoteAction as unknown as EventListener);
+    window.addEventListener('mp-combat-effect', handleRemoteEffect as unknown as EventListener);
+    window.addEventListener('mp-combat-log', handleRemoteLog as unknown as EventListener);
+    window.addEventListener('mp-combat-popup', handleRemotePopup as unknown as EventListener);
+    window.addEventListener('mp-llm-token', handleRemoteLLMToken as unknown as EventListener);
 });
+
+onUnmounted(() => {
+    audioManager.stopBgm();
+    window.removeEventListener('mp-combat-action', handleRemoteAction as unknown as EventListener);
+    window.removeEventListener('mp-combat-effect', handleRemoteEffect as unknown as EventListener);
+    window.removeEventListener('mp-combat-log', handleRemoteLog as unknown as EventListener);
+    window.removeEventListener('mp-combat-popup', handleRemotePopup as unknown as EventListener);
+    window.removeEventListener('mp-llm-token', handleRemoteLLMToken as unknown as EventListener);
+});
+
+// 多人同步：处理远程 LLM Token
+function handleRemoteLLMToken(e: CustomEvent) {
+  const { token } = e.detail;
+  if (token) {
+    streamingNarrative.value += token;
+    // 如果日志没展开，自动展开以便看到正在输入的文本
+    if (!isLogExpanded.value) isLogExpanded.value = true;
+  }
+}
+
+async function handleRemoteEffect(e: CustomEvent) {
+    const data = e.detail;
+    console.log('[战斗界面] 收到远程特效:', data);
+    
+    if (data.type === 'shake') {
+        triggerShake(true);
+    } else if (data.type === 'effect') {
+        const rect = document.body.getBoundingClientRect();
+        triggerEffect(
+            data.effectType,
+            data.xRatio * rect.width,
+            data.yRatio * rect.height,
+            data.extra,
+            true
+        );
+    } else if (data.type === 'combat_flow') {
+        playCombatFlowAnimation(true);
+    } else if (data.type === 'ultimate_anim') {
+        // Mock object for animation
+        const mockCombatant = {
+            id: data.actorId,
+            name: data.charName,
+            isPlayer: data.isPlayer,
+            team: data.isPlayer ? 'player' : 'enemy',
+            // ... minimal required props
+        } as any;
+        playUltimateAnimation(mockCombatant, data.spellName, true);
+    } else if (data.type === 'skill_anim') {
+        const mockCombatant = {
+            id: data.actorId,
+            name: data.charName,
+            isPlayer: data.isPlayer,
+            team: data.isPlayer ? 'player' : 'enemy'
+        } as any;
+        playSkillAnimation(mockCombatant, data.spellName, data.isSpecial, true);
+    }
+}
+
+async function handleRemoteLog(e: CustomEvent) {
+    const data = e.detail;
+    addLog(data.content, true);
+}
+
+async function handleRemotePopup(e: CustomEvent) {
+    const data = e.detail;
+    const target = combatState.value?.combatants.find(c => c.id === data.targetId);
+    if (target) {
+        addPopup({ ...target, popups: getPopups(target.id) } as UICombatant, data.value, data.type, true);
+    }
+}
+
+async function handleRemoteAction(e: CustomEvent) {
+    const { senderId, type, payload, targetId } = e.detail;
+    console.log('[战斗界面] 收到远程行动:', type, payload);
+    
+    // Find Actor
+    const actor = combatState.value?.combatants.find(c => c.ownerId === senderId);
+    if (!actor) {
+        console.warn('[战斗界面] 未找到发送者的角色:', senderId);
+        return;
+    }
+    
+    // Find Target (if any)
+    let target: UICombatant | undefined;
+    if (targetId) {
+        const found = combatState.value?.combatants.find(c => c.id === targetId);
+        if (found) {
+             target = { ...found, popups: getPopups(found.id) } as UICombatant;
+        }
+    }
+    
+    // Execute
+    // We need to cast actor to UICombatant to match signatures, assuming it has necessary props or we add them
+    const uiActor = { ...actor, popups: getPopups(actor.id) } as UICombatant;
+    
+    await executeCombatLogic(uiActor, type, payload, target);
+}
+
+// Extracted Core Logic
+async function executeCombatLogic(actor: UICombatant, type: string, payload: any, target?: UICombatant) {
+    if (type === 'attack' && target) {
+         audioManager.playSlash();
+         const rect = document.body.getBoundingClientRect();
+         triggerEffect('slash', rect.width * 0.7, rect.height * 0.3);
+         await sleep(200);
+         audioManager.playHeavyHit();
+         triggerShake();
+         
+         await executeAction(actor, target);
+         
+         // Update AP
+         const currentAP = actor.actionPoints !== undefined ? actor.actionPoints : 2;
+         updateCombatantState(actor.id, { actionPoints: Math.max(0, currentAP - 2) });
+         
+         if (target.hp <= 0) audioManager.playShatter();
+         await sleep(1500);
+    } else if (type === 'spell') {
+         const spell = payload as SpellCard;
+         const actualCost = getSpellCost(spell, actor);
+         
+         // Deduct MP
+         const newMp = actor.mp - actualCost;
+         actor.mp = newMp;
+         updateCombatantState(actor.id, { mp: newMp });
+
+         // Animation
+         if (spell.isUltimate) {
+             await playUltimateAnimation(actor, spell.name);
+         } else {
+             playSkillAnimation(actor, spell.name);
+             await sleep(800);
+         }
+
+         // Logic
+         const rect = document.body.getBoundingClientRect();
+
+         if (spell.scope === 'aoe') {
+             // AOE Logic
+             if (spell.isUltimate) {
+                 audioManager.playSpellCastAoE();
+                 triggerEffect('ultimate_impact', rect.width * 0.5, rect.height * 0.5);
+                 setTimeout(() => audioManager.playShatter(), 200);
+                 await sleep(2500);
+             } else {
+                 audioManager.playSpellCastAoE();
+                 triggerEffect('spell_aoe', rect.width * 0.5, rect.height * 0.5);
+                 await sleep(2200);
+             }
+
+             triggerShake();
+             audioManager.playAoEExplosion();
+             triggerEffect('hit_aoe', rect.width * 0.5, rect.height * 0.5);
+
+             // Apply to Targets
+             // Determine if Support or Attack
+             const typeStr = (spell.type || '').toLowerCase();
+             let isSupport = ['buff', 'heal', 'shield'].includes(typeStr);
+             if (!isSupport && (typeStr === 'attack' || !typeStr) && spell.damage <= 0) {
+                 if (/治愈|恢复|回复|护盾|祝福|支援|祈祷|守护|Heal|Shield|Buff|Support/i.test(spell.name)) isSupport = true;
+                 else if (spell.buffDetails && spell.buffDetails.effects.some(e => ['heal', 'shield', 'damage_reduction', 'dodge_mod'].includes(e.type))) isSupport = true;
+             }
+
+             if (isSupport) {
+                 const targets = [actor, ...allies.value].filter(t => t.hp > 0);
+                 for (const t of targets) {
+                     if (spell.buffDetails) applyBuff(t, spell.buffDetails, 'buff');
+                     else if (typeStr === 'heal' && spell.damage > 0) {
+                         const newHp = Math.min(t.maxHp, t.hp + spell.damage);
+                         t.hp = newHp;
+                         updateCombatantState(t.id, { hp: newHp });
+                         addPopup(t, spell.damage, 'heal');
+                     }
+                 }
+                 addLog(`${actor.name} 释放了 ${spell.name}，支援了全员！`);
+             } else {
+                 for (const enemy of enemies.value) {
+                     if (enemy.hp > 0) {
+                         const result = calculateDamage(actor as Combatant, enemy, spell);
+                         if (enemy.shield && enemy.shield > 0) {
+                             enemy.shield -= result.damage;
+                             updateCombatantState(enemy.id, { shield: enemy.shield });
+                             addPopup(enemy, result.damage, 'buff');
+                             if (enemy.shield <= 0) audioManager.playShatter();
+                         } else {
+                             const newHp = Math.max(0, enemy.hp - result.damage);
+                             enemy.hp = newHp;
+                             updateCombatantState(enemy.id, { hp: newHp });
+                             if (result.damage > 0) addPopup(enemy, result.damage, 'damage');
+                             else if (!spell.buffDetails) addPopup(enemy, 'MISS', 'damage');
+                         }
+                         if (spell.buffDetails) applyBuff(enemy, spell.buffDetails, 'debuff');
+                     }
+                 }
+                 addLog(`${actor.name} 释放了 ${spell.name}，攻击了所有敌人！`);
+             }
+             
+             await sleep(1500);
+
+         } else {
+             // Single Target (Self or Targeted)
+             // If target provided, use it. If not, assume Self (for Buffs)
+             const finalTarget = target || actor;
+             
+             if (spell.isUltimate) {
+                 audioManager.playSpellCastAoE();
+                 triggerEffect('ultimate_impact', rect.width * 0.5, rect.height * 0.5);
+                 setTimeout(() => audioManager.playShatter(), 200);
+                 await sleep(2500);
+             } else {
+                 if (finalTarget === actor) {
+                     audioManager.playSpellCast();
+                     triggerEffect('spell', rect.width * 0.2, rect.height * 0.8);
+                 } else {
+                     audioManager.playSpellCastSingle();
+                     triggerEffect('spell_single', rect.width * 0.75, rect.height * 0.4);
+                 }
+                 await sleep(1500);
+             }
+
+             if (spell.type === 'shield' || spell.type === 'heal' || spell.type === 'buff') {
+                 if (spell.buffDetails) applyBuff(finalTarget, spell.buffDetails, 'buff');
+                 addLog(`${actor.name} 释放了 ${spell.name}！`);
+             } else {
+                 // Attack Logic
+                 await executeAction(actor, finalTarget, 'spell', spell);
+             }
+         }
+
+         // Deduct AP
+         const currentAP = actor.actionPoints !== undefined ? actor.actionPoints : 2;
+         updateCombatantState(actor.id, { actionPoints: Math.max(0, currentAP - 2) });
+
+         // Gain Exp
+         const expGain = Math.floor(Math.random() * 6) + 5;
+         const { levelUp, newLevel } = addSpellExp(spell, expGain);
+         if (levelUp && actor.isPlayer) addPopup(actor, `符卡升级! Lv.${newLevel}`, 'buff');
+
+    } else if (type === 'item') {
+         const item = payload as Item;
+         item.count--; // This might need syncing inventory?
+         // Note: Inventory sync is handled by gameStore updates usually, but here we modify item object directly?
+         // In multiplayer, Host should update inventory.
+         // Assuming item object is from store.
+         
+         let processed = false;
+         const effects = item.effects || {};
+         
+         const healAmount = Number(effects.heal) || Number(effects.hp) || 0;
+         if (healAmount > 0) {
+             const newHp = Math.min(actor.maxHp, actor.hp + healAmount);
+             actor.hp = newHp;
+             updateCombatantState(actor.id, { hp: newHp });
+             addPopup(actor, healAmount, 'heal');
+             processed = true;
+         }
+         
+         const mpAmount = Number(effects.mp) || 0;
+         if (mpAmount > 0) {
+             const newMp = Math.min(actor.maxMp, actor.mp + mpAmount);
+             actor.mp = newMp;
+             updateCombatantState(actor.id, { mp: newMp });
+             addPopup(actor, mpAmount, 'heal');
+             processed = true;
+         }
+         
+         if (processed) {
+             addLog(`${actor.name} 使用了道具 ${item.name}！`);
+             audioManager.playHeal();
+         } else {
+             addLog(`${actor.name} 使用了 ${item.name}，但是没有效果。`);
+         }
+         
+         await sleep(1000);
+         const currentAP = actor.actionPoints !== undefined ? actor.actionPoints : 2;
+         updateCombatantState(actor.id, { actionPoints: Math.max(0, currentAP - 1) });
+
+    } else if (type === 'special') {
+         const skill = payload;
+         const currentP = actor.pPoints || 0;
+         const currentAP = actor.actionPoints !== undefined ? actor.actionPoints : 2;
+         
+         updateCombatantState(actor.id, { 
+             pPoints: Math.max(0, currentP - skill.costP),
+             actionPoints: Math.max(0, currentAP - skill.costAP)
+         });
+         
+         playSkillAnimation(actor, skill.name, true);
+         await sleep(800);
+
+         // Logic for specials
+         const baseDmg = getBaseDamage(actor.power);
+         
+         if (skill.id === 'active_defense') {
+             const shieldVal = Math.round(0.5 * baseDmg);
+             actor.shield = (actor.shield || 0) + shieldVal;
+             updateCombatantState(actor.id, { shield: actor.shield });
+             addPopup(actor, shieldVal, 'buff');
+             addLog(`${actor.name} 发动【主动防御】！`);
+             audioManager.playHeal();
+         } else if (skill.id === 'indomitable_will') {
+             const healVal = Math.round(1.0 * baseDmg);
+             const newHp = Math.min(actor.maxHp, actor.hp + healVal);
+             actor.hp = newHp;
+             updateCombatantState(actor.id, { hp: newHp });
+
+             const buff: Buff = {
+                 id: `buff_will_${Date.now()}`,
+                 name: '不屈意志',
+                type: 'buff',
+                description: '受到的伤害降低60%',
+                duration: 2,
+                createdTurn: turn.value,
+                effects: [
+                    { type: 'damage_reduction', value: 0.60, isPercentage: true }
+                ]
+             };
+             
+             if (!actor.buffs) actor.buffs = [];
+             actor.buffs.push(buff);
+             updateCombatantState(actor.id, { buffs: actor.buffs });
+             
+             const rect = document.body.getBoundingClientRect();
+             triggerEffect('spell', rect.width * 0.25, rect.height * 0.6);
+             
+             addPopup(actor, healVal, 'heal');
+             addLog(`${actor.name} 发动【不屈意志】！`);
+             audioManager.playHeal(); 
+         } else if (skill.id === 'combat_flow') {
+             await playCombatFlowAnimation();
+
+             const buff: Buff = {
+                 id: `buff_flow_${Date.now()}`,
+                 name: '战斗心流',
+                 type: 'buff',
+                 description: '全属性大幅提升',
+                 duration: 3,
+                 createdTurn: turn.value,
+                 effects: [
+                    { type: 'stat_mod', targetStat: 'attack', value: 0.40, isPercentage: true },
+                     { type: 'damage_reduction', value: 0.40, isPercentage: true },
+                     { type: 'dodge_mod', value: 0.40, isPercentage: true },
+                     { type: 'stat_mod', targetStat: 'mp_cost_reduction', value: 0.20, isPercentage: true }
+                 ]
+             };
+             
+             if (!actor.buffs) actor.buffs = [];
+             actor.buffs.push(buff);
+             updateCombatantState(actor.id, { buffs: actor.buffs });
+             
+             addLog(`${actor.name} 进入了【战斗心流】状态！`);
+         } else if (skill.id === 'inner_power' && target) {
+             audioManager.playSpellCast();
+             const rect = document.body.getBoundingClientRect();
+             triggerEffect('spell', rect.width * 0.7, rect.height * 0.3);
+             
+             const damageMult = 1.2 + Math.random() * 0.3;
+             const trueDmg = Math.round(damageMult * baseDmg);
+             const buff: Buff = {
+                 id: `debuff_inner_${Date.now()}`,
+                 name: '内伤',
+                 type: 'debuff',
+                 description: `受到真实伤害`,
+                 duration: 3, 
+                 effects: [{ type: 'damage_over_time', value: trueDmg, isPercentage: false }]
+             };
+             if (!target.buffs) target.buffs = [];
+             target.buffs.push(buff);
+             updateCombatantState(target.id, { buffs: target.buffs });
+             addPopup(target, '内伤', 'debuff');
+             addLog(`${actor.name} 对 ${target.name} 施加了【内伤】！`);
+         }
+         // ... other specials
+         await sleep(1000);
+    }
+
+    checkTurnEnd();
+}
 
 // --- Store Integration ---
 const combatState = computed(() => gameStore.state.system.combat);
@@ -1266,15 +1676,25 @@ const enemies = computed(() => {
     })) as UICombatant[];
 });
 
-const allies = computed(() => {
-    return (combatState.value?.combatants.filter(c => !c.isPlayer && c.team === 'player') || []).map(c => ({
-        ...c,
-        popups: getPopups(c.id)
-    })) as UICombatant[];
-});
-
 const player = computed(() => {
-    const p = combatState.value?.combatants.find(c => c.isPlayer);
+    if (!combatState.value) return null;
+    
+    let p: Combatant | undefined;
+    
+    if (gameStore.multiplayer.isMultiplayer) {
+        const myId = multiplayerService.identityKey;
+        // 1. Try to find My Character (Owner ID match)
+        p = combatState.value.combatants.find(c => c.ownerId === myId);
+        
+        // 2. Fallback for Host: Control the main "Player" if no specific owner assigned
+        if (!p && gameStore.multiplayer.isHost) {
+             p = combatState.value.combatants.find(c => c.isPlayer && !c.ownerId);
+        }
+    } else {
+        // Single Player
+        p = combatState.value.combatants.find(c => c.isPlayer);
+    }
+
     if (!p) return null;
     
     const stats = getEffectiveStats(p);
@@ -1285,6 +1705,15 @@ const player = computed(() => {
         dodgeRate: stats.dodgeRate,
         popups: getPopups(p.id)
     } as UICombatant;
+});
+
+const allies = computed(() => {
+    // Allies are anyone on 'player' team who is NOT 'player' (the current user's character)
+    const myId = player.value?.id;
+    return (combatState.value?.combatants.filter(c => c.team === 'player' && c.id !== myId) || []).map(c => ({
+        ...c,
+        popups: getPopups(c.id)
+    })) as UICombatant[];
 });
 
 // --- Ally Stack Management ---
@@ -1405,6 +1834,7 @@ const isGameOver = ref(false);
 const gameResult = ref<'win' | 'loss' | 'escape' | null>(null);
 const combatLogs = ref<CombatLog[]>([]);
 const isLogExpanded = ref(false);
+const streamingNarrative = ref('');
 
 // --- Enemy Queue System ---
 const exitedEnemyIds = ref<string[]>([]);
@@ -1474,7 +1904,13 @@ watch(isActive, (val) => {
 // --- Helpers ---
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-async function playCombatFlowAnimation() {
+async function playCombatFlowAnimation(isRemote: boolean = false) {
+    if (!isRemote && gameStore.multiplayer.isHost && gameStore.multiplayer.isMultiplayer) {
+        multiplayerService.sendCombatEffect({
+            type: 'combat_flow'
+        });
+    }
+
     // 1. Init
     showCombatFlowAnim.value = true;
     combatFlowPhase.value = 'start';
@@ -1490,7 +1926,7 @@ async function playCombatFlowAnimation() {
     audioManager.playSpellCastAoE(); // Burst sound
     // Trigger impact effect in background too
     const rect = document.body.getBoundingClientRect();
-    triggerEffect('ultimate_impact', rect.width/2, rect.height/2);
+    triggerEffect('ultimate_impact', rect.width/2, rect.height/2, undefined, true); // Don't re-broadcast internal effect
     
     await sleep(2500);
 
@@ -1500,7 +1936,17 @@ async function playCombatFlowAnimation() {
     showCombatFlowAnim.value = false;
 }
 
-async function playUltimateAnimation(combatant: Combatant | UICombatant, spellName: string) {
+async function playUltimateAnimation(combatant: Combatant | UICombatant, spellName: string, isRemote: boolean = false) {
+    if (!isRemote && gameStore.multiplayer.isHost && gameStore.multiplayer.isMultiplayer) {
+        multiplayerService.sendCombatEffect({
+            type: 'ultimate_anim',
+            charName: combatant.name,
+            spellName: spellName,
+            isPlayer: combatant.isPlayer || combatant.team === 'player',
+            actorId: combatant.id
+        });
+    }
+
     const isPlayerTeam = combatant.isPlayer || combatant.team === 'player';
     ultimateCutinData.value = {
         isPlayer: isPlayerTeam,
@@ -1523,7 +1969,18 @@ async function playUltimateAnimation(combatant: Combatant | UICombatant, spellNa
     showUltimateCutin.value = false;
 }
 
-async function playSkillAnimation(combatant: Combatant | UICombatant, spellName: string, isSpecial: boolean = false) {
+async function playSkillAnimation(combatant: Combatant | UICombatant, spellName: string, isSpecial: boolean = false, isRemote: boolean = false) {
+    if (!isRemote && gameStore.multiplayer.isHost && gameStore.multiplayer.isMultiplayer) {
+        multiplayerService.sendCombatEffect({
+            type: 'skill_anim',
+            charName: combatant.name,
+            spellName: spellName,
+            isSpecial: isSpecial,
+            isPlayer: combatant.isPlayer || combatant.team === 'player',
+            actorId: combatant.id
+        });
+    }
+
     const isPlayerTeam = combatant.isPlayer || combatant.team === 'player';
     skillCutinData.value = {
         isPlayer: isPlayerTeam,
@@ -1547,7 +2004,17 @@ function switchMenu(menu: 'main' | 'spell' | 'item' | 'talk' | 'special') {
   pendingAction.value = null;
 }
 
-function addLog(content: string) {
+function addLog(content: string, isRemote: boolean = false) {
+  // Clear streaming narrative when a final log entry is added
+  streamingNarrative.value = '';
+  
+  if (!isRemote && gameStore.multiplayer.isHost && gameStore.multiplayer.isMultiplayer) {
+      multiplayerService.sendCombatLog({
+          content: content,
+          turn: turn.value
+      });
+  }
+
   combatLogs.value.unshift({
     id: Date.now() + Math.random(),
     turn: turn.value,
@@ -1606,7 +2073,15 @@ function getSpellTypeName(type: string): string {
     return map[type] || '特殊';
 }
 
-function addPopup(target: UICombatant, value: number | string, type: 'damage' | 'heal' | 'crit' | 'buff' | 'debuff' = 'damage') {
+function addPopup(target: UICombatant, value: number | string, type: 'damage' | 'heal' | 'crit' | 'buff' | 'debuff' = 'damage', isRemote: boolean = false) {
+  if (!isRemote && gameStore.multiplayer.isHost && gameStore.multiplayer.isMultiplayer) {
+      multiplayerService.sendCombatPopup({
+          targetId: target.id,
+          value,
+          type
+      });
+  }
+
   const id = popupIdCounter++;
   const list = getPopups(target.id);
   list.push({ id, text: value, type });
@@ -1719,7 +2194,13 @@ function getEnemyHpStyle(hp: number, maxHp: number) {
   };
 }
 
-async function triggerShake() {
+async function triggerShake(isRemote: boolean = false) {
+  if (!isRemote && gameStore.multiplayer.isHost && gameStore.multiplayer.isMultiplayer) {
+      multiplayerService.sendCombatEffect({
+          type: 'shake'
+      });
+  }
+
   isScreenShaking.value = true;
   await sleep(500);
   isScreenShaking.value = false;
@@ -1729,8 +2210,21 @@ async function triggerEffect(
     type: 'slash' | 'spell' | 'spell_aoe' | 'spell_single' | 'enemy' | 'hit' | 'hit_aoe' | 'talk' | 'ultimate_impact', 
     x: number, 
     y: number,
-    extra?: string
+    extra?: string,
+    isRemote: boolean = false
 ) {
+  if (!isRemote && gameStore.multiplayer.isHost && gameStore.multiplayer.isMultiplayer) {
+      // Normalize coordinates
+      const rect = document.body.getBoundingClientRect();
+      multiplayerService.sendCombatEffect({
+          type: 'effect',
+          effectType: type,
+          xRatio: x / rect.width,
+          yRatio: y / rect.height,
+          extra
+      });
+  }
+
   activeEffect.value = { type, x, y, show: true, extra };
   
   let duration = 1000;
@@ -1832,6 +2326,16 @@ function updateCombatantState(id: string, updates: Partial<Combatant>) {
         const storeCombatant = combatState.value.combatants.find(c => c.id === id);
         if (storeCombatant) {
             Object.assign(storeCombatant, updates);
+            
+            // Sync immediately for HP changes if Host
+            if (gameStore.multiplayer.isHost && gameStore.multiplayer.isMultiplayer) {
+                // Debounce or sync? HP changes can be frequent (multi-hit).
+                // But syncHostState sends the whole state.
+                // Let's rely on the watchers on isActive/turn or manual trigger.
+                // Or maybe trigger here for critical updates?
+                // Let's debounce sync.
+                multiplayerService.syncHostState(gameStore.state);
+            }
         }
     }
 
@@ -2056,224 +2560,30 @@ async function handleAction(type: string, payload?: any) {
      if (player.value.mp >= actualCost) {
         // Special Case: Self-Buff / Shield / Heal (Immediate Execution) - Non-AOE only
         if ((spell.type === 'buff' || spell.type === 'shield' || spell.type === 'heal') && spell.scope !== 'aoe') {
+            // Immediate
+            if (gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost) {
+                 multiplayerService.sendCombatAction(type, payload);
+                 return;
+            }
+            
             isActing.value = true;
             currentMenu.value = 'main';
-
-            // Ultimate Cut-in or Skill Cut-in
-            if (spell.isUltimate) {
-                await playUltimateAnimation(player.value, spell.name);
-            } else {
-                playSkillAnimation(player.value, spell.name); // Non-blocking or short wait?
-                await sleep(800); // Wait for skill cut-in
-            }
-
-            const newMp = player.value.mp - actualCost;
-            player.value.mp = newMp;
-            updateCombatantState(player.value.id, { mp: newMp });
-
-            audioManager.playSpellCast();
-            const rect = document.body.getBoundingClientRect();
-            // Self Effect
-            triggerEffect('spell', rect.width * 0.2, rect.height * 0.8); 
-            
-            await sleep(2200);
-            
-            // Apply Logic
-            if (spell.type === 'shield') {
-                addLog(`${player.value.name} 释放了 ${spell.name}！`);
-            } else if (spell.type === 'heal') {
-                addLog(`${player.value.name} 释放了 ${spell.name}！`);
-            }
-            
-            // Apply Buffs (if any)
-            if (spell.buffDetails) {
-                 applyBuff(player.value, spell.buffDetails, 'buff');
-            }
-
-            await sleep(1000);
-            
-            // Deduct AP (Cost 2)
-            const currentAP = player.value.actionPoints !== undefined ? player.value.actionPoints : 2;
-            updateCombatantState(player.value.id, { actionPoints: Math.max(0, currentAP - 2) });
-            
-            // End Turn Check
-            checkTurnEnd();
-            
-            // Gain Exp (Self/Buff)
-            const expGain = Math.floor(Math.random() * 6) + 5; // 5-10
-            const { levelUp, newLevel } = addSpellExp(spell, expGain);
-            if (levelUp) {
-                addPopup(player.value, `符卡升级! Lv.${newLevel}`, 'buff');
-            }
+            await executeCombatLogic(player.value, type, payload);
+            isActing.value = false;
             return;
         }
 
         if (spell.scope === 'aoe') {
-            // Immediate Execution for AOE
+            // Immediate AOE
+            if (gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost) {
+                 multiplayerService.sendCombatAction(type, payload);
+                 return;
+            }
+
             isActing.value = true;
             currentMenu.value = 'main';
-
-            // Ultimate Cut-in or Skill Cut-in
-            if (spell.isUltimate) {
-                await playUltimateAnimation(player.value, spell.name);
-            } else {
-                playSkillAnimation(player.value, spell.name);
-                await sleep(800);
-            }
-
-            const newMp = player.value.mp - actualCost;
-            player.value.mp = newMp;
-            updateCombatantState(player.value.id, { mp: newMp });
-            
-            // 1. Cast
-            const rect = document.body.getBoundingClientRect();
-            
-            if (spell.isUltimate) {
-                audioManager.playSpellCastAoE();
-                triggerEffect('ultimate_impact', rect.width * 0.5, rect.height * 0.5);
-                setTimeout(() => audioManager.playShatter(), 200);
-            } else {
-                audioManager.playSpellCastAoE();
-                triggerEffect('spell_aoe', rect.width * 0.5, rect.height * 0.5);
-            }
-            
-            await sleep(spell.isUltimate ? 2500 : 2200);
-
-            // 2. Impact
-            triggerShake();
-            audioManager.playAoEExplosion();
-            triggerEffect('hit_aoe', rect.width * 0.5, rect.height * 0.5); // Global hit effect
-            
-            // AOE Logic
-            let anyKilled = false;
-            let totalDmg = 0;
-            let logMsg = `${player.value.name} 释放了符卡 ${spell.name}`;
-
-            const type = (spell.type || '').toLowerCase();
-            let isSupport = ['buff', 'heal', 'shield'].includes(type);
-
-            // Heuristic: If labeled 'attack' (default) but has 0 damage and support-like properties, treat as support
-            if (!isSupport && (type === 'attack' || !type) && spell.damage <= 0) {
-                 // 1. Name check
-                 if (/治愈|恢复|回复|护盾|祝福|支援|祈祷|守护|Heal|Shield|Buff|Support/i.test(spell.name)) {
-                     isSupport = true;
-                 }
-                 // 2. Effect check (if has buffDetails)
-                 else if (spell.buffDetails && spell.buffDetails.effects) {
-                     const hasSupportEffect = spell.buffDetails.effects.some(e => 
-                         ['heal', 'shield', 'damage_reduction', 'dodge_mod'].includes(e.type)
-                     );
-                     if (hasSupportEffect) isSupport = true;
-                 }
-                 // 3. Direct Heal check (no buffDetails but type='heal' - handled by first check, but what if type is missing?)
-                 // If damage is 0 and no buffDetails, it does nothing anyway unless type is 'heal'
-            }
-
-            if (isSupport) {
-                // Target: Player + Allies
-                const targets = [];
-                if (player.value) targets.push(player.value);
-                if (allies.value) targets.push(...allies.value);
-                
-                let effectName = '';
-                
-                for (const target of targets) {
-                    if (target.hp <= 0) continue;
-                    
-                    if (spell.buffDetails) {
-                         applyBuff(target, spell.buffDetails, 'buff');
-                         effectName = spell.buffDetails.name;
-                    } else if (type === 'heal' && spell.damage > 0) {
-                         // Direct heal without buffDetails
-                         const healAmount = spell.damage; 
-                         const newHp = Math.min(target.maxHp, target.hp + healAmount);
-                         target.hp = newHp;
-                         updateCombatantState(target.id, { hp: newHp });
-                         addPopup(target, healAmount, 'heal');
-                    }
-                }
-                
-                if (effectName) {
-                    logMsg += `，为全员附加了【${effectName}】`;
-                } else {
-                    logMsg += `，支援了全员`;
-                }
-            } else {
-                // Target: Enemies
-                for (const enemy of enemies.value) {
-                   if (enemy.hp > 0) {
-                       const result = calculateDamage(player.value!, enemy, spell);
-                       
-                       if (enemy.shield && enemy.shield > 0) {
-                           enemy.shield -= result.damage;
-                           updateCombatantState(enemy.id, { shield: enemy.shield });
-                           addPopup(enemy, result.damage, 'buff');
-                           
-                           if (enemy.shield <= 0) {
-                               addLog(`${player.value.name} ${spell.name}，击碎了 ${enemy.name} 的护盾！`);
-                               audioManager.playShatter();
-                           }
-                       } else {
-                           const newHp = Math.max(0, enemy.hp - result.damage);
-                           enemy.hp = newHp;
-                           updateCombatantState(enemy.id, { hp: newHp });
-                           
-                           if (result.damage > 0) {
-                               addPopup(enemy, result.damage, 'damage');
-                               
-                               // Hit Spark for AOE
-                               const rX = rect.width * (0.6 + Math.random() * 0.3);
-                               const rY = rect.height * (0.3 + Math.random() * 0.4);
-                               triggerEffect('hit', rX, rY);
-                               
-                           } else if (!spell.buffDetails) {
-                               addPopup(enemy, 'MISS', 'damage');
-                           }
-                           
-                           if (enemy.hp <= 0) anyKilled = true;
-                       }
-                       totalDmg += result.damage;
-
-                       // Apply Debuffs (if any)
-                       if (spell.buffDetails) {
-                           applyBuff(enemy, spell.buffDetails, 'debuff');
-                       }
-                   }
-                }
-
-                if (totalDmg > 0) {
-                    logMsg += `，对所有敌方单位造成了 ${totalDmg} 点总伤害`;
-                }
-                if (spell.buffDetails) {
-                    logMsg += `，并附加了【${spell.buffDetails.name}】`;
-                }
-                if (totalDmg === 0 && !spell.buffDetails) {
-                    logMsg += `，但似乎没有明显效果`;
-                }
-            }
-            
-            logMsg += "！";
-            addLog(logMsg);
-            
-            if (anyKilled) {
-               audioManager.playShatter();
-            }
-            
-            await sleep(1500);
-            
-            // Deduct AP (Cost 2)
-            const currentAP = player.value.actionPoints !== undefined ? player.value.actionPoints : 2;
-            updateCombatantState(player.value.id, { actionPoints: Math.max(0, currentAP - 2) });
-            
-            // End Turn Check
-            checkTurnEnd();
-
-            // Gain Exp (AOE)
-            const expGain = Math.floor(Math.random() * 6) + 5; // 5-10
-            const { levelUp, newLevel } = addSpellExp(spell, expGain);
-            if (levelUp) {
-                addPopup(player.value, `符卡升级! Lv.${newLevel}`, 'buff');
-            }
+            await executeCombatLogic(player.value, type, payload);
+            isActing.value = false;
         } else {
             // Single Target -> Selection Mode
             audioManager.playClick();
@@ -2294,62 +2604,16 @@ async function handleAction(type: string, payload?: any) {
      }
 
      if (item.count > 0) {
-        // Assume Self-Use for Consumables for now
-        // TODO: Support target selection for items if needed
+        // Immediate (Self-Use)
+        if (gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost) {
+             multiplayerService.sendCombatAction(type, payload);
+             return;
+        }
+
         isActing.value = true;
         currentMenu.value = 'main';
-
-        try {
-            item.count--; // Consume
-            
-            // Apply Effect
-            let processed = false;
-            const effects = item.effects || {};
-            
-            // 1. Heal / HP
-            const healAmount = Number(effects.heal) || Number(effects.hp) || 0;
-            if (healAmount > 0) {
-                 const newHp = Math.min(player.value.maxHp, player.value.hp + healAmount);
-                 player.value.hp = newHp;
-                 updateCombatantState(player.value.id, { hp: newHp });
-                 addPopup(player.value, healAmount, 'heal');
-                 addLog(`${player.value.name} 使用了道具 ${item.name}，恢复了 ${healAmount} 点HP！`);
-                 processed = true;
-            }
-            
-            // 2. MP
-            const mpAmount = Number(effects.mp) || 0;
-            if (mpAmount > 0) {
-                 const newMp = Math.min(player.value.maxMp, player.value.mp + mpAmount);
-                 player.value.mp = newMp;
-                 updateCombatantState(player.value.id, { mp: newMp });
-                 addPopup(player.value, mpAmount, 'heal'); 
-                 addLog(`${player.value.name} 使用了道具 ${item.name}，恢复了 ${mpAmount} 点MP！`);
-                 processed = true;
-            }
-            
-            if (!processed) {
-                addLog(`${player.value.name} 使用了 ${item.name}，但是什么也没有发生...`);
-            } else {
-                audioManager.playHeal();
-            }
-            
-            await sleep(1000);
-            
-            // Deduct AP (Cost 1)
-            if (player.value) {
-                const currentAP = player.value.actionPoints !== undefined ? player.value.actionPoints : 2;
-                updateCombatantState(player.value.id, { actionPoints: Math.max(0, currentAP - 1) });
-            }
-            
-            checkTurnEnd();
-        } catch (e) {
-            console.error("Item execution error:", e);
-            addLog(`[错误] 道具使用失败: ${e}`);
-            phase.value = 'player'; // Recover
-        } finally {
-            isActing.value = false;
-        }
+        await executeCombatLogic(player.value, type, payload);
+        isActing.value = false;
      }
   }
 }
@@ -2377,19 +2641,20 @@ function getSkillThemeClasses(theme: string) {
 }
 
 async function handleSpecialAction(skill: any) {
-    if (!player.value) return;
+    const p = player.value;
+    if (!p) return;
     
     // Cost Check
-    const currentP = player.value.pPoints || 0;
-    const currentAP = player.value.actionPoints !== undefined ? player.value.actionPoints : 2;
+    const currentP = p.pPoints || 0;
+    const currentAP = p.actionPoints !== undefined ? p.actionPoints : 2;
     
     if (currentP < skill.costP) {
-        addPopup(player.value, 'P点不足', 'damage');
+        addPopup(p, 'P点不足', 'damage');
         audioManager.playSoftClick(); // Or error sound
         return;
     }
     if (currentAP < skill.costAP) {
-        addPopup(player.value, 'AP不足', 'damage');
+        addPopup(p, 'AP不足', 'damage');
         audioManager.playSoftClick();
         return;
     }
@@ -2405,20 +2670,27 @@ async function handleSpecialAction(skill: any) {
     }
     
     // For self-cast skills, execute immediately
+    if (gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost) {
+         multiplayerService.sendCombatAction('special', skill);
+         return;
+    }
+
+    if (!player.value) return;
+
     // Deduct Costs
+    const curP = player.value.pPoints || 0;
+    const curAP = player.value.actionPoints !== undefined ? player.value.actionPoints : 2;
     updateCombatantState(player.value.id, { 
-        pPoints: Math.max(0, currentP - skill.costP),
-        actionPoints: Math.max(0, currentAP - skill.costAP)
+        pPoints: Math.max(0, curP - skill.costP),
+        actionPoints: Math.max(0, curAP - skill.costAP)
     });
     
     isActing.value = true;
     currentMenu.value = 'main';
     
     // Play Skill Animation
-    if (player.value) {
-        playSkillAnimation(player.value, skill.name, true);
-        await sleep(800);
-    }
+    playSkillAnimation(player.value, skill.name, true);
+    await sleep(800);
     
     try {
         const baseDmg = getBaseDamage(player.value.power);
@@ -2725,11 +2997,11 @@ async function handleTalk() {
     
     // Deduct Costs (AP: 2, P: 15)
     if (player.value) {
-        const currentAP = player.value.actionPoints !== undefined ? player.value.actionPoints : 2;
-        const currentP = player.value.pPoints || 0;
+        const currentAPFinal = player.value.actionPoints !== undefined ? player.value.actionPoints : 2;
+        const currentPFinal = player.value.pPoints || 0;
         updateCombatantState(player.value.id, { 
-            actionPoints: Math.max(0, currentAP - 2),
-            pPoints: Math.max(0, currentP - 15)
+            actionPoints: Math.max(0, currentAPFinal - 2),
+            pPoints: Math.max(0, currentPFinal - 15)
         });
     }
     
@@ -2753,144 +3025,20 @@ async function selectTarget(target: UICombatant) {
   const { type, payload } = pendingAction.value;
   
   // Start Sequence
-  isActing.value = true;
   selectionMode.value = false;
   pendingAction.value = null;
+
+  if (gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost) {
+       multiplayerService.sendCombatAction(type, payload, target.id);
+       return;
+  }
+  
+  isActing.value = true;
   
   try {
-      if (type === 'attack') {
-         // 1. Wind up
-         await sleep(500);
-
-         // 2. Attack Sound & Visual
-         audioManager.playSlash();
-         const rect = document.body.getBoundingClientRect();
-         // Visual target: 70% width (right side), 30% height (top)
-         triggerEffect('slash', rect.width * 0.7, rect.height * 0.3);
-         
-         await sleep(200);
-
-         // 3. Impact
-         audioManager.playHeavyHit();
-         triggerShake();
-         
-         if (player.value) {
-            await executeAction(player.value, target);
-            // Deduct AP (Cost 2)
-            const currentAP = player.value.actionPoints !== undefined ? player.value.actionPoints : 2;
-            updateCombatantState(player.value.id, { actionPoints: Math.max(0, currentAP - 2) });
-         }
-         
-         if (target.hp <= 0) {
-            audioManager.playShatter();
-         }
-         
-         await sleep(1500);
-      } else if (type === 'special') {
-          // Handle Targeted Special Skills
-          const skill = payload;
-          if (player.value && skill.id === 'inner_power') {
-              // Deduct Costs
-              const currentP = player.value.pPoints || 0;
-              const currentAP = player.value.actionPoints !== undefined ? player.value.actionPoints : 2;
-              
-              updateCombatantState(player.value.id, { 
-                 pPoints: Math.max(0, currentP - skill.costP),
-                 actionPoints: Math.max(0, currentAP - skill.costAP)
-              });
-
-              playSkillAnimation(player.value, skill.name, true);
-              await sleep(800);
-
-              audioManager.playSpellCast();
-              const rect = document.body.getBoundingClientRect();
-              triggerEffect('spell', rect.width * 0.7, rect.height * 0.3); // Visual on target
-
-              const baseDmg = getBaseDamage(player.value.power);
-              const damageMult = 1.2 + Math.random() * 0.3; // 1.2 ~ 1.5
-              const trueDmg = Math.round(damageMult * baseDmg);
-
-              // Apply Debuff
-              const buff: Buff = {
-                  id: `debuff_inner_${Date.now()}`,
-                  name: '内伤',
-                  type: 'debuff',
-                  description: `将在三回合内受到 ${trueDmg} 点真实伤害`,
-                  duration: 3, 
-                  effects: [
-                      { type: 'damage_over_time', value: trueDmg, isPercentage: false }
-                  ]
-              };
-
-              if (!target.buffs) target.buffs = [];
-              target.buffs.push(buff);
-              updateCombatantState(target.id, { buffs: target.buffs });
-
-              addPopup(target, '内伤', 'debuff');
-              addLog(`${player.value.name} 对 ${target.name} 施加了【内伤】！`);
-              
-              await sleep(1000);
-          }
-          
-          // Targeted special skills (like Inner Power) logic ends here
-          // checkTurnEnd() will be called at the end of selectTarget
-      } else if (type === 'spell') {
-          // Single Target Spell
-          const spell = payload as SpellCard;
-          if (player.value) {
-              // Ultimate Cut-in or Skill Cut-in
-              if (spell.isUltimate) {
-                  await playUltimateAnimation(player.value, spell.name);
-              } else {
-                  playSkillAnimation(player.value, spell.name);
-                  await sleep(800);
-              }
-
-              const actualCost = getSpellCost(spell, player.value);
-              const newMp = player.value.mp - actualCost;
-              player.value.mp = newMp;
-              updateCombatantState(player.value.id, { mp: newMp });
-              
-              const rect = document.body.getBoundingClientRect();
-              
-              if (spell.isUltimate) {
-                   audioManager.playSpellCastAoE();
-                   triggerEffect('ultimate_impact', rect.width * 0.5, rect.height * 0.5);
-                   setTimeout(() => audioManager.playShatter(), 200);
-                   await sleep(2500);
-               } else {
-                   audioManager.playSpellCastSingle();
-                   triggerEffect('spell_single', rect.width * 0.75, rect.height * 0.4); // Target area (Enemy side)
-                   await sleep(1500); // Shorter wait for single
-               }
-              
-              triggerShake();
-              audioManager.playHeavyHit();
-              
-              // Execute Damage using central logic (handles shields, shatter, logs, buffs)
-              await executeAction(player.value, target, spell.name, spell);
-              
-              // Gain Exp (Single Target)
-              const expGain = Math.floor(Math.random() * 6) + 5; // 5-10
-              const { levelUp, newLevel } = addSpellExp(spell, expGain);
-              if (levelUp) {
-                  addPopup(player.value, `符卡升级! Lv.${newLevel}`, 'buff');
-              }
-
-              if (target.hp <= 0) {
-                 audioManager.playShatter();
-              }
-              
-              await sleep(1500);
-              
-              // Deduct AP (Cost 2)
-              const currentAP = player.value.actionPoints !== undefined ? player.value.actionPoints : 2;
-              updateCombatantState(player.value.id, { actionPoints: Math.max(0, currentAP - 2) });
-          }
+      if (player.value) {
+          await executeCombatLogic(player.value, type, payload, target);
       }
-      
-      // End Player Turn (Replaced by checkTurnEnd)
-      checkTurnEnd();
   } catch (error) {
       console.error('Action execution failed:', error);
       addLog(`[错误] 行动失败: ${error}`);
