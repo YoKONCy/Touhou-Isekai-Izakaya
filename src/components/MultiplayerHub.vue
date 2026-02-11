@@ -5,7 +5,8 @@ import { audioManager } from '@/services/audio';
 import { useToastStore } from '@/stores/toast';
 import { useSaveStore } from '@/stores/save';
 import { multiplayerService } from '@/services/MultiplayerService';
-import { X, Users, User, Copy, Plus, Network, LayoutGrid, Settings, Search, Lock, Wifi, Globe, Link, Loader2, Shield, Info, Radio, HelpCircle, Server, AlertTriangle } from 'lucide-vue-next';
+import GuestIdentityModal from './GuestIdentityModal.vue';
+import { X, Users, User, Copy, Plus, Network, LayoutGrid, Settings, Search, Lock, Wifi, Globe, Link, Loader2, Shield, Info, Radio, HelpCircle, Server, AlertTriangle, Edit3 } from 'lucide-vue-next';
 
 defineProps<{
   isOpen: boolean;
@@ -161,6 +162,16 @@ const handleSaveKey = () => {
   } else {
     toastStore.addToast('秘钥格式无效（需至少8位字符）', 'error');
   }
+};
+
+const isGuestIdentityModalOpen = ref(false);
+
+const handleSaveIdentity = (data: any) => {
+  playerSetup.value.name = data.name;
+  playerSetup.value.identity = data.identity;
+  playerSetup.value.persona = data.persona;
+  playerSetup.value.power = data.power;
+  toastStore.addToast('身份配置已保存', 'success');
 };
 
 const handleStartEditKey = () => {
@@ -684,73 +695,50 @@ const copyRoomId = () => {
                 <User class="w-5 h-5 text-touhou-red" />
                 访客身份设定 (Guest Profile)
               </h3>
-              <p class="text-xs text-izakaya-wood/50 mt-1">作为客机加入他人房间时，其他玩家将看到这些信息。房主将直接使用当前存档的角色信息。</p>
+              <p class="text-xs text-izakaya-wood/50 mt-1">作为客机加入他人房间时，其他玩家将看到这些信息。</p>
             </div>
             
             <div class="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-6">
-              <div class="p-5 bg-white border border-izakaya-wood/10 rounded-2xl shadow-sm space-y-5">
-                <div class="grid grid-cols-2 gap-4">
-                  <div class="space-y-2">
-                    <label class="text-xs font-bold text-izakaya-wood/60">昵称 (Name)</label>
-                    <input v-model="playerSetup.name" type="text" placeholder="您的名字" class="w-full px-4 py-2.5 bg-izakaya-wood/5 border border-izakaya-wood/10 rounded-xl text-sm outline-none focus:border-touhou-red transition-all">
-                  </div>
-                  <div class="space-y-2">
-                    <label class="text-xs font-bold text-izakaya-wood/60">身份 (Identity)</label>
-                    <input v-model="playerSetup.identity" type="text" placeholder="例如: 异界魔法师" class="w-full px-4 py-2.5 bg-izakaya-wood/5 border border-izakaya-wood/10 rounded-xl text-sm outline-none focus:border-touhou-red transition-all">
-                  </div>
-                </div>
+              <!-- Current Profile Card -->
+              <div class="p-6 bg-white border border-izakaya-wood/10 rounded-2xl shadow-sm relative overflow-hidden group">
+                 <div class="absolute top-0 right-0 p-4 opacity-10">
+                    <User class="w-24 h-24 text-izakaya-wood" />
+                 </div>
+                 
+                 <div class="relative z-10 flex gap-4">
+                    <div class="w-16 h-16 bg-touhou-red/10 rounded-full flex items-center justify-center text-touhou-red text-2xl font-bold border-2 border-white shadow-md">
+                        {{ playerSetup.name ? playerSetup.name.charAt(0) : '?' }}
+                    </div>
+                    <div class="flex-1 space-y-1">
+                        <div class="flex items-center gap-2">
+                            <h4 class="text-lg font-bold text-izakaya-wood">{{ playerSetup.name || '未设定昵称' }}</h4>
+                            <span class="px-2 py-0.5 bg-izakaya-wood/5 rounded text-[10px] font-bold text-izakaya-wood/60">
+                                Rank: {{ playerSetup.power || 'E' }}
+                            </span>
+                        </div>
+                        <p class="text-sm text-touhou-red font-bold">{{ playerSetup.identity || '未设定身份' }}</p>
+                        <p class="text-xs text-izakaya-wood/50 line-clamp-2 mt-2 max-w-md">
+                            {{ playerSetup.persona || '暂无详细人设描述...' }}
+                        </p>
+                    </div>
+                 </div>
 
-                <div class="space-y-2">
-                   <label class="text-xs font-bold text-izakaya-wood/60">人设背景 & 性格 (Persona)</label>
-                   <textarea 
-                      v-model="playerSetup.persona" 
-                      placeholder="简要描述您的背景故事、性格特征或外貌..." 
-                      class="w-full h-32 px-4 py-3 bg-izakaya-wood/5 border border-izakaya-wood/10 rounded-xl text-sm outline-none focus:border-touhou-red transition-all resize-none"
-                   ></textarea>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                   <div class="space-y-2">
-                      <label class="text-xs font-bold text-izakaya-wood/60">战斗力 (Rank)</label>
-                      <select v-model="playerSetup.power" class="w-full px-4 py-2.5 bg-izakaya-wood/5 border border-izakaya-wood/10 rounded-xl text-sm outline-none focus:border-touhou-red transition-all">
-                         <option value="∞">∞</option>
-                         <option value="OMEGA">OMEGA</option>
-                         <option value="UX">UX</option>
-                         <option value="EX">EX</option>
-                         <option value="US">US</option>
-                         <option value="SSS">SSS</option>
-                         <option value="SS">SS</option>
-                         <option value="S+">S+</option>
-                         <option value="S">S</option>
-                         <option value="A+">A+</option>
-                         <option value="A">A</option>
-                         <option value="B+">B+</option>
-                         <option value="B">B</option>
-                         <option value="C+">C+</option>
-                         <option value="C">C</option>
-                         <option value="D+">D+</option>
-                         <option value="D">D</option>
-                         <option value="E+">E+</option>
-                         <option value="E">E</option>
-                         <option value="F+">F+</option>
-                         <option value="F">F</option>
-                         <option value="F-">F-</option>
-                      </select>
-                   </div>
-                   <div class="flex items-end">
-                      <button class="w-full py-2.5 bg-izakaya-wood/5 text-izakaya-wood/40 rounded-xl text-xs font-bold border border-dashed border-izakaya-wood/20 hover:bg-izakaya-wood/10 transition-colors flex items-center justify-center gap-2">
-                         <Loader2 class="w-3 h-3" />
-                         上传头像 (开发中)
-                      </button>
-                   </div>
-                </div>
+                 <div class="mt-6 pt-4 border-t border-izakaya-wood/5 flex justify-end">
+                    <button 
+                        @click="isGuestIdentityModalOpen = true; audioManager.playClick()"
+                        class="px-4 py-2 bg-izakaya-wood text-white rounded-xl text-xs font-bold shadow-md hover:bg-izakaya-wood/90 transition-all flex items-center gap-2"
+                    >
+                        <Edit3 class="w-3 h-3" />
+                        配置详细身份 / 预设
+                    </button>
+                 </div>
               </div>
 
               <div class="p-4 bg-blue-50 border border-blue-100 rounded-2xl flex gap-3">
                 <Info class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
                 <div class="text-[10px] text-blue-700 leading-relaxed">
                   <span class="font-bold block mb-1">提示：</span>
-                  这些信息将在您加入或创建房间时同步给其他玩家。在联机过程中修改这些信息可能需要重新同步。
+                  房主将直接使用当前存档的角色信息，无需在此配置。此处配置仅在您作为客机加入他人房间时生效。
                 </div>
               </div>
 
@@ -918,6 +906,13 @@ const copyRoomId = () => {
         </div>
       </div>
     </div>
+
+    <GuestIdentityModal 
+      :is-open="isGuestIdentityModalOpen"
+      :initial-data="playerSetup"
+      @close="isGuestIdentityModalOpen = false"
+      @save="handleSaveIdentity"
+    />
   </div>
 </template>
 
