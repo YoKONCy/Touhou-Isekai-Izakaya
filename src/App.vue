@@ -126,19 +126,9 @@ onMounted(() => {
 
   window.addEventListener('mp-story-finished', (() => {
     if (isGuestProcessing.value) {
-      // 当收到故事生成完成的广播时，将累积的内容存入 chatStore
-      if (guestStreamedContent.value) {
-        // 去除 CoT 内容后再存入（与房主逻辑保持一致）
-        const finalContent = guestStreamedContent.value
-          .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
-          .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
-          .replace(/<\/think>[\s\S]*?$/i, '') // 简单处理未闭合的 think 标签
-          .trim();
-          
-        if (finalContent) {
-          chatStore.addMessage('assistant', finalContent);
-        }
-      }
+      // 这里的逻辑改为仅重置状态，不再手动 addMessage
+      // 消息的正式存入由 MultiplayerService 接收到 SYNC_CHAT_MESSAGE 时处理
+      // 这样可以确保客机收到的内容与主机完全一致（包括清洗后的文本）
       isGuestProcessing.value = false;
       guestStage.value = 'idle';
       guestStreamedContent.value = '';

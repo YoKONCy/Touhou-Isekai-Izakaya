@@ -32,6 +32,7 @@ class MultiplayerService {
     options: string[];
     votes: Record<string, number>; // playerId -> optionIndex
     totalPlayers: number;
+    isEnded?: boolean;
   } | null = null;
 
   private constructor() {}
@@ -553,12 +554,16 @@ class MultiplayerService {
     // 3. Sync Memories (If any)
     const dbService = (await import('@/services/DatabaseService')).dbService;
     try {
-      const memories = await dbService.getMemories();
-      if (memories && memories.length > 0) {
-        // Batch send memories or send as one big blob?
-        // Let's send up to 20 recent memories for now to avoid huge payload
-        const recentMemories = memories.slice(0, 20);
-        this.send('SYNC_MEMORIES', { memories: recentMemories });
+      const saveStore = (await import('@/stores/save')).useSaveStore();
+      const saveSlotId = saveStore.currentSaveId;
+      if (saveSlotId) {
+        const memories = await dbService.getAllMemories(saveSlotId);
+        if (memories && memories.length > 0) {
+          // Batch send memories or send as one big blob?
+          // Let's send up to 20 recent memories for now to avoid huge payload
+          const recentMemories = memories.slice(0, 20);
+          this.send('SYNC_MEMORIES', { memories: recentMemories });
+        }
       }
     } catch (e) {
       console.error('[联机] 同步记忆失败:', e);
@@ -649,6 +654,26 @@ class MultiplayerService {
     const toastStore = useToastStore();
 
     switch (msg.type) {
+      case 'SYNC_CHAT_MESSAGE': {
+        if (!gameStore.multiplayer.isHost && msg.payload) {
+          const chatStore = (await import('@/stores/chat')).useChatStore();
+          const { role, content, timestamp } = msg.payload;
+          
+          // Check if this message already exists to avoid duplicates
+          const exists = chatStore.messages.some(m => 
+            m.role === role && 
+            m.content === content && 
+            Math.abs(m.timestamp - (timestamp || 0)) < 2000 // 2 second window
+          );
+          
+          if (!exists) {
+            chatStore.addMessage(role, content, timestamp);
+            console.log(`[联机] 同步收到新消息: ${role}`);
+          }
+        }
+        break;
+      }
+
       case 'SYNC_STATE':
         // Guest receives state from Host
         if (!gameStore.multiplayer.isHost && msg.payload?.state) {

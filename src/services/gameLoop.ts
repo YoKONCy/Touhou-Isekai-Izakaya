@@ -395,9 +395,30 @@ class GameLoopService {
       
       // A. Add User Message
       await chatStore.addMessage('user', finalUserContent);
+
+      // Host Side: Broadcast User Message to Guests
+      if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost) {
+        multiplayerService.send('SYNC_CHAT_MESSAGE', {
+          role: 'user',
+          content: finalUserContent,
+          timestamp: Date.now(),
+          turnCount: gameStore.state.system.turn_count
+        });
+      }
       
       // B. Add Assistant Message (without debug info for now)
       const assistantMsgId = await chatStore.addMessage('assistant', finalStory);
+
+      // Host Side: Broadcast the final committed message content to ensure guest's local chat history is in sync
+      // (Guests might have missed some tokens during streaming or had slightly different cleaned results)
+      if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost) {
+        multiplayerService.send('SYNC_CHAT_MESSAGE', {
+          role: 'assistant',
+          content: finalStory,
+          timestamp: Date.now(),
+          turnCount: gameStore.state.system.turn_count
+        });
+      }
       
       // Play notification sound
       audioManager.playChime();
