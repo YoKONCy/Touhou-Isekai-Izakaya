@@ -98,7 +98,6 @@ function sendChat() {
   // Local append ONLY for Host. 
   // For Guest, the message will come back via 'mp-chat-message' from Host broadcast.
   if (gameStore.multiplayer.isHost) {
-    const myPlayer = gameStore.multiplayer.players.find(p => p.isMe);
     // Host will receive their own broadcast in handleChatMessage too, so we shouldn't push locally if we trust the broadcast loop.
     // However, if we want instant feedback, we push locally. But then we must ignore the echo.
     // For now, let's REMOVE local push for Host too, and rely purely on broadcast for consistency.
