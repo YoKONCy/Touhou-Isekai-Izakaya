@@ -7,6 +7,7 @@ import _ from 'lodash';
 import { useSettingsStore } from '@/stores/settings';
 import { useToastStore } from '@/stores/toast';
 import { memoryGraph } from './MemoryGraphService';
+import { multiplayerService } from './MultiplayerService';
 
 function generateUUID() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -130,7 +131,7 @@ export class MemoryService {
    * Update the memory graph with a new node.
    * establishes 'sequence' (time) and 'entity' (star) connections.
    */
-  private async updateGraph(newMemory: MemoryEntry) {
+  public async updateGraph(newMemory: MemoryEntry) {
     if (!newMemory.id) return;
     
     try {
@@ -170,6 +171,13 @@ export class MemoryService {
       
     } catch (e) {
       console.error('[MemoryService] Failed to update graph:', e);
+    }
+  }
+
+  private async broadcastMemory(memoryData: any) {
+    const gameStore = useGameStore();
+    if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost) {
+      multiplayerService.sendMemorySync(memoryData);
     }
   }
 
@@ -261,6 +269,7 @@ export class MemoryService {
         };
         const mid = await dbService.addMemory(memData);
         await this.updateGraph({ ...memData, id: mid });
+        await this.broadcastMemory({ ...memData, id: mid });
       }
     }
 
@@ -321,6 +330,7 @@ ${JSON.stringify(actions)}
         };
         const mid = await dbService.addMemory(summaryData);
         await this.updateGraph({ ...summaryData, id: mid });
+        await this.broadcastMemory({ ...summaryData, id: mid });
       }
 
       // [Fix] Prevent duplicates for facilities
@@ -344,8 +354,7 @@ ${JSON.stringify(actions)}
             facilityId = generateUUID();
         }
 
-        // Update Registry
-        await dbService.upsertFacility({
+        const facilityRegistryData = {
             id: facilityId,
             saveSlotId,
             name: f.name,
@@ -356,7 +365,10 @@ ${JSON.stringify(actions)}
             staff: f.staff || existingFacility?.staff,
             is_player_owned: true,
             created_at: existingFacility?.created_at
-        });
+        };
+
+        // Update Registry
+        await dbService.upsertFacility(facilityRegistryData);
 
         const subLocs = f.sub_locations?.map((sl: any) => `${sl.name}(${sl.description || '正常'})`).join('、') || '无';
         const staff = f.staff?.length > 0 ? f.staff.join('、') : '无';
@@ -392,6 +404,7 @@ ${JSON.stringify(actions)}
         };
         const mid = await dbService.addMemory(facilityData);
         await this.updateGraph({ ...facilityData, id: mid });
+        await this.broadcastMemory({ ...facilityData, id: mid });
       }
 
       // Handle Alliance
@@ -415,6 +428,7 @@ ${JSON.stringify(actions)}
          };
          const mid = await dbService.addMemory(allianceData);
          await this.updateGraph({ ...allianceData, id: mid });
+         await this.broadcastMemory({ ...allianceData, id: mid });
       }
 
       // Handle Intelligence
@@ -438,6 +452,7 @@ ${JSON.stringify(actions)}
          };
          const mid = await dbService.addMemory(intelData);
          await this.updateGraph({ ...intelData, id: mid });
+         await this.broadcastMemory({ ...intelData, id: mid });
       }
 
     } catch (error: any) {

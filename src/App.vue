@@ -103,22 +103,75 @@ const mpStatusVisible = ref(false);
 
 const isGuestProcessing = ref(false);
 const guestStage = ref<'preparing' | 'generating_story' | 'background_processing' | 'idle'>('idle');
+const guestStreamedContent = ref('');
 
 // Listen for global events for feedback
 onMounted(() => {
-  window.addEventListener('mp-story-generating', ((e: CustomEvent) => {
+  window.addEventListener('mp-story-generating', ((e: any) => {
     guestStage.value = e.detail?.stage || 'generating_story';
     isGuestProcessing.value = true;
+    if (guestStage.value === 'generating_story') {
+      guestStreamedContent.value = ''; // Reset for new story
+    }
   }) as EventListener);
 
-  window.addEventListener('mp-llm-token', (() => {
+  window.addEventListener('mp-llm-token', ((e: any) => {
     if (isGuestProcessing.value) {
       guestStage.value = 'generating_story';
+      if (e.detail?.token) {
+        guestStreamedContent.value += e.detail.token;
+      }
+    }
+  }) as EventListener);
+
+  window.addEventListener('mp-story-finished', (() => {
+    if (isGuestProcessing.value) {
+      // 当收到故事生成完成的广播时，将累积的内容存入 chatStore
+      if (guestStreamedContent.value) {
+        // 去除 CoT 内容后再存入（与房主逻辑保持一致）
+        const finalContent = guestStreamedContent.value
+          .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+          .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
+          .replace(/<\/think>[\s\S]*?$/i, '') // 简单处理未闭合的 think 标签
+          .trim();
+          
+        if (finalContent) {
+          chatStore.addMessage('assistant', finalContent);
+        }
+      }
+      isGuestProcessing.value = false;
+      guestStage.value = 'idle';
+      guestStreamedContent.value = '';
     }
   }) as EventListener);
 
   window.addEventListener('mp-combat-popup', (() => {
     // Combat popup usually means story is finished or in a specific stage
+  }) as EventListener);
+
+  window.addEventListener('mp-memory-sync', (async (e: any) => {
+    if (!gameStore.multiplayer.isHost) {
+      const memoryData = e.detail?.memoryData;
+      if (memoryData) {
+        console.log('[联机] 收到房主同步的记忆:', memoryData.type);
+        // 保存到本地数据库
+        await dbService.addMemory(memoryData);
+        // 更新本地记忆图谱
+        await memoryService.updateGraph(memoryData);
+      }
+    }
+  }) as EventListener);
+
+  window.addEventListener('mp-combat-init', ((e: any) => {
+    if (!gameStore.multiplayer.isHost) {
+      const combatState = e.detail?.combatState;
+      if (combatState) {
+        console.log('[联机] 收到战斗初始化请求');
+        gameStore.setCombatState(combatState);
+        // 播放提示音
+        audioManager.playChime();
+      }
+    }
   }) as EventListener);
 });
 
@@ -158,19 +211,21 @@ onMounted(() => {
 });
 
 const hasPendingTriggers = computed(() => {
-  return !!gameStore.state.system.combat?.isPending || !!gameStore.state.system.pending_quest_trigger;
+  // Combat triggers are handled by CombatOverlay separately
+  return !!gameStore.state.system.pending_quest_trigger;
 });
 
 // Reset manual open state when new triggers arrive
 watch(() => gameStore.state.system.combat?.isPending, (isPending) => {
   if (isPending) {
-    userOpenCombat.value = false;
+    // Automatically open Combat Overlay when combat is pending
+    userOpenCombat.value = true;
   }
 });
 
 watch(() => gameStore.state.system.pending_quest_trigger, (quest) => {
   if (quest) {
-    userOpenQuest.value = false;
+    userOpenQuest.value = true;
   }
 });
 
@@ -830,6 +885,10 @@ const mpAllReady = computed(() => {
                            <div v-if="gameLoop.isProcessing.value && smoothContent" 
                                 class="prose prose-stone max-w-none dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-pre:my-2 break-words text-base typing-effect"
                                 v-html="parseMarkdown(smoothContent)">
+                           </div>
+                           <div v-else-if="isGuestProcessing && guestStreamedContent"
+                                class="prose prose-stone max-w-none dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-pre:my-2 break-words text-base"
+                                v-html="parseMarkdown(guestStreamedContent)">
                            </div>
                            <div v-else class="text-sm text-izakaya-wood/60 flex items-center gap-2">
                              <span class="animate-bounce">✍️</span> 正在撰写物语...

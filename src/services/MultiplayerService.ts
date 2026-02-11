@@ -501,6 +501,20 @@ class MultiplayerService {
   }
 
   /**
+   * Host: Sync Memory (e.g. Summary) to all guests
+   */
+  public sendMemorySync(memoryData: any) {
+    this.send('MEMORY_SYNC', { memoryData });
+  }
+
+  /**
+   * Host: Broadcast Combat Initialization
+   */
+  public sendCombatInit(combatState: any) {
+    this.send('COMBAT_INIT', { combatState });
+  }
+
+  /**
    * Handle incoming messages
    */
   private async handleMessage(msg: any) {
@@ -654,6 +668,36 @@ class MultiplayerService {
              detail: msg.payload
            });
            window.dispatchEvent(event);
+        }
+        break;
+      }
+
+      case 'MEMORY_SYNC': {
+        if (!gameStore.multiplayer.isHost) {
+          const event = new CustomEvent('mp-memory-sync', {
+            detail: msg.payload
+          });
+          window.dispatchEvent(event);
+        }
+        break;
+      }
+
+      case 'STORY_FINISHED': {
+        if (!gameStore.multiplayer.isHost) {
+          const event = new CustomEvent('mp-story-finished', {
+            detail: msg.payload
+          });
+          window.dispatchEvent(event);
+        }
+        break;
+      }
+
+      case 'COMBAT_INIT': {
+        if (!gameStore.multiplayer.isHost) {
+          const event = new CustomEvent('mp-combat-init', {
+            detail: msg.payload
+          });
+          window.dispatchEvent(event);
         }
         break;
       }

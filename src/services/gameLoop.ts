@@ -226,6 +226,11 @@ class GameLoopService {
             }
             const delta = chunk.choices[0]?.delta?.content || '';
             rawContent += delta;
+
+            // Host Side: Broadcast token to Guests
+            if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost && delta) {
+              multiplayerService.sendLLMToken(delta);
+            }
             
             // Clean CoT from display (handle both <think> and <thinking>)
             this.streamedContent.value = rawContent
@@ -252,6 +257,12 @@ class GameLoopService {
           }
 
           rawContent = response.choices[0]?.message?.content || '';
+
+          // Host Side: Broadcast full content to Guests if not streaming
+          if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost && rawContent) {
+            multiplayerService.sendLLMToken(rawContent);
+          }
+
           this.streamedContent.value = rawContent
               .replace(/<think>[\s\S]*?<\/think>/gi, '')
               .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
@@ -371,6 +382,11 @@ class GameLoopService {
         } catch (e) {
           console.error('Failed to parse management trigger:', e);
         }
+      }
+
+      // Host Side: Broadcast story finished to Guests
+      if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost) {
+        multiplayerService.send('STORY_FINISHED', {});
       }
 
       // 3. Immediately commit the story message to chat
@@ -1198,6 +1214,11 @@ class GameLoopService {
     };
 
     gameStore.setCombatState(combatState);
+    
+    // Host Side: Broadcast Combat Init to Guests
+    if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost) {
+      multiplayerService.sendCombatInit(combatState);
+    }
     
     console.log('[Game Loop] Combat Initialized (Pending User Confirmation)');
   }
