@@ -1,6 +1,45 @@
 <!doctype html>
 <html lang="zh-CN">
   <head>
+    <script>
+      (function() {
+        const LOG_SERVER = 'http://localhost:14792/log';
+        function report(level, message, stack) {
+          fetch(LOG_SERVER, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              level: level,
+              message: message,
+              stack: stack,
+              url: window.location.href
+            })
+          }).catch(() => {}); // 静默失败，避免循环报错
+        }
+
+        // 拦截控制台错误
+        const _error = console.error;
+        console.error = function() {
+          const args = Array.from(arguments);
+          const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+          report('error', msg, new Error().stack);
+          _error.apply(console, arguments);
+        };
+
+        // 拦截未捕获异常
+        window.onerror = function(msg, url, line, col, err) {
+          report('error', `运行时错误: ${msg}`, err ? err.stack : `Line: ${line}, Col: ${col}`);
+        };
+
+        // 拦截 Promise 拒绝
+        window.onunhandledrejection = function(event) {
+          report('error', `未处理的 Promise 拒绝: ${event.reason}`, event.reason ? event.reason.stack : '');
+        };
+
+        console.log("%c[启动器]%c 浏览器日志同步已建立", "color: #fff; background: #8B4513; padding: 2px 4px; border-radius: 3px;", "color: #8B4513;");
+      })();
+    </script>
     <script src="coi-serviceworker.js"></script>
     <meta charset="UTF-8" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏮</text></svg>">

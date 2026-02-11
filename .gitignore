@@ -29,3 +29,9 @@ dist-ssr
 
 CLAUDE.md
 GEMINI.md
+
+# Launcher Build Artifacts
+launcher/icon.ico
+launcher/resource.syso
+# 一键启动.exe (作为分发入口，不应忽略)
+

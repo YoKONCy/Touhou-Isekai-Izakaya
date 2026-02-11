@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="lanternGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF4D4D;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8B0000;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Lantern Body -->
+  <path d="M40 30 Q64 20 88 30 L95 80 Q64 95 33 80 Z" fill="url(#lanternGrad)" stroke="#333" stroke-width="2"/>
+  <!-- Lantern Top -->
+  <rect x="50" y="15" width="28" height="10" rx="2" fill="#333"/>
+  <!-- Lantern Bottom -->
+  <rect x="50" y="85" width="28" height="8" rx="2" fill="#333"/>
+  <!-- Tassel -->
+  <line x1="64" y1="93" x2="64" y2="115" stroke="#FFD700" stroke-width="4"/>
+  <circle cx="64" cy="118" r="4" fill="#FFD700"/>
+  <!-- Decorative Text/Symbol (Simple Lantern lines) -->
+  <line x1="45" y1="40" x2="83" y2="40" stroke="#FFD700" stroke-width="1" opacity="0.5"/>
+  <line x1="42" y1="55" x2="86" y2="55" stroke="#FFD700" stroke-width="1" opacity="0.5"/>
+  <line x1="45" y1="70" x2="83" y2="70" stroke="#FFD700" stroke-width="1" opacity="0.5"/>
+  <!-- Inner Symbol (Simplified 'Izakaya' hint) -->
+  <text x="64" y="65" font-family="Arial" font-size="24" fill="#FFD700" text-anchor="middle" font-weight="bold">🏮</text>
+</svg>
