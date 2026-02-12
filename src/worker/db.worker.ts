@@ -232,6 +232,15 @@ function exportSave(db: any, saveSlotId: number) {
   
   const chats = getRows('SELECT * FROM chats WHERE saveSlotId = ?', [saveSlotId]);
   const memories = getRows('SELECT * FROM memories WHERE saveSlotId = ?', [saveSlotId]);
+  
+  // Export memory relations associated with this save slot's memories
+  const memoryRelations = getRows(`
+    SELECT mr.* 
+    FROM memory_relations mr 
+    JOIN memories m ON mr.source_id = m.id 
+    WHERE m.saveSlotId = ?
+  `, [saveSlotId]);
+
   const snapshots = getRows('SELECT * FROM snapshots WHERE saveSlotId = ?', [saveSlotId]);
   const facilities = getRows('SELECT * FROM facilities WHERE saveSlotId = ?', [saveSlotId]);
   const characters = getRows('SELECT * FROM characters'); // Global characters
@@ -268,6 +277,7 @@ function exportSave(db: any, saveSlotId: number) {
     saveSlot: saveSlotData,
     chats,
     memories,
+    memoryRelations,
     snapshots: optimizedSnapshots,
     characters,
     facilities
@@ -288,12 +298,14 @@ function importSaveWithCorrectOrder(db: any, jsonContent: string) {
 
     // 1. Create Save Slot
     exec(
-      'INSERT INTO save_slots (name, summary, lastPlayed, location, playTime, isMultiplayer) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO save_slots (name, summary, lastPlayed, location, gameDate, gameTime, playTime, isMultiplayer) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         `${data.saveSlot.name} (导入)`,
         data.saveSlot.summary,
         Date.now(),
         data.saveSlot.location,
+        data.saveSlot.gameDate || '1/1',
+        data.saveSlot.gameTime || '10:00',
         data.saveSlot.playTime || 0,
         data.saveSlot.isMultiplayer ? 1 : 0
       ]
@@ -419,6 +431,8 @@ function importSaveWithCorrectOrder(db: any, jsonContent: string) {
     }
     
     // 6. Import Memories
+    const memoryIdMap = new Map<number, number>();
+    
     if (Array.isArray(data.memories)) {
         for (const mem of data.memories) {
             const fields = ['saveSlotId', 'turnCount', 'type', 'content', 'tags', 'related_entities', 'importance', 'createdAt', 'gameDate', 'gameTime', 'location', 'characters'];
@@ -446,6 +460,28 @@ function importSaveWithCorrectOrder(db: any, jsonContent: string) {
                 `INSERT INTO memories (${fields.join(', ')}) VALUES (${placeholders})`,
                 values
             );
+            const newMemoryId = exec('SELECT last_insert_rowid() as id')[0].id;
+            memoryIdMap.set(mem.id, newMemoryId);
+        }
+    }
+
+    // 6.1 Import Memory Relations
+    if (Array.isArray(data.memoryRelations)) {
+        for (const rel of data.memoryRelations) {
+            const newSourceId = memoryIdMap.get(rel.source_id);
+            const newTargetId = memoryIdMap.get(rel.target_id);
+            
+            // Only import if both memories were successfully imported/mapped
+            if (newSourceId && newTargetId) {
+                try {
+                    exec(
+                        'INSERT OR IGNORE INTO memory_relations (source_id, target_id, rel_type, strength, created_at) VALUES (?, ?, ?, ?, ?)',
+                        [newSourceId, newTargetId, rel.rel_type, rel.strength, rel.created_at || Date.now()]
+                    );
+                } catch (e) {
+                    console.warn('[Import] Failed to import memory relation:', e);
+                }
+            }
         }
     }
 
