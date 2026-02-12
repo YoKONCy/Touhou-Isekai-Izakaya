@@ -120,6 +120,26 @@ export class PromptService {
       }
     };
 
+    // 2.6 Narrative Relay (Selectable Options)
+    this.blockHandlers['narrative_relay'] = async (ctx) => {
+      const promptStore = usePromptStore();
+      const block = promptStore.blocks.find(b => b.id === 'narrative_relay');
+      
+      if (!block || !block.options) return;
+
+      const selectedId = block.selectedOptionId || 'normal_relay';
+      const selectedOption = block.options.find(o => o.id === selectedId);
+
+      if (selectedOption && selectedOption.content) {
+        let finalContent = selectedOption.content;
+        const gameStore = useGameStore();
+        const playerName = gameStore.state.player.name || '玩家';
+        finalContent = finalContent.replace(/\{\{user\}\}/g, playerName);
+
+        this.addSection(ctx, 'narrative_relay', `转述设定 (${selectedOption.name})`, 'system', finalContent);
+      }
+    };
+
     // 3. World Info (Static/Configurable)
     this.blockHandlers['world_info'] = async (ctx, content) => {
       let finalContent = content || '';
