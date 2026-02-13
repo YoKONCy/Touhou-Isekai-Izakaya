@@ -244,8 +244,37 @@ export class DatabaseService {
         const id = this.generateId();
         this.pendingRequests.set(id, {
             resolve: (data: any) => {
-                const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-                resolve(blob);
+                try {
+                    // 使用分段构建 Blob 的方式，避免单个巨大的 JSON 字符串导致 RangeError: Invalid string length
+                    const parts: any[] = [];
+                    parts.push('{"version":' + (data.version || 2) + ',');
+                    parts.push('"timestamp":' + (data.timestamp || Date.now()) + ',');
+                    
+                    parts.push('"saveSlot":' + JSON.stringify(data.saveSlot) + ',');
+                    parts.push('"chats":' + JSON.stringify(data.chats) + ',');
+                    parts.push('"memories":' + JSON.stringify(data.memories) + ',');
+                    parts.push('"memoryRelations":' + JSON.stringify(data.memoryRelations) + ',');
+                    parts.push('"characters":' + JSON.stringify(data.characters) + ',');
+                    parts.push('"facilities":' + JSON.stringify(data.facilities) + ',');
+                    
+                    // 特别处理 snapshots，因为它们通常是最大的部分
+                    parts.push('"snapshots":[');
+                    if (Array.isArray(data.snapshots)) {
+                        for (let i = 0; i < data.snapshots.length; i++) {
+                            parts.push(JSON.stringify(data.snapshots[i]));
+                            if (i < data.snapshots.length - 1) {
+                                parts.push(',');
+                            }
+                        }
+                    }
+                    parts.push(']}');
+
+                    const blob = new Blob(parts, { type: 'application/json' });
+                    resolve(blob);
+                } catch (err) {
+                    console.error('序列化导出数据失败:', err);
+                    reject(err);
+                }
             },
             reject
         });
