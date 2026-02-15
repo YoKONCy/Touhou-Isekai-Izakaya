@@ -202,7 +202,7 @@ export const useSaveStore = defineStore('save', () => {
     return text;
   }
 
-  async function importSave(fileContent: string) {
+  async function importSave(fileContent: ArrayBuffer) {
     try {
       await dbService.importSave(fileContent);
       await loadSaves();

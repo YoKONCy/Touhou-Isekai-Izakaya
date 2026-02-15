@@ -284,8 +284,16 @@ function exportSave(db: any, saveSlotId: number) {
   };
 }
 
-function importSaveWithCorrectOrder(db: any, jsonContent: string) {
-  const data = JSON.parse(jsonContent);
+function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBuffer) {
+  let data;
+  if (typeof jsonContent === 'string') {
+    data = JSON.parse(jsonContent);
+  } else {
+    // ArrayBuffer
+    const decoder = new TextDecoder();
+    data = JSON.parse(decoder.decode(jsonContent));
+  }
+  
   if (!data.saveSlot || !Array.isArray(data.chats)) {
     throw new Error("Invalid save file format");
   }
@@ -487,6 +495,9 @@ function importSaveWithCorrectOrder(db: any, jsonContent: string) {
 
     // 7. Import Facilities
     if (Array.isArray(data.facilities)) {
+        // Helper for stringifying
+        const ensureString = (val: any) => (typeof val === 'object' && val !== null) ? JSON.stringify(val) : (val || '[]');
+
         for (const fac of data.facilities) {
             const fields = ['id', 'saveSlotId', 'name', 'location', 'description', 'status', 'sub_locations', 'staff', 'is_player_owned', 'created_at', 'updated_at'];
             const placeholders = fields.map(() => '?').join(', ');
@@ -498,9 +509,9 @@ function importSaveWithCorrectOrder(db: any, jsonContent: string) {
                 fac.location || '',
                 fac.description || '',
                 fac.status || '正常',
-                fac.sub_locations || '[]',
-                fac.staff || '[]',
-                fac.is_player_owned || 0,
+                ensureString(fac.sub_locations),
+                ensureString(fac.staff),
+                fac.is_player_owned ? 1 : 0,
                 fac.created_at || Date.now(),
                 fac.updated_at || Date.now()
             ];

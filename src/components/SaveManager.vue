@@ -242,18 +242,27 @@ async function handleImport(event: Event) {
   const reader = new FileReader();
   reader.onload = async (e) => {
     try {
-      const content = e.target?.result as string;
+      const content = e.target?.result as ArrayBuffer;
+      if (!content) throw new Error('读取文件失败');
+      
+      console.log(`[SaveManager] Importing file size: ${(content.byteLength / 1024 / 1024).toFixed(2)}MB`);
+      
       await saveStore.importSave(content);
       alert('存档导入成功！');
-    } catch (error) {
-      console.error('Import failed:', error);
-      alert('导入存档失败，请检查文件格式');
+    } catch (error: any) {
+      console.error('Import failed details:', {
+        message: error?.message,
+        name: error?.name,
+        stack: error?.stack,
+        raw: error
+      });
+      alert(`导入存档失败: ${error?.message || '未知错误 (请检查控制台详情)'}`);
     } finally {
       // Reset input
       if (fileInput.value) fileInput.value.value = '';
     }
   };
-  reader.readAsText(file);
+  reader.readAsArrayBuffer(file);
 }
 
 async function handleExportText(save: any) {

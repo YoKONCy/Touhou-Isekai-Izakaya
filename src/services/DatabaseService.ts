@@ -294,7 +294,7 @@ export class DatabaseService {
     });
   }
 
-  async importSave(fileContent: string): Promise<{ newSaveId: number }> {
+  async importSave(fileContent: ArrayBuffer): Promise<{ newSaveId: number }> {
     return new Promise((resolve, reject) => {
         const id = this.generateId();
         this.pendingRequests.set(id, { resolve, reject });
@@ -303,7 +303,7 @@ export class DatabaseService {
             id,
             type: 'IMPORT_SAVE',
             payload: { jsonContent: fileContent }
-        });
+        }, [fileContent]); // Transfer the ArrayBuffer
     });
   }
 
