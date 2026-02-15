@@ -310,6 +310,177 @@ function exportSave(db: any, saveSlotId: number) {
   };
 }
 
+/**
+ * Helper to strip a large JSON array section from ArrayBuffer
+ * Returns a new ArrayBuffer (or the same one modified if we want to be destructive, but better safe)
+ * Replaces the content of the array with spaces: "key": [ ... ] -> "key": [     ]
+ * @param keepLast If > 0, keeps the last N items and strips the rest.
+ */
+function stripJsonSection(buffer: ArrayBuffer, keyName: string, keepLast: number = 0): ArrayBuffer {
+    const uint8 = new Uint8Array(buffer);
+    const key = `"${keyName}":`;
+    const keyBytes = new TextEncoder().encode(key);
+    
+    // Simple Knuth-Morris-Pratt or just brute force search (fast enough for 100MB-1GB in simple loop)
+    let foundIndex = -1;
+    
+    for (let i = 0; i < uint8.length - keyBytes.length; i++) {
+        let match = true;
+        for (let j = 0; j < keyBytes.length; j++) {
+            if (uint8[i + j] !== keyBytes[j]) {
+                match = false;
+                break;
+            }
+        }
+        if (match) {
+            foundIndex = i;
+            break;
+        }
+    }
+    
+    if (foundIndex === -1) {
+        console.warn(`[Import] Key "${keyName}" not found in buffer.`);
+        return buffer;
+    }
+    
+    // Found key. Now find the start of the value.
+    // Scan forward from foundIndex + keyBytes.length
+    let cursor = foundIndex + keyBytes.length;
+    let startBracket = -1;
+    
+    // Find opening '['
+    while (cursor < uint8.length) {
+        const byte = uint8[cursor];
+        if (byte === undefined) break;
+        
+        if (byte === 91) { // '['
+            startBracket = cursor;
+            break;
+        } else if (byte > 32) { // Non-whitespace char that is not '['
+            // Maybe it's null? or object? We only target arrays here.
+            console.warn(`[Import] Value for "${keyName}" is not an array.`);
+            return buffer;
+        }
+        cursor++;
+    }
+    
+    if (startBracket === -1) return buffer;
+    
+    // Now find the matching closing ']'
+    let depth = 1;
+    let inString = false;
+    let escaped = false;
+    cursor = startBracket + 1;
+    
+    while (cursor < uint8.length && depth > 0) {
+        const byte = uint8[cursor];
+        if (byte === undefined) break;
+        
+        if (inString) {
+            if (escaped) {
+                escaped = false;
+            } else {
+                if (byte === 92) { // Backslash '\'
+                    escaped = true;
+                } else if (byte === 34) { // Quote '"'
+                    inString = false;
+                }
+            }
+        } else {
+            if (byte === 34) { // Quote '"'
+                inString = true;
+            } else if (byte === 91) { // '['
+                depth++;
+            } else if (byte === 93) { // ']'
+                depth--;
+            }
+        }
+        
+        if (depth === 0) break;
+        cursor++;
+    }
+    
+    if (depth !== 0) {
+        console.warn(`[Import] Could not find closing bracket for "${keyName}".`);
+        return buffer;
+    }
+    
+    const endBracket = cursor;
+    
+    let stripEnd = endBracket;
+    
+    if (keepLast > 0) {
+        // We want to keep the last N items.
+        // Scan backwards from endBracket - 1 to find the (N)th comma at depth 1.
+        let commaCount = 0;
+        let scanCursor = endBracket - 1;
+        let scanDepth = 1; // We are inside the array
+        let scanInString = false;
+        
+        // Helper to check if a quote at scanCursor is escaped
+        // Looks at bytes BEFORE scanCursor to count backslashes
+        const isEscapedQuote = (pos: number): boolean => {
+            let backslashCount = 0;
+            let checkPos = pos - 1;
+            while (checkPos >= startBracket && uint8[checkPos] === 92) { // 92 is backslash
+                backslashCount++;
+                checkPos--;
+            }
+            return (backslashCount % 2) === 1;
+        };
+
+        while (scanCursor > startBracket) {
+            const byte = uint8[scanCursor];
+            if (byte === undefined) break;
+            
+            if (byte === 34) { // Quote '"'
+                if (!isEscapedQuote(scanCursor)) {
+                    scanInString = !scanInString;
+                }
+            } else if (!scanInString) {
+                if (byte === 93) { // ']'
+                    scanDepth++;
+                } else if (byte === 91) { // '['
+                    scanDepth--;
+                } else if (byte === 125) { // '}'
+                    scanDepth++;
+                } else if (byte === 123) { // '{'
+                    scanDepth--;
+                } else if (byte === 44) { // ','
+                    if (scanDepth === 1) {
+                        commaCount++;
+                        if (commaCount === keepLast) {
+                            // Found the split point!
+                            // The comma at scanCursor separates the kept items from the stripped ones.
+                            // We should strip up to and including this comma.
+                            stripEnd = scanCursor + 1; // +1 to include comma in strip range
+                            break;
+                        }
+                    }
+                }
+            }
+            scanCursor--;
+        }
+        
+        if (commaCount < keepLast) {
+            // Found fewer items than requested. Keep everything.
+            console.log(`[Import] Requested to keep ${keepLast} items, but only found ${commaCount} (or fewer). Keeping all.`);
+            return buffer;
+        }
+    }
+
+    // We want to keep the brackets but empty the content
+    // Replace range (startBracket + 1) to (stripEnd - 1) with spaces (32)
+    
+    console.log(`[Import] Stripping "${keyName}" from byte ${startBracket} to ${stripEnd}. Length: ${stripEnd - startBracket}`);
+    
+    for (let k = startBracket + 1; k < stripEnd; k++) {
+        uint8[k] = 32; // Space
+    }
+    
+    return buffer;
+}
+
 async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBuffer) {
   let data;
   try {
@@ -318,10 +489,25 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
         data = JSON.parse(jsonContent);
     } else {
         // ArrayBuffer
-        console.log('[Import] Parsing ArrayBuffer content, size:', jsonContent.byteLength);
+        let buffer = jsonContent;
+        console.log('[Import] Parsing ArrayBuffer content, size:', buffer.byteLength);
+        
+        // If file is very large (> 100MB), try to strip unnecessary data (snapshots) to avoid OOM
+         if (buffer.byteLength > 100 * 1024 * 1024) {
+             console.warn('[Import] File too large, attempting to strip old snapshots to save memory...');
+             try {
+                 // Try to keep the last 50 snapshots, strip the rest
+                 buffer = stripJsonSection(buffer, 'snapshots', 50);
+                 console.log('[Import] Snapshots processed. New size:', buffer.byteLength); 
+             } catch (e) {
+                 console.error('[Import] Failed to strip snapshots:', e);
+                 // Continue with original buffer
+             }
+         }
+
         // Use Response.json() to parse large JSON asynchronously and efficiently
         // This avoids V8 string length limits for large files
-        data = await new Response(new Blob([jsonContent])).json();
+        data = await new Response(new Blob([buffer])).json();
     }
   } catch (e: any) {
     console.error('[Import] JSON Parse failed:', e);
@@ -331,6 +517,9 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
   if (!data.saveSlot || !Array.isArray(data.chats)) {
     throw new Error("Invalid save file format");
   }
+
+  // Ensure snapshots is an array if we stripped it (it might be parsed as empty array if we replaced content)
+  if (!data.snapshots) data.snapshots = [];
 
   let newSaveId = 0;
 
