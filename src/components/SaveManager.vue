@@ -5,7 +5,7 @@ import { useGameStore } from '@/stores/game';
 import { useChatStore } from '@/stores/chat';
 import NewGameWizard from './NewGameWizard.vue';
 import { gameLoop } from '@/services/gameLoop';
-import { X, Plus, Trash2, Edit2, Play, Check, Download, Upload, RefreshCw } from 'lucide-vue-next';
+import { X, Plus, Trash2, Edit2, Play, Check, Download, Upload, RefreshCw, FileText } from 'lucide-vue-next';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
@@ -256,6 +256,31 @@ async function handleImport(event: Event) {
   reader.readAsText(file);
 }
 
+async function handleExportText(save: any) {
+  if (!save || !save.id) {
+    toastStore.addToast('无效的存档，无法导出', 'error');
+    return;
+  }
+  try {
+    const text = await saveStore.exportSaveText(save.id);
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `TouhouNovel_${save.name.replace(/[\\/:*?"<>|]/g, '_')}_${dayjs().format('YYYYMMDD_HHmmss')}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+    toastStore.addToast('小说正文导出成功', 'success');
+  } catch (error: any) {
+    console.error('Export text failed:', error);
+    toastStore.addToast(`导出失败: ${error.message || '未知错误'}`, 'error');
+  }
+}
+
 function onWizardCancel() {
   showWizard.value = false;
 }
@@ -465,6 +490,15 @@ function formatTime(timestamp: number) {
                       title="导出存档"
                     >
                       <Upload class="w-4 h-4" />
+                    </button>
+
+                    <button 
+                      v-if="editingId !== save.id"
+                      @click="handleExportText(save)"
+                      class="p-2 text-izakaya-wood/40 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg transition-colors"
+                      title="导出小说正文"
+                    >
+                      <FileText class="w-4 h-4" />
                     </button>
 
                     <button 

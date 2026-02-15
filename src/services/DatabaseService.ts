@@ -146,6 +146,13 @@ export class DatabaseService {
       [saveSlotId, limit, offset]
     );
   }
+
+  async getAllChatHistory(saveSlotId: number): Promise<any[]> {
+    return this.exec(
+      'SELECT * FROM chats WHERE saveSlotId = ? ORDER BY timestamp ASC',
+      [saveSlotId]
+    );
+  }
   
   async addChatMessage(saveSlotId: number, msg: any): Promise<number> {
     await this.exec(

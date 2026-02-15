@@ -154,6 +154,54 @@ export const useSaveStore = defineStore('save', () => {
     return await dbService.exportSave(numericId);
   }
 
+  async function exportSaveText(id: number): Promise<string> {
+    const history = await dbService.getAllChatHistory(id);
+    const gameStore = useGameStore();
+    
+    // Try to get player name
+    let playerName = '玩家';
+    
+    if (id === currentSaveId.value) {
+      playerName = gameStore.state.player.name || '玩家';
+    } else {
+      // For other saves, try to get name from latest snapshot
+      try {
+        const snapshot = await dbService.getLatestSnapshot(id);
+        if (snapshot && snapshot.gameState) {
+          const state = JSON.parse(snapshot.gameState);
+          if (state.player && state.player.name) {
+            playerName = state.player.name;
+          }
+        }
+      } catch (e) {
+        console.warn('[SaveStore] Failed to load player name for export', e);
+      }
+    }
+
+    let text = '';
+    
+    for (const msg of history) {
+      // Skip system messages (usually prompts)
+      if (msg.role === 'system') continue;
+      
+      const roleName = msg.role === 'user' ? `【${playerName}】` : '【GM】';
+      let content = msg.content || '';
+      
+      // Remove <think> blocks
+      content = content.replace(/<think>[\s\S]*?<\/think>/gi, '');
+      
+      // Remove any other XML-like tags that might be internal (optional, but <think> is the main one)
+      
+      content = content.trim();
+      
+      if (!content) continue;
+      
+      text += `${roleName}：\n${content}\n\n`;
+    }
+    
+    return text;
+  }
+
   async function importSave(fileContent: string) {
     try {
       await dbService.importSave(fileContent);
@@ -179,6 +227,7 @@ export const useSaveStore = defineStore('save', () => {
     renameSave,
     deleteSave,
     exportSave,
+    exportSaveText,
     importSave,
     convertToMultiplayer
   };
