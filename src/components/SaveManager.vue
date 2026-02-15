@@ -592,6 +592,15 @@ function formatTime(timestamp: number) {
 
                     <button 
                       v-if="editingId !== save.id"
+                      @click="handleExportText(save)"
+                      class="p-2 text-izakaya-wood/40 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg transition-colors"
+                      title="导出小说正文"
+                    >
+                      <FileText class="w-4 h-4" />
+                    </button>
+
+                    <button 
+                      v-if="editingId !== save.id"
                       @click="startEdit(save)"
                       :disabled="isMultiplayerActive"
                       class="p-2 text-izakaya-wood/40 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
