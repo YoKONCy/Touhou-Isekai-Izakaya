@@ -187,19 +187,29 @@ export class DatabaseService {
   // --- Snapshots ---
   
   async getSnapshot(id: number): Promise<any | null> {
-    const res = await this.exec('SELECT * FROM snapshots WHERE id = ?', [id]);
-    return res[0] || null;
+    return new Promise((resolve, reject) => {
+        const reqId = this.generateId();
+        this.pendingRequests.set(reqId, { resolve, reject });
+        
+        this.worker.postMessage({
+            id: reqId,
+            type: 'GET_SNAPSHOT_RESTORED',
+            payload: { id }
+        });
+    });
   }
   
   async createSnapshot(saveSlotId: number, chatId: number, gameState: any): Promise<number> {
-    // gameState is object, we stringify it. BLOB compression can be added in Worker later.
-    const stateStr = JSON.stringify(gameState);
-    await this.exec(
-      'INSERT INTO snapshots (saveSlotId, chatId, createdAt, gameState) VALUES (?, ?, ?, ?)',
-      [saveSlotId, chatId, Date.now(), stateStr]
-    );
-    const res = await this.exec('SELECT last_insert_rowid() as id');
-    return res[0].id;
+    return new Promise((resolve, reject) => {
+        const id = this.generateId();
+        this.pendingRequests.set(id, { resolve, reject });
+        
+        this.worker.postMessage({
+            id,
+            type: 'OPTIMIZE_AND_CREATE_SNAPSHOT',
+            payload: { saveSlotId, chatId, gameState }
+        });
+    }).then((res: any) => res.id);
   }
 
   async updateSnapshot(id: number, updates: any): Promise<void> {

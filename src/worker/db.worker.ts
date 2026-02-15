@@ -108,6 +108,153 @@ function runMigrations(db: any) {
   }
 }
 
+// --- Optimization Helpers ---
+const hashCache = new Map<string, string>();
+
+async function sha1(str: string): Promise<string> {
+    if (hashCache.has(str)) return hashCache.get(str)!;
+    
+    // Fallback if crypto not available
+    if (!self.crypto || !self.crypto.subtle) {
+        let hash = 5381;
+        for (let i = 0; i < str.length; i++) {
+            hash = ((hash << 5) + hash) + str.charCodeAt(i);
+        }
+        const res = (hash >>> 0).toString(16);
+        hashCache.set(str, res);
+        return res;
+    }
+    
+    const msgUint8 = new TextEncoder().encode(str);
+    const hashBuffer = await self.crypto.subtle.digest('SHA-1', msgUint8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    hashCache.set(str, hashHex);
+    return hashHex;
+}
+
+async function optimizeGameState(state: any): Promise<any> {
+    if (!state) return state;
+    
+    // Process Items
+    if (state.player && Array.isArray(state.player.items)) {
+        for (let i = 0; i < state.player.items.length; i++) {
+            const item = state.player.items[i];
+            if (item._ref) continue;
+            
+            const { id, count, ...staticProps } = item;
+            if (Object.keys(staticProps).length > 0) {
+                const content = JSON.stringify(staticProps);
+                const hash = await sha1(content);
+                
+                db.exec({
+                    sql: 'INSERT OR IGNORE INTO static_data (id, type, content) VALUES (?, ?, ?)',
+                    bind: [hash, 'item', content]
+                });
+                
+                state.player.items[i] = { id, count, _ref: hash };
+            }
+        }
+    }
+    
+    // Process Recipes
+    if (state.player && Array.isArray(state.player.recipes)) {
+        for (let i = 0; i < state.player.recipes.length; i++) {
+            const recipe = state.player.recipes[i];
+            if (recipe._ref) continue;
+            
+            const { id, status, ...staticProps } = recipe;
+             if (Object.keys(staticProps).length > 0) {
+                const content = JSON.stringify(staticProps);
+                const hash = await sha1(content);
+                
+                db.exec({
+                    sql: 'INSERT OR IGNORE INTO static_data (id, type, content) VALUES (?, ?, ?)',
+                    bind: [hash, 'recipe', content]
+                });
+                
+                state.player.recipes[i] = { id, status, _ref: hash };
+             }
+        }
+    }
+    
+    // Process Quests
+    if (state.system && Array.isArray(state.system.quests)) {
+        for (let i = 0; i < state.system.quests.length; i++) {
+            const quest = state.system.quests[i];
+            if (quest._ref) continue;
+            
+            const { id, status, logs, completedTurn, completedDate, completedTime, completionSummary, ...staticProps } = quest;
+             if (Object.keys(staticProps).length > 0) {
+                const content = JSON.stringify(staticProps);
+                const hash = await sha1(content);
+                
+                db.exec({
+                    sql: 'INSERT OR IGNORE INTO static_data (id, type, content) VALUES (?, ?, ?)',
+                    bind: [hash, 'quest', content]
+                });
+                
+                state.system.quests[i] = { 
+                    id, status, logs, completedTurn, completedDate, completedTime, completionSummary, 
+                    _ref: hash 
+                };
+             }
+        }
+    }
+    
+    return state;
+}
+
+async function restoreGameState(state: any): Promise<any> {
+    if (!state) return state;
+    
+    const getContent = (hash: string) => {
+        const res = db.exec({
+            sql: 'SELECT content FROM static_data WHERE id = ?',
+            bind: [hash],
+            returnValue: 'resultRows',
+            rowMode: 'object'
+        });
+        if (res.length > 0) return JSON.parse(res[0].content);
+        return {};
+    };
+    
+    if (state.player && Array.isArray(state.player.items)) {
+        for (let i = 0; i < state.player.items.length; i++) {
+            const item = state.player.items[i];
+            if (item._ref) {
+                const staticProps = getContent(item._ref);
+                const { _ref, ...dynamicProps } = item;
+                state.player.items[i] = { ...staticProps, ...dynamicProps };
+            }
+        }
+    }
+    
+    if (state.player && Array.isArray(state.player.recipes)) {
+        for (let i = 0; i < state.player.recipes.length; i++) {
+            const recipe = state.player.recipes[i];
+            if (recipe._ref) {
+                const staticProps = getContent(recipe._ref);
+                const { _ref, ...dynamicProps } = recipe;
+                state.player.recipes[i] = { ...staticProps, ...dynamicProps };
+            }
+        }
+    }
+    
+    if (state.system && Array.isArray(state.system.quests)) {
+        for (let i = 0; i < state.system.quests.length; i++) {
+            const quest = state.system.quests[i];
+            if (quest._ref) {
+                const staticProps = getContent(quest._ref);
+                const { _ref, ...dynamicProps } = quest;
+                state.system.quests[i] = { ...staticProps, ...dynamicProps };
+            }
+        }
+    }
+    
+    return state;
+}
+
 self.onmessage = async (e: MessageEvent) => {
   const { id, type, payload } = e.data;
   
@@ -132,7 +279,49 @@ self.onmessage = async (e: MessageEvent) => {
         break;
 
       case 'EXPORT_SAVE':
-        result = exportSave(db, payload.saveSlotId);
+        result = await exportSave(db, payload.saveSlotId);
+        break;
+
+      case 'OPTIMIZE_AND_CREATE_SNAPSHOT':
+        {
+            const { saveSlotId, chatId, gameState } = payload;
+            const optimizedState = await optimizeGameState(gameState);
+            const stateStr = JSON.stringify(optimizedState);
+            
+            db.exec({
+                sql: 'INSERT INTO snapshots (saveSlotId, chatId, createdAt, gameState) VALUES (?, ?, ?, ?)',
+                bind: [saveSlotId, chatId, Date.now(), stateStr]
+            });
+            const res = db.exec({ sql: 'SELECT last_insert_rowid() as id', returnValue: 'resultRows', rowMode: 'object' });
+            result = { id: res[0].id };
+        }
+        break;
+
+      case 'GET_SNAPSHOT_RESTORED':
+        {
+            const res = db.exec({
+                sql: 'SELECT * FROM snapshots WHERE id = ?',
+                bind: [payload.id],
+                returnValue: 'resultRows',
+                rowMode: 'object'
+            });
+            
+            if (res.length > 0) {
+                const snap = res[0];
+                if (snap.gameState) {
+                    try {
+                        const state = JSON.parse(snap.gameState);
+                        const restored = await restoreGameState(state);
+                        snap.gameState = JSON.stringify(restored);
+                    } catch (e) {
+                        console.warn('Failed to restore snapshot state', e);
+                    }
+                }
+                result = snap;
+            } else {
+                result = null;
+            }
+        }
         break;
 
       case 'IMPORT_SAVE':
@@ -264,7 +453,7 @@ function stripBase64Images(obj: any, threshold = 1024): boolean {
     return changed;
 }
 
-function exportSave(db: any, saveSlotId: number) {
+async function exportSave(db: any, saveSlotId: number) {
   const getRows = (sql: string, bind: any[] = []) => 
     db.exec({ sql, bind, returnValue: 'resultRows', rowMode: 'object' });
 
@@ -300,29 +489,32 @@ function exportSave(db: any, saveSlotId: number) {
   const snapshots = getRows('SELECT * FROM snapshots WHERE saveSlotId = ?', [saveSlotId]);
   const facilities = getRows('SELECT * FROM facilities WHERE saveSlotId = ?', [saveSlotId]);
   const characters = getRows('SELECT * FROM characters'); // Global characters
+  
+  // Export static data (Deduplicated items/recipes/quests)
+  // We export ALL static data to ensure references in snapshots are valid.
+  // In a more complex system, we would filter only used IDs, but since this table is deduplicated, it shouldn't be too large.
+  const staticData = getRows('SELECT * FROM static_data');
 
-  // Optimize snapshots
-  const optimizedSnapshots = snapshots.map((s: any) => {
+  // Optimize snapshots (Strip Base64, KEEP references)
+  const optimizedSnapshots = [];
+  for (const s of snapshots) {
     try {
       if (s.gameState) {
         const stateObj = JSON.parse(s.gameState);
-        let changed = false;
+        
+        // 1. DO NOT restore static data. Keep references to reduce size.
+        // stateObj = await restoreGameState(stateObj); 
+        
+        // 2. Strip Base64 (Optimization for export size)
+        stripBase64Images(stateObj, 2048);
 
-        // More aggressive cleaning: recursively remove all base64 images from the ENTIRE state object
-        // This handles player avatar, companions, and any other deeply nested image data
-        if (stripBase64Images(stateObj, 2048)) { // 2KB threshold for non-data URI strings
-            changed = true;
-        }
-
-        if (changed) {
-          s.gameState = JSON.stringify(stateObj);
-        }
+        s.gameState = JSON.stringify(stateObj);
       }
     } catch (e) {
       console.warn('Snapshot optimization failed', e);
     }
-    return s;
-  });
+    optimizedSnapshots.push(s);
+  }
 
   return {
     version: 2,
@@ -333,7 +525,8 @@ function exportSave(db: any, saveSlotId: number) {
     memoryRelations,
     snapshots: optimizedSnapshots,
     characters,
-    facilities
+    facilities,
+    staticData // New field
   };
 }
 
@@ -549,6 +742,64 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
   if (!data.snapshots) data.snapshots = [];
 
   let newSaveId = 0;
+
+  db.transaction(() => {
+    // const exec = (sql: string, bind: any[] = []) => 
+    //    db.exec({ sql, bind, returnValue: 'resultRows', rowMode: 'object' });
+
+    // 0. Import Static Data (Pre-requisite for snapshots)
+    if (Array.isArray(data.staticData)) {
+        console.log('[Import] Importing static data...', data.staticData.length);
+        const stmt = db.prepare('INSERT OR IGNORE INTO static_data (id, type, content) VALUES (?, ?, ?)');
+        try {
+            for (const item of data.staticData) {
+                stmt.bind([item.id, item.type, item.content]);
+                stmt.step();
+                stmt.reset();
+            }
+        } finally {
+            stmt.finalize();
+        }
+    }
+
+    // NEW: Optimize snapshots INSIDE transaction (or before? No, references must exist first if we want to validte, 
+    // but optimizeGameState inserts into static_data if missing.
+    // However, since we just imported static_data, optimizeGameState will see them if they exist?
+    // Actually optimizeGameState calculates hash and inserts if not exists.
+    // So if we imported static_data, optimizeGameState will generate same hash and IGNORE insert.
+    // BUT we need to process snapshots to ensure they are optimized (if importing old full save)
+    // OR if importing new optimized save, they are already refs.
+    
+    // We can do this optimization loop here, but since it involves DB writes (inserting static_data), 
+    // it's better to do it. But wait, optimizeGameState is async because of SHA1?
+    // Yes, sha1 is async. We cannot call async function inside db.transaction callback if we want to be safe?
+    // Actually sqlite3-wasm transaction is synchronous. We cannot await inside it.
+    // So we must move snapshot optimization OUTSIDE the transaction or use synchronous SHA1.
+    // Our sha1 implementation checks crypto.subtle (async) or fallback (sync-ish but blocking).
+    // Let's keep snapshot optimization OUTSIDE transaction as before.
+  });
+  
+  // Optimize snapshots before transaction to save space in DB
+  // This is async, so we do it outside transaction
+  if (data.snapshots.length > 0) {
+      console.log('[Import] Optimizing snapshots for storage...');
+      for (const snap of data.snapshots) {
+         try {
+             let state = snap.gameState;
+             if (typeof state === 'string') state = JSON.parse(state);
+             
+             // Optimize (extract static data)
+             // Note: If we just imported staticData, this function will re-hash and try to insert.
+             // INSERT OR IGNORE handles duplicates efficiently.
+             state = await optimizeGameState(state);
+             
+             snap.gameState = JSON.stringify(state);
+         } catch (e) {
+             console.warn('Snapshot pre-optimization failed', e);
+         }
+      }
+      console.log('[Import] Snapshots optimized.');
+  }
 
   db.transaction(() => {
     const exec = (sql: string, bind: any[] = []) => 

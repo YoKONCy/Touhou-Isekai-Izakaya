@@ -99,6 +99,13 @@ export const SCHEMA_SQL = [
   `CREATE INDEX IF NOT EXISTS idx_memory_relations_source ON memory_relations(source_id);`,
   `CREATE INDEX IF NOT EXISTS idx_memory_relations_target ON memory_relations(target_id);`,
 
+  // 6. Static Data (Deduplication Storage for Items, Recipes, Quests)
+  `CREATE TABLE IF NOT EXISTS static_data (
+    id TEXT PRIMARY KEY, -- Hash of the content
+    type TEXT, -- 'item' | 'recipe' | 'quest'
+    content TEXT -- JSON string of the static properties
+  );`,
+
   // Trigger to keep FTS index in sync with memories table
   `CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
     INSERT INTO memories_fts(rowid, content, tags, related_entities) 
