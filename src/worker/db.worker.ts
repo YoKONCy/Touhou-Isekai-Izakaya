@@ -136,7 +136,7 @@ self.onmessage = async (e: MessageEvent) => {
         break;
 
       case 'IMPORT_SAVE':
-        result = importSaveWithCorrectOrder(db, payload.jsonContent);
+        result = await importSaveWithCorrectOrder(db, payload.jsonContent);
         break;
 
 
@@ -230,7 +230,15 @@ function exportSave(db: any, saveSlotId: number) {
     isMultiplayer: Boolean(rawSave.isMultiplayer)
   };
   
-  const chats = getRows('SELECT * FROM chats WHERE saveSlotId = ?', [saveSlotId]);
+  const chats = getRows('SELECT * FROM chats WHERE saveSlotId = ?', [saveSlotId]).map((chat: any) => {
+    // Optimization: Remove debugLog and potential duplicate large fields from chat history
+    // We keep illustrationUrl as it is content
+    if (chat.debugLog) {
+        chat.debugLog = undefined;
+    }
+    return chat;
+  });
+
   const memories = getRows('SELECT * FROM memories WHERE saveSlotId = ?', [saveSlotId]);
   
   // Export memory relations associated with this save slot's memories
@@ -250,8 +258,10 @@ function exportSave(db: any, saveSlotId: number) {
     try {
       if (s.gameState) {
         const stateObj = JSON.parse(s.gameState);
+        let changed = false;
+
+        // Optimize Player Images
         if (stateObj.player) {
-          let changed = false;
           if (stateObj.player.avatarUrl) {
             delete stateObj.player.avatarUrl;
             changed = true;
@@ -260,9 +270,25 @@ function exportSave(db: any, saveSlotId: number) {
             delete stateObj.player.referenceImageUrl;
             changed = true;
           }
-          if (changed) {
-            s.gameState = JSON.stringify(stateObj);
-          }
+        }
+
+        // Optimize Multiplayer Companions Images
+        if (stateObj.multiplayer_companions) {
+            for (const key in stateObj.multiplayer_companions) {
+                const companion = stateObj.multiplayer_companions[key];
+                if (companion.avatarUrl) {
+                    delete companion.avatarUrl;
+                    changed = true;
+                }
+                if (companion.referenceImageUrl) {
+                    delete companion.referenceImageUrl;
+                    changed = true;
+                }
+            }
+        }
+
+        if (changed) {
+          s.gameState = JSON.stringify(stateObj);
         }
       }
     } catch (e) {
@@ -284,14 +310,22 @@ function exportSave(db: any, saveSlotId: number) {
   };
 }
 
-function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBuffer) {
+async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBuffer) {
   let data;
-  if (typeof jsonContent === 'string') {
-    data = JSON.parse(jsonContent);
-  } else {
-    // ArrayBuffer
-    const decoder = new TextDecoder();
-    data = JSON.parse(decoder.decode(jsonContent));
+  try {
+    if (typeof jsonContent === 'string') {
+        console.log('[Import] Parsing string content, length:', jsonContent.length);
+        data = JSON.parse(jsonContent);
+    } else {
+        // ArrayBuffer
+        console.log('[Import] Parsing ArrayBuffer content, size:', jsonContent.byteLength);
+        // Use Response.json() to parse large JSON asynchronously and efficiently
+        // This avoids V8 string length limits for large files
+        data = await new Response(new Blob([jsonContent])).json();
+    }
+  } catch (e: any) {
+    console.error('[Import] JSON Parse failed:', e);
+    throw new Error(`JSON parsing failed: ${e.message}`);
   }
   
   if (!data.saveSlot || !Array.isArray(data.chats)) {
