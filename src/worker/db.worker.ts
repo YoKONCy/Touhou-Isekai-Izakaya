@@ -467,12 +467,82 @@ async function exportSave(db: any, saveSlotId: number) {
   `, [saveSlotId]);
 
   const snapshotsCount = getRows('SELECT COUNT(*) as c FROM snapshots WHERE saveSlotId = ?', [saveSlotId])[0].c;
+  
+  // 1. Optimize Phase (Must be done BEFORE exporting staticData)
+  // We iterate through all snapshots to ensure they are optimized (deduplicated)
+  // This reduces the export size significantly.
+  const OPTIMIZE_BATCH_SIZE = 10;
+  let optimizedCount = 0;
+  
+  for (let offset = 0; offset < snapshotsCount; offset += OPTIMIZE_BATCH_SIZE) {
+      const batch = getRows('SELECT id, gameState FROM snapshots WHERE saveSlotId = ? LIMIT ? OFFSET ?', [saveSlotId, OPTIMIZE_BATCH_SIZE, offset]);
+      const updates: { id: number, gameState: string }[] = [];
+      
+      for (const s of batch) {
+          if (!s.gameState) continue;
+          try {
+              // Check if already optimized (simple heuristic: contains "_ref")
+              // If it contains "_ref", it's likely already optimized.
+              // However, optimizeGameState checks internally too.
+              // To be safe and ensure maximum compression, we run it.
+              // But we only update DB if string changes.
+              
+              const originalStr = s.gameState;
+              // Parse: if it's a string, parse it. If it's already an object (unlikely from DB), use it.
+              let state: any;
+              if (typeof originalStr === 'string') {
+                  state = JSON.parse(originalStr);
+              } else {
+                  state = originalStr;
+              }
+              
+              await optimizeGameState(state); // This inserts into static_data
+              
+              const newStr = JSON.stringify(state);
+              
+              // Only update if size reduced or content changed
+              if (newStr !== originalStr) {
+                  updates.push({ id: s.id, gameState: newStr });
+              }
+          } catch (e) {
+              console.warn(`[Export] Optimization failed for snapshot ${s.id}`, e);
+          }
+      }
+      
+      // Batch update snapshots
+      if (updates.length > 0) {
+          db.transaction(() => {
+              const stmt = db.prepare('UPDATE snapshots SET gameState = ? WHERE id = ?');
+              try {
+                  for (const u of updates) {
+                      stmt.bind([u.gameState, u.id]);
+                      stmt.step();
+                      stmt.reset();
+                  }
+              } finally {
+                  stmt.finalize();
+              }
+          });
+      }
+      
+      optimizedCount += batch.length;
+      
+      // Yield to main thread to prevent UI freeze
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
+      // Report progress
+      if (optimizedCount % 50 === 0) {
+           console.log(`[Export] Optimization Progress: ${optimizedCount}/${snapshotsCount}`);
+           // Optional: Send progress to main thread if needed
+      }
+  }
+
   const facilities = getRows('SELECT * FROM facilities WHERE saveSlotId = ?', [saveSlotId]);
   const characters = getRows('SELECT * FROM characters'); // Global characters
   
   // Export static data (Deduplicated items/recipes/quests)
   // We export ALL static data to ensure references in snapshots are valid.
-  // In a more complex system, we would filter only used IDs, but since this table is deduplicated, it shouldn't be too large.
+  // CRITICAL: This must be queried AFTER the optimization phase above!
   const staticData = getRows('SELECT * FROM static_data');
 
   // Stream-like Blob Construction
@@ -494,8 +564,9 @@ async function exportSave(db: any, saveSlotId: number) {
   // Snapshots (processed in batches)
   jsonParts.push(`"snapshots":[`);
   
-  const BATCH_SIZE = 10;
+  const BATCH_SIZE = 50; // Larger batch for read-only
   let processedCount = 0;
+  let isFirstSnapshot = true;
   
   for (let offset = 0; offset < snapshotsCount; offset += BATCH_SIZE) {
       const batch = getRows('SELECT * FROM snapshots WHERE saveSlotId = ? LIMIT ? OFFSET ?', [saveSlotId, BATCH_SIZE, offset]);
@@ -503,16 +574,8 @@ async function exportSave(db: any, saveSlotId: number) {
       for (let i = 0; i < batch.length; i++) {
           const s = batch[i];
           
-          // FAST PATH: Directly use the stored JSON string without parsing/optimizing
-          // This avoids the massive CPU overhead of parsing, optimizing, and re-stringifying 
-          // thousands of snapshots during export.
-          // We assume data in DB is already optimized during save (createSnapshot).
-          
           let gameStateStr = 'null';
           if (s.gameState) {
-              // Ensure it's treated as a raw JSON object in the output, not a string
-              // s.gameState is already a JSON string from DB. 
-              // We append it directly to avoid double-encoding overhead.
               gameStateStr = s.gameState;
           }
 
@@ -522,17 +585,20 @@ async function exportSave(db: any, saveSlotId: number) {
           
           const jsonItem = `{"id":${s.id},"saveSlotId":${s.saveSlotId},"chatId":${s.chatId},"createdAt":${s.createdAt},"gameState":${gameStateStr}}`;
           
-          jsonParts.push(jsonItem);
-          
-          if (processedCount < snapshotsCount - 1) {
+          if (!isFirstSnapshot) {
               jsonParts.push(',');
           }
+          jsonParts.push(jsonItem);
+          isFirstSnapshot = false;
           processedCount++;
       }
       
+      // Yield to main thread
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
       // Optional: Report progress (every 50 items)
       if (processedCount % 50 === 0) {
-          console.log(`[Export] Progress: ${processedCount}/${snapshotsCount}`);
+          console.log(`[Export] Packaging Progress: ${processedCount}/${snapshotsCount}`);
       }
   }
   
