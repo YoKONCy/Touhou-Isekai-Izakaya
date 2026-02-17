@@ -432,53 +432,6 @@ function batchInsert(db: any, table: string, rows: any[]) {
   return insertedCount;
 }
 
-/**
- * Recursively strips Base64 images and large strings from an object
- * Returns true if any change was made
- */
-function stripBase64Images(obj: any, threshold = 1024): boolean {
-    if (!obj || typeof obj !== 'object') return false;
-    let changed = false;
-
-    if (Array.isArray(obj)) {
-        for (const item of obj) {
-            if (stripBase64Images(item, threshold)) changed = true;
-        }
-        return changed;
-    }
-
-    for (const key in obj) {
-        if (Object.prototype.hasOwnProperty.call(obj, key)) {
-            const val = obj[key];
-            if (typeof val === 'string') {
-                // Check for potential image fields
-                // We target keys that likely contain images
-                const lowerKey = key.toLowerCase();
-                const isImageKey = lowerKey.includes('avatar') || 
-                                  lowerKey.includes('image') || 
-                                  lowerKey.includes('img') ||
-                                  lowerKey.includes('b64') ||
-                                  lowerKey.includes('url');
-
-                if (isImageKey) {
-                    if (val.startsWith('data:image')) {
-                        // It is definitely a base64 image
-                        delete obj[key];
-                        changed = true;
-                    } else if (val.length > threshold * 2 && !val.startsWith('http')) {
-                        // Very long string that is not a standard URL (likely base64 without prefix or raw data)
-                        // Be conservative: only if > 2KB
-                        delete obj[key];
-                        changed = true;
-                    }
-                }
-            } else if (typeof val === 'object') {
-                if (stripBase64Images(val, threshold)) changed = true;
-            }
-        }
-    }
-    return changed;
-}
 
 async function exportSave(db: any, saveSlotId: number) {
   const getRows = (sql: string, bind: any[] = []) => 
