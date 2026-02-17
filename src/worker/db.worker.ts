@@ -524,10 +524,15 @@ async function exportSave(db: any, saveSlotId: number) {
 
   // Optimize snapshots (Strip Base64, KEEP references)
   const optimizedSnapshots = [];
+  let totalOriginalSize = 0;
+  let totalOptimizedSize = 0;
+
   for (const s of snapshots) {
     try {
       if (s.gameState) {
         let stateObj = JSON.parse(s.gameState);
+        const originalSize = s.gameState.length;
+        totalOriginalSize += originalSize;
         
         // 0. Explicitly optimize state (extract static data to table, replace with refs)
         // This ensures historical snapshots are also compressed.
@@ -539,13 +544,17 @@ async function exportSave(db: any, saveSlotId: number) {
         // 2. Strip Base64 (Optimization for export size)
         stripBase64Images(stateObj, 2048);
 
-        s.gameState = JSON.stringify(stateObj);
+        const optimizedJson = JSON.stringify(stateObj);
+        s.gameState = optimizedJson;
+        totalOptimizedSize += optimizedJson.length;
       }
     } catch (e) {
       console.warn('Snapshot optimization failed', e);
     }
     optimizedSnapshots.push(s);
   }
+  
+  console.log(`[Export] Snapshots optimized: ${snapshots.length} count. Size: ${(totalOriginalSize/1024/1024).toFixed(2)}MB -> ${(totalOptimizedSize/1024/1024).toFixed(2)}MB`);
 
   return {
     version: 2,
@@ -999,16 +1008,16 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
     }
 
     // 7. Import Facilities
+    const facilityIdMap = new Map<number, number>();
     if (Array.isArray(data.facilities)) {
         // Helper for stringifying
         const ensureString = (val: any) => (typeof val === 'object' && val !== null) ? JSON.stringify(val) : (val || '[]');
 
         for (const fac of data.facilities) {
-            const fields = ['id', 'saveSlotId', 'name', 'location', 'description', 'status', 'sub_locations', 'staff', 'is_player_owned', 'created_at', 'updated_at'];
+            const fields = ['saveSlotId', 'name', 'location', 'description', 'status', 'sub_locations', 'staff', 'is_player_owned', 'created_at', 'updated_at'];
             const placeholders = fields.map(() => '?').join(', ');
             
             const values = [
-                fac.id,
                 newSaveId,
                 fac.name,
                 fac.location || '',
@@ -1025,6 +1034,9 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
                 `INSERT INTO facilities (${fields.join(', ')}) VALUES (${placeholders})`,
                 values
             );
+            
+            const newFacId = exec('SELECT last_insert_rowid() as id')[0].id;
+            facilityIdMap.set(fac.id, newFacId);
         }
     }
   });
