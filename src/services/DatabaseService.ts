@@ -52,6 +52,20 @@ export class DatabaseService {
     return Math.random().toString(36).substring(2, 15);
   }
 
+  /**
+   * Helper to sanitize data before sending to Worker.
+   * This removes Vue Proxies and ensures the object is clonable by postMessage.
+   */
+  private sanitize<T>(data: T): T {
+      if (data === undefined || data === null) return data;
+      try {
+          return JSON.parse(JSON.stringify(data));
+      } catch (e) {
+          console.error('Failed to sanitize data:', e);
+          return data;
+      }
+  }
+
   public async init(): Promise<void> {
     await this.exec('SELECT 1');
     console.log('[数据库服务] Worker 已初始化就绪。');
@@ -78,7 +92,10 @@ export class DatabaseService {
       this.worker.postMessage({
         id,
         type: 'EXEC',
-        payload: { sql, bind }
+        payload: { 
+            sql, 
+            bind: this.sanitize(bind) 
+        }
       });
     });
   }
@@ -91,7 +108,10 @@ export class DatabaseService {
       this.worker.postMessage({
         id,
         type: 'BATCH_INSERT',
-        payload: { table, rows }
+        payload: { 
+            table, 
+            rows: this.sanitize(rows) 
+        }
       });
     });
   }
@@ -207,7 +227,11 @@ export class DatabaseService {
         this.worker.postMessage({
             id,
             type: 'OPTIMIZE_AND_CREATE_SNAPSHOT',
-            payload: { saveSlotId, chatId, gameState }
+            payload: { 
+                saveSlotId, 
+                chatId, 
+                gameState: this.sanitize(gameState) 
+            }
         });
     }).then((res: any) => res.id);
   }
@@ -220,11 +244,16 @@ export class DatabaseService {
   }
   
   async getLatestSnapshot(saveSlotId: number): Promise<any | null> {
-    const res = await this.exec(
-        'SELECT * FROM snapshots WHERE saveSlotId = ? ORDER BY id DESC LIMIT 1', 
-        [saveSlotId]
-    );
-    return res[0] || null;
+    return new Promise((resolve, reject) => {
+        const id = this.generateId();
+        this.pendingRequests.set(id, { resolve, reject });
+        
+        this.worker.postMessage({
+            id,
+            type: 'GET_LATEST_SNAPSHOT',
+            payload: { saveSlotId }
+        });
+    });
   }
 
   // --- Memory Relations ---
@@ -273,6 +302,7 @@ export class DatabaseService {
                     parts.push('"memoryRelations":' + JSON.stringify(data.memoryRelations) + ',');
                     parts.push('"characters":' + JSON.stringify(data.characters) + ',');
                     parts.push('"facilities":' + JSON.stringify(data.facilities) + ',');
+                    parts.push('"staticData":' + JSON.stringify(data.staticData) + ',');
                     
                     // 特别处理 snapshots，因为它们通常是最大的部分
                     parts.push('"snapshots":[');

@@ -324,6 +324,33 @@ self.onmessage = async (e: MessageEvent) => {
         }
         break;
 
+      case 'GET_LATEST_SNAPSHOT':
+        {
+            const res = db.exec({
+                sql: 'SELECT * FROM snapshots WHERE saveSlotId = ? ORDER BY id DESC LIMIT 1',
+                bind: [payload.saveSlotId],
+                returnValue: 'resultRows',
+                rowMode: 'object'
+            });
+            
+            if (res.length > 0) {
+                const snap = res[0];
+                if (snap.gameState) {
+                    try {
+                        const state = JSON.parse(snap.gameState);
+                        const restored = await restoreGameState(state);
+                        snap.gameState = JSON.stringify(restored);
+                    } catch (e) {
+                        console.warn('Failed to restore latest snapshot state', e);
+                    }
+                }
+                result = snap;
+            } else {
+                result = null;
+            }
+        }
+        break;
+
       case 'IMPORT_SAVE':
         result = await importSaveWithCorrectOrder(db, payload.jsonContent);
         break;
@@ -500,8 +527,12 @@ async function exportSave(db: any, saveSlotId: number) {
   for (const s of snapshots) {
     try {
       if (s.gameState) {
-        const stateObj = JSON.parse(s.gameState);
+        let stateObj = JSON.parse(s.gameState);
         
+        // 0. Explicitly optimize state (extract static data to table, replace with refs)
+        // This ensures historical snapshots are also compressed.
+        stateObj = await optimizeGameState(stateObj);
+
         // 1. DO NOT restore static data. Keep references to reduce size.
         // stateObj = await restoreGameState(stateObj); 
         
