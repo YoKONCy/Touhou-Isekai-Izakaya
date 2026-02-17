@@ -543,33 +543,33 @@ async function exportSave(db: any, saveSlotId: number) {
   
   const BATCH_SIZE = 10;
   let processedCount = 0;
-  let totalOriginalSize = 0;
-  let totalOptimizedSize = 0;
   
   for (let offset = 0; offset < snapshotsCount; offset += BATCH_SIZE) {
       const batch = getRows('SELECT * FROM snapshots WHERE saveSlotId = ? LIMIT ? OFFSET ?', [saveSlotId, BATCH_SIZE, offset]);
       
       for (let i = 0; i < batch.length; i++) {
           const s = batch[i];
-          try {
-              if (s.gameState) {
-                  let stateObj = JSON.parse(s.gameState);
-                  const originalSize = s.gameState.length;
-                  totalOriginalSize += originalSize;
-                  
-                  // Optimize
-                  stateObj = await optimizeGameState(stateObj);
-                  stripBase64Images(stateObj, 2048);
-                  
-                  const optimizedJson = JSON.stringify(stateObj);
-                  s.gameState = optimizedJson;
-                  totalOptimizedSize += optimizedJson.length;
-              }
-          } catch (e) {
-              console.warn('Snapshot optimization failed', e);
-          }
           
-          jsonParts.push(JSON.stringify(s));
+          // FAST PATH: Directly use the stored JSON string without parsing/optimizing
+          // This avoids the massive CPU overhead of parsing, optimizing, and re-stringifying 
+          // thousands of snapshots during export.
+          // We assume data in DB is already optimized during save (createSnapshot).
+          
+          let gameStateStr = 'null';
+          if (s.gameState) {
+              // Ensure it's treated as a raw JSON object in the output, not a string
+              // s.gameState is already a JSON string from DB. 
+              // We append it directly to avoid double-encoding overhead.
+              gameStateStr = s.gameState;
+          }
+
+          // Manually construct the JSON object string to avoid JSON.stringify(s) 
+          // which would escape s.gameState if it were a string property.
+          // We want: { "id": 1, ..., "gameState": { ... } }
+          
+          const jsonItem = `{"id":${s.id},"saveSlotId":${s.saveSlotId},"chatId":${s.chatId},"createdAt":${s.createdAt},"gameState":${gameStateStr}}`;
+          
+          jsonParts.push(jsonItem);
           
           if (processedCount < snapshotsCount - 1) {
               jsonParts.push(',');
@@ -577,12 +577,15 @@ async function exportSave(db: any, saveSlotId: number) {
           processedCount++;
       }
       
-      // Optional: Report progress or yield to event loop if needed (not easy in sync loop, but await optimizeGameState helps)
+      // Optional: Report progress (every 50 items)
+      if (processedCount % 50 === 0) {
+          console.log(`[Export] Progress: ${processedCount}/${snapshotsCount}`);
+      }
   }
   
   jsonParts.push(']}');
   
-  console.log(`[Export] Snapshots optimized: ${processedCount} count. Size: ${(totalOriginalSize/1024/1024).toFixed(2)}MB -> ${(totalOptimizedSize/1024/1024).toFixed(2)}MB`);
+  console.log(`[Export] Completed. Total snapshots: ${processedCount}`);
 
   // Create Blob directly in Worker
   return new Blob(jsonParts, { type: 'application/json' });
