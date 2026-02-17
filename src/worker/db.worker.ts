@@ -513,7 +513,7 @@ async function exportSave(db: any, saveSlotId: number) {
     WHERE m.saveSlotId = ?
   `, [saveSlotId]);
 
-  const snapshots = getRows('SELECT * FROM snapshots WHERE saveSlotId = ?', [saveSlotId]);
+  const snapshotsCount = getRows('SELECT COUNT(*) as c FROM snapshots WHERE saveSlotId = ?', [saveSlotId])[0].c;
   const facilities = getRows('SELECT * FROM facilities WHERE saveSlotId = ?', [saveSlotId]);
   const characters = getRows('SELECT * FROM characters'); // Global characters
   
@@ -522,52 +522,70 @@ async function exportSave(db: any, saveSlotId: number) {
   // In a more complex system, we would filter only used IDs, but since this table is deduplicated, it shouldn't be too large.
   const staticData = getRows('SELECT * FROM static_data');
 
-  // Optimize snapshots (Strip Base64, KEEP references)
-  const optimizedSnapshots = [];
+  // Stream-like Blob Construction
+  // Instead of building a huge object and JSON.stringify-ing it (which causes OOM or string limit errors),
+  // we build the JSON string in parts and create a Blob.
+  
+  const jsonParts: string[] = [];
+  
+  // Header
+  jsonParts.push(`{"version":2,"timestamp":${Date.now()},`);
+  jsonParts.push(`"saveSlot":${JSON.stringify(saveSlotData)},`);
+  jsonParts.push(`"chats":${JSON.stringify(chats)},`);
+  jsonParts.push(`"memories":${JSON.stringify(memories)},`);
+  jsonParts.push(`"memoryRelations":${JSON.stringify(memoryRelations)},`);
+  jsonParts.push(`"characters":${JSON.stringify(characters)},`);
+  jsonParts.push(`"facilities":${JSON.stringify(facilities)},`);
+  jsonParts.push(`"staticData":${JSON.stringify(staticData)},`);
+  
+  // Snapshots (processed in batches)
+  jsonParts.push(`"snapshots":[`);
+  
+  const BATCH_SIZE = 10;
+  let processedCount = 0;
   let totalOriginalSize = 0;
   let totalOptimizedSize = 0;
-
-  for (const s of snapshots) {
-    try {
-      if (s.gameState) {
-        let stateObj = JSON.parse(s.gameState);
-        const originalSize = s.gameState.length;
-        totalOriginalSize += originalSize;
-        
-        // 0. Explicitly optimize state (extract static data to table, replace with refs)
-        // This ensures historical snapshots are also compressed.
-        stateObj = await optimizeGameState(stateObj);
-
-        // 1. DO NOT restore static data. Keep references to reduce size.
-        // stateObj = await restoreGameState(stateObj); 
-        
-        // 2. Strip Base64 (Optimization for export size)
-        stripBase64Images(stateObj, 2048);
-
-        const optimizedJson = JSON.stringify(stateObj);
-        s.gameState = optimizedJson;
-        totalOptimizedSize += optimizedJson.length;
+  
+  for (let offset = 0; offset < snapshotsCount; offset += BATCH_SIZE) {
+      const batch = getRows('SELECT * FROM snapshots WHERE saveSlotId = ? LIMIT ? OFFSET ?', [saveSlotId, BATCH_SIZE, offset]);
+      
+      for (let i = 0; i < batch.length; i++) {
+          const s = batch[i];
+          try {
+              if (s.gameState) {
+                  let stateObj = JSON.parse(s.gameState);
+                  const originalSize = s.gameState.length;
+                  totalOriginalSize += originalSize;
+                  
+                  // Optimize
+                  stateObj = await optimizeGameState(stateObj);
+                  stripBase64Images(stateObj, 2048);
+                  
+                  const optimizedJson = JSON.stringify(stateObj);
+                  s.gameState = optimizedJson;
+                  totalOptimizedSize += optimizedJson.length;
+              }
+          } catch (e) {
+              console.warn('Snapshot optimization failed', e);
+          }
+          
+          jsonParts.push(JSON.stringify(s));
+          
+          if (processedCount < snapshotsCount - 1) {
+              jsonParts.push(',');
+          }
+          processedCount++;
       }
-    } catch (e) {
-      console.warn('Snapshot optimization failed', e);
-    }
-    optimizedSnapshots.push(s);
+      
+      // Optional: Report progress or yield to event loop if needed (not easy in sync loop, but await optimizeGameState helps)
   }
   
-  console.log(`[Export] Snapshots optimized: ${snapshots.length} count. Size: ${(totalOriginalSize/1024/1024).toFixed(2)}MB -> ${(totalOptimizedSize/1024/1024).toFixed(2)}MB`);
+  jsonParts.push(']}');
+  
+  console.log(`[Export] Snapshots optimized: ${processedCount} count. Size: ${(totalOriginalSize/1024/1024).toFixed(2)}MB -> ${(totalOptimizedSize/1024/1024).toFixed(2)}MB`);
 
-  return {
-    version: 2,
-    timestamp: Date.now(),
-    saveSlot: saveSlotData,
-    chats,
-    memories,
-    memoryRelations,
-    snapshots: optimizedSnapshots,
-    characters,
-    facilities,
-    staticData // New field
-  };
+  // Create Blob directly in Worker
+  return new Blob(jsonParts, { type: 'application/json' });
 }
 
 /**
