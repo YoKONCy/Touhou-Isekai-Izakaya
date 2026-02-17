@@ -569,84 +569,103 @@ async function exportSave(db: any, saveSlotId: number) {
  */
 function stripJsonSection(buffer: ArrayBuffer, keyName: string, keepLast: number = 0): ArrayBuffer {
     const uint8 = new Uint8Array(buffer);
-    const key = `"${keyName}":`;
-    const keyBytes = new TextEncoder().encode(key);
+    const keyBytes = new TextEncoder().encode(`"${keyName}"`);
     
-    // Simple Knuth-Morris-Pratt or just brute force search (fast enough for 100MB-1GB in simple loop)
-    let foundIndex = -1;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    let cursor = 0;
+    let keyFoundAt = -1;
     
-    for (let i = 0; i < uint8.length - keyBytes.length; i++) {
-        let match = true;
-        for (let j = 0; j < keyBytes.length; j++) {
-            if (uint8[i + j] !== keyBytes[j]) {
-                match = false;
-                break;
+    // 1. Find the key at root level (depth 1)
+    while (cursor < uint8.length) {
+        const byte = uint8[cursor]!;
+        if (inString) {
+            if (escaped) escaped = false;
+            else {
+                if (byte === 92) escaped = true;
+                else if (byte === 34) inString = false;
+            }
+        } else {
+            if (byte === 123) depth++;
+            else if (byte === 125) depth--;
+            else if (byte === 34) {
+                inString = true;
+                if (depth === 1) {
+                    let match = true;
+                    if (cursor + keyBytes.length > uint8.length) match = false;
+                    else {
+                         for (let i = 0; i < keyBytes.length; i++) {
+                             if (uint8[cursor + i]! !== keyBytes[i]) {
+                                 match = false;
+                                 break;
+                             }
+                         }
+                    }
+                    
+                    if (match) {
+                        let checkCursor = cursor + keyBytes.length;
+                        while (checkCursor < uint8.length && uint8[checkCursor]! <= 32) checkCursor++;
+                        if (checkCursor < uint8.length && uint8[checkCursor]! === 58) {
+                            keyFoundAt = checkCursor + 1;
+                            cursor = checkCursor;
+                        }
+                    }
+                }
             }
         }
-        if (match) {
-            foundIndex = i;
-            break;
-        }
+        if (keyFoundAt !== -1) break;
+        cursor++;
     }
     
-    if (foundIndex === -1) {
-        console.warn(`[Import] Key "${keyName}" not found in buffer.`);
+    if (keyFoundAt === -1) {
+        console.warn(`[Import] Key "${keyName}" not found at root level.`);
         return buffer;
     }
-    
-    // Found key. Now find the start of the value.
-    // Scan forward from foundIndex + keyBytes.length
-    let cursor = foundIndex + keyBytes.length;
+
+    // 2. Find start of array value
+    cursor = keyFoundAt;
     let startBracket = -1;
-    
-    // Find opening '['
     while (cursor < uint8.length) {
-        const byte = uint8[cursor];
-        if (byte === undefined) break;
-        
-        if (byte === 91) { // '['
+        const byte = uint8[cursor]!;
+        if (byte === 91) {
             startBracket = cursor;
             break;
-        } else if (byte > 32) { // Non-whitespace char that is not '['
-            // Maybe it's null? or object? We only target arrays here.
-            console.warn(`[Import] Value for "${keyName}" is not an array.`);
-            return buffer;
+        } else if (byte > 32) {
+             console.warn(`[Import] Value for "${keyName}" is not an array.`);
+             return buffer;
         }
         cursor++;
     }
     
     if (startBracket === -1) return buffer;
     
-    // Now find the matching closing ']'
-    let depth = 1;
-    let inString = false;
-    let escaped = false;
+    // 3. Find end of array and collect comma positions
+    depth = 1;
+    inString = false;
+    escaped = false;
     cursor = startBracket + 1;
     
+    const commaPositions: number[] = [];
+    
     while (cursor < uint8.length && depth > 0) {
-        const byte = uint8[cursor];
-        if (byte === undefined) break;
-        
+        const byte = uint8[cursor]!;
         if (inString) {
-            if (escaped) {
-                escaped = false;
-            } else {
-                if (byte === 92) { // Backslash '\'
-                    escaped = true;
-                } else if (byte === 34) { // Quote '"'
-                    inString = false;
-                }
+            if (escaped) escaped = false;
+            else {
+                if (byte === 92) escaped = true;
+                else if (byte === 34) inString = false;
             }
         } else {
-            if (byte === 34) { // Quote '"'
-                inString = true;
-            } else if (byte === 91) { // '['
-                depth++;
-            } else if (byte === 93) { // ']'
-                depth--;
+            if (byte === 34) inString = true;
+            else if (byte === 91) depth++;
+            else if (byte === 93) depth--;
+            else if (byte === 123) depth++;
+            else if (byte === 125) depth--;
+            else if (byte === 44 && depth === 1) {
+                commaPositions.push(cursor);
             }
         }
-        
         if (depth === 0) break;
         cursor++;
     }
@@ -657,76 +676,30 @@ function stripJsonSection(buffer: ArrayBuffer, keyName: string, keepLast: number
     }
     
     const endBracket = cursor;
-    
     let stripEnd = endBracket;
     
+    // 4. Calculate strip position
     if (keepLast > 0) {
-        // We want to keep the last N items.
-        // Scan backwards from endBracket - 1 to find the (N)th comma at depth 1.
-        let commaCount = 0;
-        let scanCursor = endBracket - 1;
-        let scanDepth = 1; // We are inside the array
-        let scanInString = false;
-        
-        // Helper to check if a quote at scanCursor is escaped
-        // Looks at bytes BEFORE scanCursor to count backslashes
-        const isEscapedQuote = (pos: number): boolean => {
-            let backslashCount = 0;
-            let checkPos = pos - 1;
-            while (checkPos >= startBracket && uint8[checkPos] === 92) { // 92 is backslash
-                backslashCount++;
-                checkPos--;
-            }
-            return (backslashCount % 2) === 1;
-        };
-
-        while (scanCursor > startBracket) {
-            const byte = uint8[scanCursor];
-            if (byte === undefined) break;
-            
-            if (byte === 34) { // Quote '"'
-                if (!isEscapedQuote(scanCursor)) {
-                    scanInString = !scanInString;
-                }
-            } else if (!scanInString) {
-                if (byte === 93) { // ']'
-                    scanDepth++;
-                } else if (byte === 91) { // '['
-                    scanDepth--;
-                } else if (byte === 125) { // '}'
-                    scanDepth++;
-                } else if (byte === 123) { // '{'
-                    scanDepth--;
-                } else if (byte === 44) { // ','
-                    if (scanDepth === 1) {
-                        commaCount++;
-                        if (commaCount === keepLast) {
-                            // Found the split point!
-                            // The comma at scanCursor separates the kept items from the stripped ones.
-                            // We should strip up to and including this comma.
-                            stripEnd = scanCursor + 1; // +1 to include comma in strip range
-                            break;
-                        }
-                    }
-                }
-            }
-            scanCursor--;
+        let hasContent = false;
+        for (let k = startBracket + 1; k < endBracket; k++) {
+            if (uint8[k]! > 32) { hasContent = true; break; }
         }
         
-        if (commaCount < keepLast) {
-            // Found fewer items than requested. Keep everything.
-            console.log(`[Import] Requested to keep ${keepLast} items, but only found ${commaCount} (or fewer). Keeping all.`);
+        const totalItems = hasContent ? commaPositions.length + 1 : 0;
+        
+        if (totalItems > keepLast) {
+             const commaIndex = (totalItems - keepLast) - 1;
+             if (commaIndex >= 0 && commaIndex < commaPositions.length) {
+                 stripEnd = commaPositions[commaIndex]! + 1;
+             }
+        } else {
             return buffer;
         }
     }
-
-    // We want to keep the brackets but empty the content
-    // Replace range (startBracket + 1) to (stripEnd - 1) with spaces (32)
     
-    console.log(`[Import] Stripping "${keyName}" from byte ${startBracket} to ${stripEnd}. Length: ${stripEnd - startBracket}`);
-    
+    // 5. Fill with spaces
     for (let k = startBracket + 1; k < stripEnd; k++) {
-        uint8[k] = 32; // Space
+        uint8[k] = 32;
     }
     
     return buffer;
