@@ -298,11 +298,16 @@ class GameLoopService {
       const combatMatch = finalStory.match(/<combat_trigger>([\s\S]*?)<\/combat_trigger>/);
       if (combatMatch) {
         try {
-          combatTriggerData = JSON.parse(combatMatch[1]?.trim() || '{}');
+          const jsonStr = combatMatch[1]?.trim();
+          if (jsonStr) {
+              combatTriggerData = JSON.parse(jsonStr);
+          } else {
+              combatTriggerData = {};
+          }
           finalStory = finalStory.replace(/<combat_trigger>[\s\S]*?<\/combat_trigger>/g, '').trim();
           this.streamedContent.value = finalStory; 
         } catch (e) {
-          console.error('Failed to parse combat trigger:', e);
+          console.warn('Failed to parse combat trigger, ignoring:', e);
         }
       }
 
@@ -311,11 +316,16 @@ class GameLoopService {
       const questMatch = finalStory.match(/<quest_trigger>([\s\S]*?)<\/quest_trigger>/);
       if (questMatch) {
         try {
-          questTriggerData = JSON.parse(questMatch[1]?.trim() || '{}');
+          const jsonStr = questMatch[1]?.trim();
+          if (jsonStr) {
+              questTriggerData = JSON.parse(jsonStr);
+          } else {
+              questTriggerData = {};
+          }
           finalStory = finalStory.replace(/<quest_trigger>[\s\S]*?<\/quest_trigger>/g, '').trim();
           this.streamedContent.value = finalStory;
         } catch (e) {
-          console.error('Failed to parse quest trigger:', e);
+          console.warn('Failed to parse quest trigger, ignoring:', e);
         }
       }
 
@@ -324,11 +334,16 @@ class GameLoopService {
       const questUpdateMatch = finalStory.match(/<quest_update>([\s\S]*?)<\/quest_update>/);
       if (questUpdateMatch) {
         try {
-          questUpdateData = JSON.parse(questUpdateMatch[1]?.trim() || '{}');
+          const jsonStr = questUpdateMatch[1]?.trim();
+          if (jsonStr) {
+              questUpdateData = JSON.parse(jsonStr);
+          } else {
+              questUpdateData = {};
+          }
           finalStory = finalStory.replace(/<quest_update>[\s\S]*?<\/quest_update>/g, '').trim();
           this.streamedContent.value = finalStory;
         } catch (e) {
-          console.error('Failed to parse quest update:', e);
+          console.warn('Failed to parse quest update, ignoring:', e);
         }
       }
 
@@ -337,11 +352,16 @@ class GameLoopService {
       const predictionMatch = finalStory.match(/<prediction_trigger>([\s\S]*?)<\/prediction_trigger>/);
       if (predictionMatch) {
         try {
-          predictionTriggerData = JSON.parse(predictionMatch[1]?.trim() || '{}');
+          const jsonStr = predictionMatch[1]?.trim();
+          if (jsonStr) {
+              predictionTriggerData = JSON.parse(jsonStr);
+          } else {
+              predictionTriggerData = {};
+          }
           finalStory = finalStory.replace(/<prediction_trigger>[\s\S]*?<\/prediction_trigger>/g, '').trim();
           this.streamedContent.value = finalStory;
         } catch (e) {
-          console.error('Failed to parse prediction trigger:', e);
+          console.warn('Failed to parse prediction trigger, ignoring:', e);
         }
       }
 
@@ -350,11 +370,16 @@ class GameLoopService {
       const promiseMatch = finalStory.match(/<promise_trigger>([\s\S]*?)<\/promise_trigger>/);
       if (promiseMatch) {
         try {
-          promiseTriggerData = JSON.parse(promiseMatch[1]?.trim() || '{}');
+          const jsonStr = promiseMatch[1]?.trim();
+          if (jsonStr) {
+              promiseTriggerData = JSON.parse(jsonStr);
+          } else {
+              promiseTriggerData = {};
+          }
           finalStory = finalStory.replace(/<promise_trigger>[\s\S]*?<\/promise_trigger>/g, '').trim();
           this.streamedContent.value = finalStory;
         } catch (e) {
-          console.error('解析约定的触发器失败:', e);
+          console.warn('解析约定的触发器失败, 已忽略:', e);
         }
       }
 
@@ -363,11 +388,16 @@ class GameLoopService {
       const promiseUpdateMatch = finalStory.match(/<promise_update>([\s\S]*?)<\/promise_update>/);
       if (promiseUpdateMatch) {
         try {
-          promiseUpdateData = JSON.parse(promiseUpdateMatch[1]?.trim() || '{}');
+          const jsonStr = promiseUpdateMatch[1]?.trim();
+          if (jsonStr) {
+              promiseUpdateData = JSON.parse(jsonStr);
+          } else {
+              promiseUpdateData = {};
+          }
           finalStory = finalStory.replace(/<promise_update>[\s\S]*?<\/promise_update>/g, '').trim();
           this.streamedContent.value = finalStory;
         } catch (e) {
-          console.error('解析约定的更新失败:', e);
+          console.warn('解析约定的更新失败, 已忽略:', e);
         }
       }
 
@@ -376,11 +406,16 @@ class GameLoopService {
       const managementMatch = finalStory.match(/<management_trigger>([\s\S]*?)<\/management_trigger>/);
       if (managementMatch) {
         try {
-          managementTriggerData = JSON.parse(managementMatch[1]?.trim() || '{}');
+          const jsonStr = managementMatch[1]?.trim();
+          if (jsonStr) {
+              managementTriggerData = JSON.parse(jsonStr);
+          } else {
+              managementTriggerData = {};
+          }
           finalStory = finalStory.replace(/<management_trigger>[\s\S]*?<\/management_trigger>/g, '').trim();
           this.streamedContent.value = finalStory;
         } catch (e) {
-          console.error('解析经营触发器失败:', e);
+          console.warn('解析经营触发器失败, 已忽略:', e);
         }
       }
 

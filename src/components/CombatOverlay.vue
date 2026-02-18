@@ -1431,18 +1431,20 @@ async function executeCombatLogic(actor: UICombatant, type: string, payload: any
                  for (const enemy of enemies.value) {
                      if (enemy.hp > 0) {
                          const result = calculateDamage(actor as Combatant, enemy, spell);
-                         if (enemy.shield && enemy.shield > 0) {
-                             enemy.shield -= result.damage;
-                             updateCombatantState(enemy.id, { shield: enemy.shield });
-                             addPopup(enemy, result.damage, 'buff');
-                             if (enemy.shield <= 0) audioManager.playShatter();
-                         } else {
-                             const newHp = Math.max(0, enemy.hp - result.damage);
-                             enemy.hp = newHp;
-                             updateCombatantState(enemy.id, { hp: newHp });
-                             if (result.damage > 0) addPopup(enemy, result.damage, 'damage');
-                             else if (!spell.buffDetails) addPopup(enemy, 'MISS', 'damage');
-                         }
+                        
+                        let finalDamage = result.damage;
+                        if (finalDamage > 0 && enemy.shield && enemy.shield > 0) {
+                            finalDamage = applyShieldDamage(enemy, finalDamage, actor as Combatant, '攻击', true);
+                        }
+
+                        if (finalDamage > 0) {
+                            const newHp = Math.max(0, enemy.hp - finalDamage);
+                            enemy.hp = newHp;
+                            updateCombatantState(enemy.id, { hp: newHp });
+                            addPopup(enemy, finalDamage, 'damage');
+                        } else if (result.damage <= 0 && !spell.buffDetails) {
+                            addPopup(enemy, 'MISS', 'damage');
+                        }
                          if (spell.buffDetails) applyBuff(enemy, spell.buffDetails, 'debuff');
                      }
                  }
@@ -2376,6 +2378,31 @@ function updateCombatantState(id: string, updates: Partial<Combatant>) {
     }
 }
 
+// --- Helper to Apply Shield Logic (Shield Gate) ---
+function applyShieldDamage(target: UICombatant, damage: number, attacker: Combatant, actionName: string = '攻击', isAoE: boolean = false) {
+    if (!target.shield || target.shield <= 0) return damage;
+
+    const damageToShield = Math.min(target.shield, damage);
+    
+    if (damage >= target.shield) {
+        // Shield Break
+        target.shield = 0;
+        audioManager.playShatter();
+        addPopup(target, damageToShield, 'buff');
+        if (!isAoE) addLog(`${attacker.name} ${actionName}，击碎了 ${target.name} 的护盾！`);
+    } else {
+        // Shield Reduce
+        target.shield -= damage;
+        addPopup(target, damage, 'buff');
+        if (!isAoE) addLog(`${attacker.name} ${actionName}，造成了 ${damage} 点护盾伤害！`);
+    }
+    
+    updateCombatantState(target.id, { shield: target.shield });
+    
+    // Shield Gate: Absorbs ALL damage if shield was present
+    return 0; 
+}
+
 // Core Logic Wrapper
 async function executeAction(attacker: Combatant, defender: UICombatant, actionName: string = '普通攻击', spell?: SpellCard) {
   // Determine number of attacks
@@ -2405,24 +2432,18 @@ async function executeAction(attacker: Combatant, defender: UICombatant, actionN
     }
 
     if (result.damage > 0) {
+        let remainingDamage = result.damage;
+
         if (defender.shield && defender.shield > 0) {
-            // Shield Gate Logic: Damage is capped at shield value by calculateDamage
-            defender.shield -= result.damage;
-            updateCombatantState(defender.id, { shield: defender.shield });
-            
-            addPopup(defender, result.damage, 'buff'); 
-            if (defender.shield <= 0) {
-                addLog(`${attacker.name} ${actionName}，击碎了 ${defender.name} 的护盾！`);
-                audioManager.playShatter();
-            } else {
-                addLog(`${attacker.name} ${actionName}，造成了 ${result.damage} 点护盾伤害！`);
-            }
-        } else {
-            const newHp = Math.max(0, defender.hp - result.damage);
+            remainingDamage = applyShieldDamage(defender, remainingDamage, attacker, actionName);
+        }
+
+        if (remainingDamage > 0) {
+            const newHp = Math.max(0, defender.hp - remainingDamage);
             defender.hp = newHp; // Local visual update
             updateCombatantState(defender.id, { hp: newHp });
             
-            addPopup(defender, result.damage, 'damage');
+            addPopup(defender, remainingDamage, 'damage');
             
             // Trigger Hit Spark
             const isPlayer = defender.isPlayer || defender.team === 'player';
