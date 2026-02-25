@@ -687,7 +687,7 @@ const mpAllReady = computed(() => {
       <div class="absolute inset-0 pointer-events-none opacity-5 bg-texture-stardust"></div>
 
       <div class="font-display font-bold text-xl flex items-center gap-2 md:gap-3 relative z-10 text-izakaya-wood">
-        <span class="text-xl md:text-2xl filter drop-shadow-sm">⛩️</span>
+        <img src="/assets/logo.png" alt="Logo" class="w-8 h-8 md:w-10 md:h-10 object-contain filter drop-shadow-sm" />
         <div class="flex items-center gap-1 md:gap-2">
           <span class="tracking-widest font-serif-display text-lg md:text-2xl">东方异界食堂</span>
           <span class="px-1 md:px-1.5 py-0.5 text-[8px] md:text-[10px] font-bold text-white bg-touhou-red rounded-sm uppercase tracking-wider shadow-sm transform translate-y-0.5">beta</span>
