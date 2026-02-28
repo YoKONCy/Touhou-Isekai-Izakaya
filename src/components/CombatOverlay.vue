@@ -557,7 +557,7 @@
                                    <span>{{ getEffectName(eff) }}</span>
                                    <span :class="eff.value > 0 ? 'text-green-400' : 'text-red-400'">
                                        {{ eff.value > 0 ? '+' : '' }}{{ 
-                                           eff.type === 'heal' || eff.type === 'damage_over_time' || (eff.type === 'stat_mod' && !eff.isPercentage)
+                                           eff.type === 'heal' || eff.type === 'heal_mp' || eff.type === 'shield' || eff.type === 'damage_over_time' || (eff.type === 'stat_mod' && !eff.isPercentage)
                                            ? Math.round(eff.value) 
                                            : Math.round(eff.value * 100) + '%' 
                                        }}
@@ -822,7 +822,7 @@
                                     <span>{{ getEffectName(eff) }}</span>
                                     <span :class="eff.value > 0 ? 'text-green-400' : 'text-red-400'">
                                         {{ eff.value > 0 ? '+' : '' }}{{ 
-                                            eff.type === 'heal' || eff.type === 'damage_over_time' || (eff.type === 'stat_mod' && !eff.isPercentage)
+                                            eff.type === 'heal' || eff.type === 'heal_mp' || eff.type === 'shield' || eff.type === 'damage_over_time' || (eff.type === 'stat_mod' && !eff.isPercentage)
                                             ? Math.round(eff.value) 
                                             : Math.round(eff.value * 100) + '%' 
                                         }}
@@ -2885,11 +2885,11 @@ async function handleTalk() {
                       description: effect.description || effect.buffDetails.name,
                       duration: effect.buffDetails.duration,
                       createdTurn: turn.value,
-                      effects: effect.buffDetails.effects.map(e => ({
+                      effects: effect.buffDetails.effects.map((e: any) => ({
                           type: e.type,
                           targetStat: e.targetStat,
                           value: e.value,
-                          isPercentage: ['stat_mod', 'damage_reduction', 'dodge_mod'].includes(e.type)
+                          isPercentage: e.isPercentage !== undefined ? e.isPercentage : ['stat_mod', 'damage_reduction', 'dodge_mod'].includes(e.type)
                       }))
                   };
                   target.buffs.push(newBuff);
@@ -2944,11 +2944,11 @@ async function handleTalk() {
                         description: effect.description || effect.buffDetails.name,
                         duration: effect.buffDetails.duration,
                         createdTurn: turn.value,
-                        effects: effect.buffDetails.effects.map(e => ({
+                        effects: effect.buffDetails.effects.map((e: any) => ({
                             type: e.type,
                             targetStat: e.targetStat,
                             value: e.value,
-                            isPercentage: ['stat_mod', 'damage_reduction', 'dodge_mod'].includes(e.type)
+                            isPercentage: e.isPercentage !== undefined ? e.isPercentage : ['stat_mod', 'damage_reduction', 'dodge_mod'].includes(e.type)
                         }))
                     };
                     target.buffs.push(newBuff);
@@ -2994,11 +2994,11 @@ async function handleTalk() {
                    description: effect.description || effect.buffDetails.name,
                    duration: effect.buffDetails.duration,
                    createdTurn: turn.value,
-                   effects: effect.buffDetails.effects.map(e => ({
+                   effects: effect.buffDetails.effects.map((e: any) => ({
                        type: e.type,
                        targetStat: e.targetStat,
                        value: e.value,
-                       isPercentage: ['stat_mod', 'damage_reduction', 'dodge_mod'].includes(e.type)
+                       isPercentage: e.isPercentage !== undefined ? e.isPercentage : ['stat_mod', 'damage_reduction', 'dodge_mod'].includes(e.type)
                    }))
                };
                console.log('[HandleTalk] Adding Buff to Player:', newBuff);
@@ -3112,6 +3112,9 @@ function processTurnStart() {
     const allCombatants = [player.value, ...allies.value, ...enemies.value].filter(c => c !== null) as UICombatant[];
     
     for (const c of allCombatants) {
+        const prevHp = c.hp;
+        const prevMp = c.mp || 0;
+
         // Trigger onTurnStart lifecycle hooks (handles DoT, HoT, and other turn-based talent effects)
         applyLifecycleHook('onTurnStart', c, { 
             attacker: c, 
@@ -3120,7 +3123,13 @@ function processTurnStart() {
             onPopup: (target, val, type) => addPopup(target as UICombatant, val, type)
         });
 
-        if (!c.buffs || c.buffs.length === 0) continue;
+        if (!c.buffs || c.buffs.length === 0) {
+            // Even if no buffs, we need to sync HP/MP changes from talents or other hooks
+            if (c.hp !== prevHp || (c.mp || 0) !== prevMp) {
+                updateCombatantState(c.id, { hp: c.hp, mp: c.mp });
+            }
+            continue;
+        }
         
         const expiredBuffs: Buff[] = [];
         const activeBuffs: Buff[] = [];
@@ -3161,9 +3170,20 @@ function processTurnStart() {
             }
         }
         
-        if (changed) {
-             c.buffs = activeBuffs;
-             updateCombatantState(c.id, { buffs: activeBuffs });
+        // Sync both buffs and potential HP/MP changes from DoT/HoT hooks
+        const hpChanged = c.hp !== prevHp;
+        const mpChanged = (c.mp || 0) !== prevMp;
+
+        if (changed || hpChanged || mpChanged) {
+             const updates: any = {};
+             if (changed) {
+                 c.buffs = activeBuffs;
+                 updates.buffs = activeBuffs;
+             }
+             if (hpChanged) updates.hp = c.hp;
+             if (mpChanged) updates.mp = c.mp;
+
+             updateCombatantState(c.id, updates);
              
              for (const b of expiredBuffs) {
                  addLog(`${c.name} 的状态 【${b.name}】 已失效。`);

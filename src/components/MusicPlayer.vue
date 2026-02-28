@@ -177,7 +177,7 @@ function toggleExpand() {
 <template>
   <div 
     v-show="!isCombatActive"
-    class="fixed z-[9999] flex flex-col items-end gap-2 font-serif text-izakaya-wood select-none"
+    class="fixed z-[9999] hidden md:flex flex-col items-end gap-2 font-serif text-izakaya-wood select-none"
     :style="{ left: position.x + 'px', top: position.y + 'px' }"
     @mouseenter="isHovered = true"
     @mouseleave="isHovered = false"

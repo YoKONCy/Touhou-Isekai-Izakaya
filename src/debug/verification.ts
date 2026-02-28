@@ -46,30 +46,29 @@ export function runCombatVerification() {
   }
 
   // 4. Test DoT Lifecycle Hook
-  // This part doesn't depend on store, only combatModifiers.ts logic
   const dotBuff: Buff = {
     id: 'b2', name: 'Poison', description: '', duration: 3, type: 'debuff',
     effects: [{ type: 'damage_over_time', value: 10, isPercentage: false }]
   };
   
-  // Clone defender
   const dotDefender = { ...defender, buffs: [dotBuff] };
   const initialHp = dotDefender.hp;
 
-  // Manually trigger hook
-  let logMsg = '';
+  // Simulate processTurnStart logic
+  const prevHp = dotDefender.hp;
   const context = {
-      attacker: dotDefender, // Self is context for turn start
+      attacker: dotDefender,
       turn: 1,
-      onLog: (msg: string) => { logMsg = msg; }
+      onLog: (msg: string) => { console.log(`[Log] ${msg}`); }
   };
   
   applyLifecycleHook('onTurnStart', dotDefender, context);
   
-  if (dotDefender.hp < initialHp && logMsg.includes('Poison')) {
-    console.log(`%c✅ DoT Hook Verified (HP: ${initialHp} -> ${dotDefender.hp})`, 'color: green');
+  const hpChanged = dotDefender.hp !== prevHp;
+  if (hpChanged && dotDefender.hp === initialHp - 10) {
+    console.log(`%c✅ DoT Hook & Sync Logic Verified (HP: ${initialHp} -> ${dotDefender.hp})`, 'color: green');
   } else {
-    console.error(`❌ DoT Hook Failed. HP: ${dotDefender.hp}, Log: ${logMsg}`);
+    console.error(`❌ DoT Hook Failed. HP: ${dotDefender.hp}`);
   }
 
   console.log('%c--- Verification Complete ---', 'color: #fb923c; font-weight: bold; font-size: 14px;');

@@ -150,14 +150,14 @@ function convertBuffToModifier(buff: Buff): CombatModifier {
          
          const val = Number(effect.value);
          if (effect.type === 'damage_over_time') {
-           const damage = val;
+           const damage = effect.isPercentage ? Math.floor(combatant.maxHp * val) : val;
            if (damage > 0) {
             combatant.hp = Math.max(0, combatant.hp - damage);
             if (context.onLog) context.onLog(`${combatant.name} 受到 ${buff.name} 的持续伤害 ${damage}点！`);
             if (context.onPopup) context.onPopup(combatant, damage, 'damage');
           }
          } else if (effect.type === 'heal') {
-           const heal = val;
+           const heal = effect.isPercentage ? Math.floor(combatant.maxHp * val) : val;
            if (heal > 0) {
              combatant.hp = Math.min(combatant.maxHp, combatant.hp + heal);
              if (context.onLog) context.onLog(`${combatant.name} 因 ${buff.name} 恢复了 ${heal} 点生命！`);

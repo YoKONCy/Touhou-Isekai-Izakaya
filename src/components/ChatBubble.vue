@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { type ChatMessage } from '@/types/db';
-import { User, Bot, Trash2, Bug, Copy, Edit, MoreVertical, Terminal, X, RefreshCw } from 'lucide-vue-next';
+import { User, Bot, Trash2, Bug, Copy, Edit, MoreVertical, Terminal, X, RefreshCw, ChevronDown, ChevronRight } from 'lucide-vue-next';
 import { useChatStore } from '@/stores/chat';
 import { useGameStore } from '@/stores/game';
 import { useConfirm } from '@/utils/confirm';
@@ -25,9 +25,26 @@ const showActionMenu = ref(false);
 const closeMenuTimer = ref<number | null>(null);
 const isTouchDevice = ref(false);
 
+// 调试面板展开状态
+const expandedSections = ref({
+  input: false,
+  thinking: true, // 默认展开思维链
+  output: false,
+  illustration: false
+});
+
+function toggleSection(section: keyof typeof expandedSections.value) {
+  expandedSections.value[section] = !expandedSections.value[section];
+}
+
+// 获取思维链内容，优先使用 thought_content
+const logicThinkingContent = computed(() => {
+  return props.message.thought_content || props.message.debugLog?.logicThinking || '';
+});
+
 onMounted(() => {
   isTouchDevice.value = window.matchMedia('(pointer: coarse)').matches;
-  // Listen for clicks outside to close the menu
+  // 监听外部点击以关闭菜单
   document.addEventListener('click', closeMenuOnOutsideClick);
 });
 
@@ -42,7 +59,7 @@ function closeMenuOnOutsideClick() {
 }
 
 function handleMouseEnterMenu() {
-  if (isTouchDevice.value) return; // Ignore hover on touch devices
+  if (isTouchDevice.value) return; // 触摸设备忽略悬停
   if (closeMenuTimer.value) {
     clearTimeout(closeMenuTimer.value);
     closeMenuTimer.value = null;
@@ -51,7 +68,7 @@ function handleMouseEnterMenu() {
 }
 
 function handleMouseLeaveMenu() {
-  if (isTouchDevice.value) return; // Ignore hover on touch devices
+  if (isTouchDevice.value) return; // 触摸设备忽略悬停
   closeMenuTimer.value = window.setTimeout(() => {
     showActionMenu.value = false;
   }, 150);
@@ -70,14 +87,8 @@ const renderedContent = computed(() => {
   return parseMarkdown(props.message.content);
 });
 
-// handleBubbleClick removed as TTS is disabled
-// function handleBubbleClick(e: MouseEvent) {}
-
 const hasDebugLog = computed(() => {
-  const hasLog = !!props.message.debugLog;
-  if (props.message.role === 'assistant') {
-      // console.log(`[ChatBubble] Msg ${props.message.id} hasDebugLog: ${hasLog}`, props.message.debugLog);
-  }
+  const hasLog = !!props.message.debugLog || !!props.message.thought_content;
   return hasLog;
 });
 
@@ -251,36 +262,60 @@ async function handleRegenerateMemory() {
            
            <div class="p-3 overflow-x-auto custom-scrollbar max-h-[400px]">
              <div v-if="hasDebugLog" class="space-y-4">
+                <!-- Logic Input -->
                 <div class="group/debug-section">
-                   <div class="text-green-400 font-bold mb-1 flex items-center gap-2 opacity-80 group-hover/debug-section:opacity-100 transition-opacity">
+                   <div 
+                      @click="toggleSection('input')"
+                      class="text-green-400 font-bold mb-1 flex items-center gap-2 opacity-80 group-hover/debug-section:opacity-100 transition-opacity cursor-pointer select-none"
+                   >
+                      <ChevronDown v-if="expandedSections.input" class="w-3 h-3" />
+                      <ChevronRight v-else class="w-3 h-3" />
                       <span class="w-1.5 h-1.5 rounded-full bg-green-400"></span>
-                      Logic Input (Context)
+                      逻辑输入 (上下文)
                    </div>
-                   <pre class="bg-black/30 p-2 rounded border border-gray-800 text-gray-300">{{ message.debugLog?.logicInput }}</pre>
+                   <pre v-if="expandedSections.input" class="bg-black/30 p-2 rounded border border-gray-800 text-gray-300 animate-in slide-in-from-top-1 duration-200 overflow-x-auto">{{ message.debugLog?.logicInput }}</pre>
                 </div>
                 
+                <!-- Logic Thinking (CoT) -->
                 <div class="group/debug-section">
-                   <div class="text-marisa-gold font-bold mb-1 flex items-center gap-2 opacity-80 group-hover/debug-section:opacity-100 transition-opacity">
+                   <div 
+                      @click="toggleSection('thinking')"
+                      class="text-marisa-gold font-bold mb-1 flex items-center gap-2 opacity-80 group-hover/debug-section:opacity-100 transition-opacity cursor-pointer select-none"
+                   >
+                      <ChevronDown v-if="expandedSections.thinking" class="w-3 h-3" />
+                      <ChevronRight v-else class="w-3 h-3" />
                       <span class="w-1.5 h-1.5 rounded-full bg-marisa-gold"></span>
-                      Logic Thinking (CoT)
+                      思维链 (CoT)
                    </div>
-                   <div class="bg-black/30 p-2 rounded border border-gray-800 text-gray-300 whitespace-pre-wrap">{{ message.debugLog?.logicThinking }}</div>
+                   <div v-if="expandedSections.thinking" class="bg-black/30 p-2 rounded border border-gray-800 text-gray-300 whitespace-pre-wrap animate-in slide-in-from-top-1 duration-200">{{ logicThinkingContent || '暂无思维链内容' }}</div>
                 </div>
                 
+                <!-- Logic Output -->
                 <div class="group/debug-section">
-                   <div class="text-blue-400 font-bold mb-1 flex items-center gap-2 opacity-80 group-hover/debug-section:opacity-100 transition-opacity">
+                   <div 
+                      @click="toggleSection('output')"
+                      class="text-blue-400 font-bold mb-1 flex items-center gap-2 opacity-80 group-hover/debug-section:opacity-100 transition-opacity cursor-pointer select-none"
+                   >
+                      <ChevronDown v-if="expandedSections.output" class="w-3 h-3" />
+                      <ChevronRight v-else class="w-3 h-3" />
                       <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
-                      Logic Output (JSON)
+                      逻辑输出 (JSON)
                    </div>
-                   <pre class="bg-black/30 p-2 rounded border border-gray-800 text-gray-300">{{ message.debugLog?.logicOutput }}</pre>
+                   <pre v-if="expandedSections.output" class="bg-black/30 p-2 rounded border border-gray-800 text-gray-300 animate-in slide-in-from-top-1 duration-200 overflow-x-auto">{{ message.debugLog?.logicOutput }}</pre>
                 </div>
 
+                <!-- Illustration Prompt -->
                 <div v-if="message.illustrationPrompt" class="group/debug-section">
-                   <div class="text-purple-400 font-bold mb-1 flex items-center gap-2 opacity-80 group-hover/debug-section:opacity-100 transition-opacity">
+                   <div 
+                      @click="toggleSection('illustration')"
+                      class="text-purple-400 font-bold mb-1 flex items-center gap-2 opacity-80 group-hover/debug-section:opacity-100 transition-opacity cursor-pointer select-none"
+                   >
+                      <ChevronDown v-if="expandedSections.illustration" class="w-3 h-3" />
+                      <ChevronRight v-else class="w-3 h-3" />
                       <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
-                      Illustration Prompt
+                      插画提示词
                    </div>
-                   <div class="bg-black/30 p-2 rounded border border-gray-800 text-gray-300 whitespace-pre-wrap text-xs">{{ message.illustrationPrompt }}</div>
+                   <div v-if="expandedSections.illustration" class="bg-black/30 p-2 rounded border border-gray-800 text-gray-300 whitespace-pre-wrap text-xs animate-in slide-in-from-top-1 duration-200">{{ message.illustrationPrompt }}</div>
                 </div>
              </div>
              <div v-else class="text-center text-gray-500 py-8 flex flex-col items-center gap-2">
