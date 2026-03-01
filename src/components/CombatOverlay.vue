@@ -557,7 +557,7 @@
                                    <span>{{ getEffectName(eff) }}</span>
                                    <span :class="eff.value > 0 ? 'text-green-400' : 'text-red-400'">
                                        {{ eff.value > 0 ? '+' : '' }}{{ 
-                                           eff.type === 'heal' || eff.type === 'heal_mp' || eff.type === 'shield' || eff.type === 'damage_over_time' || (eff.type === 'stat_mod' && !eff.isPercentage)
+                                           (eff.isPercentage === false || ['heal', 'heal_mp', 'shield', 'damage_over_time'].includes(eff.type))
                                            ? Math.round(eff.value) 
                                            : Math.round(eff.value * 100) + '%' 
                                        }}
@@ -822,7 +822,7 @@
                                     <span>{{ getEffectName(eff) }}</span>
                                     <span :class="eff.value > 0 ? 'text-green-400' : 'text-red-400'">
                                         {{ eff.value > 0 ? '+' : '' }}{{ 
-                                            eff.type === 'heal' || eff.type === 'heal_mp' || eff.type === 'shield' || eff.type === 'damage_over_time' || (eff.type === 'stat_mod' && !eff.isPercentage)
+                                            (eff.isPercentage === false || ['heal', 'heal_mp', 'shield', 'damage_over_time'].includes(eff.type))
                                             ? Math.round(eff.value) 
                                             : Math.round(eff.value * 100) + '%' 
                                         }}
@@ -2543,12 +2543,21 @@ function applyBuff(target: UICombatant, buffDetails: any, type: 'buff' | 'debuff
         description: buffDetails.description || buffDetails.name || '效果持续中',
         duration: buffDetails.duration || 3,
         createdTurn: turn.value,
-        effects: (buffDetails.effects || []).map((e: any) => ({
-            type: e.type,
-            targetStat: e.targetStat,
-            value: Number(e.value) || 0,
-            isPercentage: e.isPercentage !== false // Default true unless specified
-        }))
+        effects: (buffDetails.effects || []).map((e: any) => {
+            const isPct = e.isPercentage !== undefined 
+                ? (String(e.isPercentage) === 'true') 
+                : ['stat_mod', 'damage_reduction', 'dodge_mod'].includes(e.type);
+            
+            // 额外修正：heal, damage_over_time, shield 强制不作为百分比处理，除非显式指定
+            const finalIsPct = ['heal', 'damage_over_time', 'shield', 'heal_mp'].includes(e.type) ? false : isPct;
+
+            return {
+                type: e.type,
+                targetStat: e.targetStat,
+                value: Number(e.value) || 0,
+                isPercentage: finalIsPct
+            };
+        })
     };
     
     target.buffs.push(newBuff);
@@ -2885,12 +2894,21 @@ async function handleTalk() {
                       description: effect.description || effect.buffDetails.name,
                       duration: effect.buffDetails.duration,
                       createdTurn: turn.value,
-                      effects: effect.buffDetails.effects.map((e: any) => ({
-                          type: e.type,
-                          targetStat: e.targetStat,
-                          value: e.value,
-                          isPercentage: e.isPercentage !== undefined ? e.isPercentage : ['stat_mod', 'damage_reduction', 'dodge_mod'].includes(e.type)
-                      }))
+                      effects: effect.buffDetails.effects.map((e: any) => {
+                          const isPct = e.isPercentage !== undefined 
+                              ? (String(e.isPercentage) === 'true') 
+                              : ['stat_mod', 'damage_reduction', 'dodge_mod'].includes(e.type);
+                          
+                          // 强制修正：heal, damage_over_time, shield 强制不作为百分比处理，除非显式指定
+                          const finalIsPct = ['heal', 'damage_over_time', 'shield', 'heal_mp'].includes(e.type) ? false : isPct;
+
+                          return {
+                              type: e.type,
+                              targetStat: e.targetStat,
+                              value: Number(e.value) || 0,
+                              isPercentage: finalIsPct
+                          };
+                      })
                   };
                   target.buffs.push(newBuff);
                   updateCombatantState(target.id, { buffs: target.buffs });
@@ -2944,12 +2962,21 @@ async function handleTalk() {
                         description: effect.description || effect.buffDetails.name,
                         duration: effect.buffDetails.duration,
                         createdTurn: turn.value,
-                        effects: effect.buffDetails.effects.map((e: any) => ({
-                            type: e.type,
-                            targetStat: e.targetStat,
-                            value: e.value,
-                            isPercentage: e.isPercentage !== undefined ? e.isPercentage : ['stat_mod', 'damage_reduction', 'dodge_mod'].includes(e.type)
-                        }))
+                        effects: effect.buffDetails.effects.map((e: any) => {
+                            const isPct = e.isPercentage !== undefined 
+                                ? (String(e.isPercentage) === 'true') 
+                                : ['stat_mod', 'damage_reduction', 'dodge_mod'].includes(e.type);
+                            
+                            // 强制修正：heal, damage_over_time, shield 强制不作为百分比处理，除非显式指定
+                            const finalIsPct = ['heal', 'damage_over_time', 'shield', 'heal_mp'].includes(e.type) ? false : isPct;
+
+                            return {
+                                type: e.type,
+                                targetStat: e.targetStat,
+                                value: Number(e.value) || 0,
+                                isPercentage: finalIsPct
+                            };
+                        })
                     };
                     target.buffs.push(newBuff);
                     updateCombatantState(target.id, { buffs: target.buffs });
@@ -2994,12 +3021,21 @@ async function handleTalk() {
                    description: effect.description || effect.buffDetails.name,
                    duration: effect.buffDetails.duration,
                    createdTurn: turn.value,
-                   effects: effect.buffDetails.effects.map((e: any) => ({
-                       type: e.type,
-                       targetStat: e.targetStat,
-                       value: e.value,
-                       isPercentage: e.isPercentage !== undefined ? e.isPercentage : ['stat_mod', 'damage_reduction', 'dodge_mod'].includes(e.type)
-                   }))
+                   effects: effect.buffDetails.effects.map((e: any) => {
+                       const isPct = e.isPercentage !== undefined 
+                           ? (String(e.isPercentage) === 'true') 
+                           : ['stat_mod', 'damage_reduction', 'dodge_mod'].includes(e.type);
+                       
+                       // 强制修正：heal, damage_over_time, shield 强制不作为百分比处理，除非显式指定
+                       const finalIsPct = ['heal', 'damage_over_time', 'shield', 'heal_mp'].includes(e.type) ? false : isPct;
+
+                       return {
+                           type: e.type,
+                           targetStat: e.targetStat,
+                           value: Number(e.value) || 0,
+                           isPercentage: finalIsPct
+                       };
+                   })
                };
                console.log('[HandleTalk] Adding Buff to Player:', newBuff);
                player.value.buffs.push(newBuff);

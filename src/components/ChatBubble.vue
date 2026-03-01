@@ -34,6 +34,7 @@ const expandedSections = ref({
 });
 
 function toggleSection(section: keyof typeof expandedSections.value) {
+  console.log('[ChatBubble] Toggling section:', section, 'Current state:', expandedSections.value[section]);
   expandedSections.value[section] = !expandedSections.value[section];
 }
 
@@ -249,7 +250,7 @@ async function handleRegenerateMemory() {
     </div>
       
       <!-- Debug Panel -->
-      <div v-if="showDebug" class="mt-2 w-full max-w-2xl animate-in slide-in-from-top-2 fade-in duration-300">
+      <div v-if="showDebug" class="mt-2 w-full max-w-2xl animate-in slide-in-from-top-2 fade-in duration-300 relative z-30">
         <div class="bg-gray-900/95 text-gray-100 rounded-lg text-xs font-mono overflow-hidden border border-touhou-red/30 shadow-xl backdrop-blur-sm">
            <!-- Header -->
            <div class="flex items-center justify-between px-3 py-2 bg-gray-800/50 border-b border-gray-700">
