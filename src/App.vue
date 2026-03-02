@@ -201,11 +201,11 @@ onMounted(() => {
 });
 
 const hasPendingTriggers = computed(() => {
-  // Combat triggers are handled by CombatOverlay separately
-  return !!gameStore.state.system.pending_quest_trigger;
+  return !!gameStore.state.system.pending_quest_trigger || !!gameStore.state.system.combat?.isPending;
 });
 
-// Reset manual open state when new triggers arrive
+// 移除自动弹出逻辑，改为通过底部的提示按钮手动开启
+/*
 watch(() => gameStore.state.system.combat?.isPending, (isPending) => {
   if (isPending) {
     // Automatically open Combat Overlay when combat is pending
@@ -218,6 +218,7 @@ watch(() => gameStore.state.system.pending_quest_trigger, (quest) => {
     userOpenQuest.value = true;
   }
 });
+*/
 
 function handleOpenHelp(sectionId?: string) {
   helpInitialSectionId.value = sectionId;
