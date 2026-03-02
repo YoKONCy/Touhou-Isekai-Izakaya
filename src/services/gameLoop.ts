@@ -587,21 +587,7 @@ class GameLoopService {
       // 4. Background Processing: LLM #2 & LLM #3 (Non-blocking)
       // CRITICAL: Only proceed if we have a valid story and not aborted
       if (!this.abortController?.signal.aborted && finalStory.trim()) {
-        // Prepare LLM1 Debug Info
-        const storyDebug = {
-          input: JSON.stringify(messages, null, 2),
-          output: rawContent,
-          thinking: thoughtContent
-        };
-
-        this.processBackgroundTasks(
-          finalUserContent, 
-          finalStory, 
-          currentSaveSlotId, 
-          assistantMsgId, 
-          this.abortController?.signal,
-          storyDebug
-        );
+        this.processBackgroundTasks(finalUserContent, finalStory, currentSaveSlotId, assistantMsgId, this.abortController?.signal);
       } else {
         console.log('[GameLoop] Skipping background processing: aborted or empty story.');
         this.currentStage.value = 'idle';
@@ -634,15 +620,14 @@ class GameLoopService {
     finalStory: string, 
     currentSaveSlotId: number,
     assistantMsgId?: number,
-    signal?: AbortSignal,
-    storyDebug?: { input: string, output: string, thinking: string }
+    signal?: AbortSignal
   ) {
     try {
       const gameStore = useGameStore();
       const toastStore = useToastStore();
       const chatStore = useChatStore(); // Ensure chatStore is available for the whole function scope
       
-      // Capture Input for Debug (LLM #2 Logic)
+      // Capture Input for Debug
       const logicInputSnapshot = JSON.stringify({
          current_state: {
              player: logicService.sanitizePlayer(gameStore.state.player),
@@ -705,7 +690,6 @@ class GameLoopService {
             const currentState = JSON.parse(JSON.stringify(gameStore.state));
             
             // Update snapshot with NEW game state
-            const dbService = (window as any).dbService;
             await dbService.updateSnapshot(msg.snapshotId, {
                gameState: JSON.stringify(currentState)
             });
@@ -717,16 +701,10 @@ class GameLoopService {
         toastStore.addToast(logicResult.summary, 'info', 5000);
       }
       
-      // Update the assistant message with debug info (Combined LLM1 and LLM2)
+      // Update the assistant message with debug info
       if (assistantMsgId) {
         await chatStore.updateMessage(assistantMsgId, { 
           debugLog: {
-            // LLM #1: Story
-            storyInput: storyDebug?.input,
-            storyOutput: storyDebug?.output,
-            storyThinking: storyDebug?.thinking,
-
-            // LLM #2: Logic
             logicInput: logicInputSnapshot,
             logicOutput: JSON.stringify(logicResult, null, 2),
             logicThinking: logicResult.thinking || 'No thinking process returned from Logic Model.'
