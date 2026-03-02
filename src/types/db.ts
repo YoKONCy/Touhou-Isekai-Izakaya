@@ -17,6 +17,12 @@ export interface ChatMessage {
   
   // Debug Info
   debugLog?: {
+    // LLM #1: Storyteller
+    storyInput?: string;
+    storyOutput?: string;
+    storyThinking?: string;
+
+    // LLM #2: Logic
     logicInput?: string;
     logicOutput?: string;
     logicThinking?: string;

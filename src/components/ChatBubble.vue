@@ -27,6 +27,12 @@ const isTouchDevice = ref(false);
 
 // 调试面板展开状态
 const expandedSections = ref({
+  // LLM #1: Story
+  storyInput: false,
+  storyThinking: true,
+  storyOutput: false,
+  
+  // LLM #2: Logic
   input: false,
   thinking: true, // 默认展开思维链
   output: false,
@@ -38,7 +44,12 @@ function toggleSection(section: keyof typeof expandedSections.value) {
   expandedSections.value[section] = !expandedSections.value[section];
 }
 
-// 获取思维链内容，优先使用 thought_content
+// 获取剧情模型思维链内容
+const storyThinkingContent = computed(() => {
+  return props.message.debugLog?.storyThinking || '';
+});
+
+// 获取逻辑模型思维链内容，优先使用 thought_content
 const logicThinkingContent = computed(() => {
   return props.message.thought_content || props.message.debugLog?.logicThinking || '';
 });
@@ -263,60 +274,122 @@ async function handleRegenerateMemory() {
            
            <div class="p-3 overflow-x-auto custom-scrollbar max-h-[400px]">
              <div v-if="hasDebugLog" class="space-y-4">
-                <!-- Logic Input -->
-                <div class="group/debug-section">
-                   <div 
-                      @click="toggleSection('input')"
-                      class="text-green-400 font-bold mb-1 flex items-center gap-2 opacity-80 group-hover/debug-section:opacity-100 transition-opacity cursor-pointer select-none"
-                   >
-                      <ChevronDown v-if="expandedSections.input" class="w-3 h-3" />
-                      <ChevronRight v-else class="w-3 h-3" />
-                      <span class="w-1.5 h-1.5 rounded-full bg-green-400"></span>
-                      逻辑输入 (上下文)
+                <!-- LLM #1: Storyteller -->
+                <div class="border-b border-gray-800 pb-2 mb-2">
+                   <div class="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-2 flex items-center gap-2">
+                      <span class="w-2 h-0.5 bg-touhou-red"></span>
+                      LLM #1: Storyteller (剧情生成)
                    </div>
-                   <pre v-if="expandedSections.input" class="bg-black/30 p-2 rounded border border-gray-800 text-gray-300 animate-in slide-in-from-top-1 duration-200 overflow-x-auto">{{ message.debugLog?.logicInput }}</pre>
-                </div>
-                
-                <!-- Logic Thinking (CoT) -->
-                <div class="group/debug-section">
-                   <div 
-                      @click="toggleSection('thinking')"
-                      class="text-marisa-gold font-bold mb-1 flex items-center gap-2 opacity-80 group-hover/debug-section:opacity-100 transition-opacity cursor-pointer select-none"
-                   >
-                      <ChevronDown v-if="expandedSections.thinking" class="w-3 h-3" />
-                      <ChevronRight v-else class="w-3 h-3" />
-                      <span class="w-1.5 h-1.5 rounded-full bg-marisa-gold"></span>
-                      思维链 (CoT)
+                   
+                   <div class="space-y-3 pl-2">
+                      <!-- Story Input -->
+                      <div class="group/debug-section">
+                         <div 
+                            @click="toggleSection('storyInput')"
+                            class="text-green-400/80 font-bold mb-1 flex items-center gap-2 opacity-80 group-hover/debug-section:opacity-100 transition-opacity cursor-pointer select-none"
+                         >
+                            <ChevronDown v-if="expandedSections.storyInput" class="w-3 h-3" />
+                            <ChevronRight v-else class="w-3 h-3" />
+                            <span class="w-1.5 h-1.5 rounded-full bg-green-400/50"></span>
+                            剧情输入 (Prompt)
+                         </div>
+                         <pre v-if="expandedSections.storyInput" class="bg-black/30 p-2 rounded border border-gray-800 text-gray-300 animate-in slide-in-from-top-1 duration-200 overflow-x-auto text-[10px]">{{ message.debugLog?.storyInput || '暂无输入信息' }}</pre>
+                      </div>
+
+                      <!-- Story Thinking -->
+                      <div class="group/debug-section">
+                         <div 
+                            @click="toggleSection('storyThinking')"
+                            class="text-marisa-gold/80 font-bold mb-1 flex items-center gap-2 opacity-80 group-hover/debug-section:opacity-100 transition-opacity cursor-pointer select-none"
+                         >
+                            <ChevronDown v-if="expandedSections.storyThinking" class="w-3 h-3" />
+                            <ChevronRight v-else class="w-3 h-3" />
+                            <span class="w-1.5 h-1.5 rounded-full bg-marisa-gold/50"></span>
+                            剧情思维链 (CoT)
+                         </div>
+                         <div v-if="expandedSections.storyThinking" class="bg-black/30 p-2 rounded border border-gray-800 text-gray-300 whitespace-pre-wrap animate-in slide-in-from-top-1 duration-200 text-[10px]">{{ storyThinkingContent || '暂无思维链内容' }}</div>
+                      </div>
+
+                      <!-- Story Output -->
+                      <div class="group/debug-section">
+                         <div 
+                            @click="toggleSection('storyOutput')"
+                            class="text-blue-400/80 font-bold mb-1 flex items-center gap-2 opacity-80 group-hover/debug-section:opacity-100 transition-opacity cursor-pointer select-none"
+                         >
+                            <ChevronDown v-if="expandedSections.storyOutput" class="w-3 h-3" />
+                            <ChevronRight v-else class="w-3 h-3" />
+                            <span class="w-1.5 h-1.5 rounded-full bg-blue-400/50"></span>
+                            剧情原始输出
+                         </div>
+                         <pre v-if="expandedSections.storyOutput" class="bg-black/30 p-2 rounded border border-gray-800 text-gray-300 animate-in slide-in-from-top-1 duration-200 overflow-x-auto text-[10px]">{{ message.debugLog?.storyOutput || '暂无输出内容' }}</pre>
+                      </div>
                    </div>
-                   <div v-if="expandedSections.thinking" class="bg-black/30 p-2 rounded border border-gray-800 text-gray-300 whitespace-pre-wrap animate-in slide-in-from-top-1 duration-200">{{ logicThinkingContent || '暂无思维链内容' }}</div>
-                </div>
-                
-                <!-- Logic Output -->
-                <div class="group/debug-section">
-                   <div 
-                      @click="toggleSection('output')"
-                      class="text-blue-400 font-bold mb-1 flex items-center gap-2 opacity-80 group-hover/debug-section:opacity-100 transition-opacity cursor-pointer select-none"
-                   >
-                      <ChevronDown v-if="expandedSections.output" class="w-3 h-3" />
-                      <ChevronRight v-else class="w-3 h-3" />
-                      <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
-                      逻辑输出 (JSON)
-                   </div>
-                   <pre v-if="expandedSections.output" class="bg-black/30 p-2 rounded border border-gray-800 text-gray-300 animate-in slide-in-from-top-1 duration-200 overflow-x-auto">{{ message.debugLog?.logicOutput }}</pre>
                 </div>
 
-                <!-- Illustration Prompt -->
-                <div v-if="message.illustrationPrompt" class="group/debug-section">
-                   <div 
-                      @click="toggleSection('illustration')"
-                      class="text-purple-400 font-bold mb-1 flex items-center gap-2 opacity-80 group-hover/debug-section:opacity-100 transition-opacity cursor-pointer select-none"
-                   >
-                      <ChevronDown v-if="expandedSections.illustration" class="w-3 h-3" />
-                      <ChevronRight v-else class="w-3 h-3" />
-                      <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
-                      插画提示词
+                <!-- LLM #2: Logic -->
+                <div>
+                   <div class="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-2 flex items-center gap-2">
+                      <span class="w-2 h-0.5 bg-blue-500"></span>
+                      LLM #2: Logic (逻辑处理)
                    </div>
-                   <div v-if="expandedSections.illustration" class="bg-black/30 p-2 rounded border border-gray-800 text-gray-300 whitespace-pre-wrap text-xs animate-in slide-in-from-top-1 duration-200">{{ message.illustrationPrompt }}</div>
+
+                   <div class="space-y-3 pl-2">
+                      <!-- Logic Input -->
+                      <div class="group/debug-section">
+                         <div 
+                            @click="toggleSection('input')"
+                            class="text-green-400/80 font-bold mb-1 flex items-center gap-2 opacity-80 group-hover/debug-section:opacity-100 transition-opacity cursor-pointer select-none"
+                         >
+                            <ChevronDown v-if="expandedSections.input" class="w-3 h-3" />
+                            <ChevronRight v-else class="w-3 h-3" />
+                            <span class="w-1.5 h-1.5 rounded-full bg-green-400/50"></span>
+                            逻辑输入 (上下文)
+                         </div>
+                         <pre v-if="expandedSections.input" class="bg-black/30 p-2 rounded border border-gray-800 text-gray-300 animate-in slide-in-from-top-1 duration-200 overflow-x-auto text-[10px]">{{ message.debugLog?.logicInput }}</pre>
+                      </div>
+                      
+                      <!-- Logic Thinking (CoT) -->
+                      <div class="group/debug-section">
+                         <div 
+                            @click="toggleSection('thinking')"
+                            class="text-marisa-gold/80 font-bold mb-1 flex items-center gap-2 opacity-80 group-hover/debug-section:opacity-100 transition-opacity cursor-pointer select-none"
+                         >
+                            <ChevronDown v-if="expandedSections.thinking" class="w-3 h-3" />
+                            <ChevronRight v-else class="w-3 h-3" />
+                            <span class="w-1.5 h-1.5 rounded-full bg-marisa-gold/50"></span>
+                            逻辑思维链 (CoT)
+                         </div>
+                         <div v-if="expandedSections.thinking" class="bg-black/30 p-2 rounded border border-gray-800 text-gray-300 whitespace-pre-wrap animate-in slide-in-from-top-1 duration-200 text-[10px]">{{ logicThinkingContent || '暂无思维链内容' }}</div>
+                      </div>
+                      
+                      <!-- Logic Output -->
+                      <div class="group/debug-section">
+                         <div 
+                            @click="toggleSection('output')"
+                            class="text-blue-400/80 font-bold mb-1 flex items-center gap-2 opacity-80 group-hover/debug-section:opacity-100 transition-opacity cursor-pointer select-none"
+                         >
+                            <ChevronDown v-if="expandedSections.output" class="w-3 h-3" />
+                            <ChevronRight v-else class="w-3 h-3" />
+                            <span class="w-1.5 h-1.5 rounded-full bg-blue-400/50"></span>
+                            逻辑输出 (JSON)
+                         </div>
+                         <pre v-if="expandedSections.output" class="bg-black/30 p-2 rounded border border-gray-800 text-gray-300 animate-in slide-in-from-top-1 duration-200 overflow-x-auto text-[10px]">{{ message.debugLog?.logicOutput }}</pre>
+                      </div>
+
+                      <!-- Illustration Prompt -->
+                      <div v-if="message.illustrationPrompt" class="group/debug-section">
+                         <div 
+                            @click="toggleSection('illustration')"
+                            class="text-purple-400/80 font-bold mb-1 flex items-center gap-2 opacity-80 group-hover/debug-section:opacity-100 transition-opacity cursor-pointer select-none"
+                         >
+                            <ChevronDown v-if="expandedSections.illustration" class="w-3 h-3" />
+                            <ChevronRight v-else class="w-3 h-3" />
+                            <span class="w-1.5 h-1.5 rounded-full bg-purple-400/50"></span>
+                            插画提示词
+                         </div>
+                         <div v-if="expandedSections.illustration" class="bg-black/30 p-2 rounded border border-gray-800 text-gray-300 whitespace-pre-wrap text-[10px] animate-in slide-in-from-top-1 duration-200">{{ message.illustrationPrompt }}</div>
+                      </div>
+                   </div>
                 </div>
              </div>
              <div v-else class="text-center text-gray-500 py-8 flex flex-col items-center gap-2">
