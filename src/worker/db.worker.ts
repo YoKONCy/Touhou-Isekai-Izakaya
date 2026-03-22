@@ -111,26 +111,30 @@ function runMigrations(db: any) {
 // --- Optimization Helpers ---
 const hashCache = new Map<string, string>();
 
-async function sha1(str: string): Promise<string> {
+/**
+ * Fast synchronous hash for deduplication. We don't need cryptographic security here,
+ * just a consistent key for content-addressed storage. Using FNV-1a for speed.
+ */
+function fastHash(str: string): string {
     if (hashCache.has(str)) return hashCache.get(str)!;
     
-    // Fallback if crypto not available
-    if (!self.crypto || !self.crypto.subtle) {
-        let hash = 5381;
-        for (let i = 0; i < str.length; i++) {
-            hash = ((hash << 5) + hash) + str.charCodeAt(i);
-        }
-        const res = (hash >>> 0).toString(16);
-        hashCache.set(str, res);
-        return res;
+    // FNV-1a 32-bit + secondary djb2 to reduce collision chance
+    let h1 = 0x811c9dc5;
+    let h2 = 5381;
+    for (let i = 0; i < str.length; i++) {
+        const c = str.charCodeAt(i);
+        h1 ^= c;
+        h1 = Math.imul(h1, 0x01000193);
+        h2 = ((h2 << 5) + h2) + c;
     }
-    
-    const msgUint8 = new TextEncoder().encode(str);
-    const hashBuffer = await self.crypto.subtle.digest('SHA-1', msgUint8);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    hashCache.set(str, hashHex);
-    return hashHex;
+    const res = (h1 >>> 0).toString(16).padStart(8, '0') + (h2 >>> 0).toString(16).padStart(8, '0');
+    hashCache.set(str, res);
+    return res;
+}
+
+// Keep async sha1 as alias for backward compatibility (callers already awaited it)
+async function sha1(str: string): Promise<string> {
+    return fastHash(str);
 }
 
 async function optimizeGameState(state: any): Promise<any> {
@@ -448,8 +452,6 @@ async function exportSave(db: any, saveSlotId: number) {
   };
   
   const chats = getRows('SELECT * FROM chats WHERE saveSlotId = ?', [saveSlotId]).map((chat: any) => {
-    // Optimization: Remove debugLog and potential duplicate large fields from chat history
-    // We keep illustrationUrl as it is content
     if (chat.debugLog) {
         chat.debugLog = undefined;
     }
@@ -458,7 +460,6 @@ async function exportSave(db: any, saveSlotId: number) {
 
   const memories = getRows('SELECT * FROM memories WHERE saveSlotId = ?', [saveSlotId]);
   
-  // Export memory relations associated with this save slot's memories
   const memoryRelations = getRows(`
     SELECT mr.* 
     FROM memory_relations mr 
@@ -468,48 +469,60 @@ async function exportSave(db: any, saveSlotId: number) {
 
   const snapshotsCount = getRows('SELECT COUNT(*) as c FROM snapshots WHERE saveSlotId = ?', [saveSlotId])[0].c;
   
-  // 1. Optimize Phase (Must be done BEFORE exporting staticData)
-  // We iterate through all snapshots to ensure they are optimized (deduplicated)
-  // This reduces the export size significantly.
-  const OPTIMIZE_BATCH_SIZE = 10;
+  console.log(`[Export] Starting export. Snapshots: ${snapshotsCount}, Chats: ${chats.length}`);
+  
+  // =================================================================
+  // Phase 1: Optimize snapshots (deduplication)
+  // FAST PATH: Skip already-optimized snapshots (those containing "_ref")
+  // =================================================================
+  const OPTIMIZE_BATCH_SIZE = 50;
   let optimizedCount = 0;
+  let skippedCount = 0;
+  
+  // Cache: store optimized gameState strings keyed by snapshot id
+  // to avoid re-reading them from DB in phase 2
+  const snapshotCache = new Map<number, string>();
   
   for (let offset = 0; offset < snapshotsCount; offset += OPTIMIZE_BATCH_SIZE) {
-      const batch = getRows('SELECT id, gameState FROM snapshots WHERE saveSlotId = ? LIMIT ? OFFSET ?', [saveSlotId, OPTIMIZE_BATCH_SIZE, offset]);
+      const batch = getRows(
+        'SELECT id, gameState FROM snapshots WHERE saveSlotId = ? ORDER BY id LIMIT ? OFFSET ?',
+        [saveSlotId, OPTIMIZE_BATCH_SIZE, offset]
+      );
       const updates: { id: number, gameState: string }[] = [];
       
       for (const s of batch) {
-          if (!s.gameState) continue;
+          if (!s.gameState) {
+              snapshotCache.set(s.id, 'null');
+              continue;
+          }
+          
+          const originalStr = typeof s.gameState === 'string' ? s.gameState : JSON.stringify(s.gameState);
+          
+          // FAST PATH: If already contains _ref markers, skip optimization
+          // This is safe because optimizeGameState only adds _ref and never removes them
+          if (originalStr.includes('"_ref"')) {
+              snapshotCache.set(s.id, originalStr);
+              skippedCount++;
+              continue;
+          }
+          
           try {
-              // Check if already optimized (simple heuristic: contains "_ref")
-              // If it contains "_ref", it's likely already optimized.
-              // However, optimizeGameState checks internally too.
-              // To be safe and ensure maximum compression, we run it.
-              // But we only update DB if string changes.
-              
-              const originalStr = s.gameState;
-              // Parse: if it's a string, parse it. If it's already an object (unlikely from DB), use it.
-              let state: any;
-              if (typeof originalStr === 'string') {
-                  state = JSON.parse(originalStr);
-              } else {
-                  state = originalStr;
-              }
-              
-              await optimizeGameState(state); // This inserts into static_data
-              
+              const state = JSON.parse(originalStr);
+              await optimizeGameState(state);
               const newStr = JSON.stringify(state);
               
-              // Only update if size reduced or content changed
+              snapshotCache.set(s.id, newStr);
+              
               if (newStr !== originalStr) {
                   updates.push({ id: s.id, gameState: newStr });
               }
           } catch (e) {
               console.warn(`[Export] Optimization failed for snapshot ${s.id}`, e);
+              snapshotCache.set(s.id, originalStr);
           }
       }
       
-      // Batch update snapshots
+      // Batch update changed snapshots
       if (updates.length > 0) {
           db.transaction(() => {
               const stmt = db.prepare('UPDATE snapshots SET gameState = ? WHERE id = ?');
@@ -527,31 +540,26 @@ async function exportSave(db: any, saveSlotId: number) {
       
       optimizedCount += batch.length;
       
-      // Yield to main thread to prevent UI freeze
-      await new Promise(resolve => setTimeout(resolve, 0));
-      
-      // Report progress
-      if (optimizedCount % 50 === 0) {
-           console.log(`[Export] Optimization Progress: ${optimizedCount}/${snapshotsCount}`);
-           // Optional: Send progress to main thread if needed
+      // Yield every batch to keep worker responsive
+      if (optimizedCount % 100 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+          console.log(`[Export] Optimize: ${optimizedCount}/${snapshotsCount} (skipped ${skippedCount})`);
       }
   }
+  
+  console.log(`[Export] Optimization done. Processed: ${optimizedCount}, Skipped: ${skippedCount}`);
 
   const facilities = getRows('SELECT * FROM facilities WHERE saveSlotId = ?', [saveSlotId]);
-  const characters = getRows('SELECT * FROM characters'); // Global characters
+  const characters = getRows('SELECT * FROM characters');
   
-  // Export static data (Deduplicated items/recipes/quests)
-  // We export ALL static data to ensure references in snapshots are valid.
-  // CRITICAL: This must be queried AFTER the optimization phase above!
+  // Export static data AFTER optimization (new refs may have been inserted)
   const staticData = getRows('SELECT * FROM static_data');
 
-  // Stream-like Blob Construction
-  // Instead of building a huge object and JSON.stringify-ing it (which causes OOM or string limit errors),
-  // we build the JSON string in parts and create a Blob.
-  
+  // =================================================================
+  // Phase 2: Build JSON Blob in streaming fashion
+  // =================================================================
   const jsonParts: string[] = [];
   
-  // Header
   jsonParts.push(`{"version":2,"timestamp":${Date.now()},`);
   jsonParts.push(`"saveSlot":${JSON.stringify(saveSlotData)},`);
   jsonParts.push(`"chats":${JSON.stringify(chats)},`);
@@ -561,52 +569,46 @@ async function exportSave(db: any, saveSlotId: number) {
   jsonParts.push(`"facilities":${JSON.stringify(facilities)},`);
   jsonParts.push(`"staticData":${JSON.stringify(staticData)},`);
   
-  // Snapshots (processed in batches)
+  // Snapshots — use cached data from phase 1 to avoid re-reading from DB
   jsonParts.push(`"snapshots":[`);
   
-  const BATCH_SIZE = 50; // Larger batch for read-only
   let processedCount = 0;
   let isFirstSnapshot = true;
   
-  for (let offset = 0; offset < snapshotsCount; offset += BATCH_SIZE) {
-      const batch = getRows('SELECT * FROM snapshots WHERE saveSlotId = ? LIMIT ? OFFSET ?', [saveSlotId, BATCH_SIZE, offset]);
-      
-      for (let i = 0; i < batch.length; i++) {
-          const s = batch[i];
+  // If we have all snapshots cached, use cache directly (no DB re-read needed)
+  if (snapshotCache.size > 0) {
+      // We need the full snapshot metadata. Read in batches but use cached gameState.
+      const BATCH_SIZE = 100;
+      for (let offset = 0; offset < snapshotsCount; offset += BATCH_SIZE) {
+          const batch = getRows(
+            'SELECT id, saveSlotId, chatId, createdAt FROM snapshots WHERE saveSlotId = ? ORDER BY id LIMIT ? OFFSET ?',
+            [saveSlotId, BATCH_SIZE, offset]
+          );
           
-          let gameStateStr = 'null';
-          if (s.gameState) {
-              gameStateStr = s.gameState;
+          for (const s of batch) {
+              const gameStateStr = snapshotCache.get(s.id) || 'null';
+              const jsonItem = `{"id":${s.id},"saveSlotId":${s.saveSlotId},"chatId":${s.chatId},"createdAt":${s.createdAt},"gameState":${gameStateStr}}`;
+              
+              if (!isFirstSnapshot) jsonParts.push(',');
+              jsonParts.push(jsonItem);
+              isFirstSnapshot = false;
+              processedCount++;
           }
-
-          // Manually construct the JSON object string to avoid JSON.stringify(s) 
-          // which would escape s.gameState if it were a string property.
-          // We want: { "id": 1, ..., "gameState": { ... } }
           
-          const jsonItem = `{"id":${s.id},"saveSlotId":${s.saveSlotId},"chatId":${s.chatId},"createdAt":${s.createdAt},"gameState":${gameStateStr}}`;
-          
-          if (!isFirstSnapshot) {
-              jsonParts.push(',');
+          if (processedCount % 200 === 0) {
+              await new Promise(resolve => setTimeout(resolve, 0));
+              console.log(`[Export] Packaging: ${processedCount}/${snapshotsCount}`);
           }
-          jsonParts.push(jsonItem);
-          isFirstSnapshot = false;
-          processedCount++;
-      }
-      
-      // Yield to main thread
-      await new Promise(resolve => setTimeout(resolve, 0));
-      
-      // Optional: Report progress (every 50 items)
-      if (processedCount % 50 === 0) {
-          console.log(`[Export] Packaging Progress: ${processedCount}/${snapshotsCount}`);
       }
   }
+  
+  // Free cache memory
+  snapshotCache.clear();
   
   jsonParts.push(']}');
   
   console.log(`[Export] Completed. Total snapshots: ${processedCount}`);
 
-  // Create Blob directly in Worker
   return new Blob(jsonParts, { type: 'application/json' });
 }
 

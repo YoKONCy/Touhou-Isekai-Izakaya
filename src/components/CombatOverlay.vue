@@ -1,1129 +1,142 @@
 <template>
   <div v-if="showOverlay" class="fixed inset-0 z-50 font-sans overflow-hidden animate-fade-in">
     
-    <!-- Combat Request Dialog (Preserved from original) -->
-    <div v-if="isPending" class="absolute inset-0 z-50 flex items-center justify-center bg-stone-900/80 backdrop-blur-sm">
-      <div class="relative max-w-md w-full rounded-xl overflow-hidden shadow-2xl animate-scale-in group">
-         <!-- Background & Texture -->
-         <div class="absolute inset-0 bg-stone-100 dark:bg-stone-900"></div>
-         <div class="absolute inset-0 opacity-40 bg-texture-rice-paper"></div>
-         <div class="absolute inset-0 opacity-10 bg-texture-stardust animate-pulse-slow"></div>
-         
-         <!-- Content -->
-         <div class="relative z-10 p-8 text-center">
-           <h2 class="text-3xl font-bold font-display text-touhou-red mb-6 tracking-wider flex items-center justify-center gap-3">
-             <span class="animate-bounce">⚠</span> 
-             <span class="drop-shadow-sm">战斗遭遇</span> 
-             <span class="animate-bounce">⚠</span>
-           </h2>
-           
-           <div class="mb-8 p-4 bg-stone-200/50 dark:bg-stone-800/50 rounded-lg border border-izakaya-wood/20 backdrop-blur-sm">
-             <p class="text-izakaya-wood dark:text-stone-300 mb-2 font-serif text-lg">
-               遭遇敌人
-             </p>
-             <div class="text-2xl font-bold text-touhou-red font-display mb-4">{{ enemyNames }}</div>
-             <p class="text-sm text-izakaya-wood/70 dark:text-stone-500 italic">
-               "是否展开弹幕结界进行迎击？"
-             </p>
-           </div>
+    <!-- Combat Request Dialog -->
+    <CombatRequestDialog
+      v-if="isPending"
+      :enemyNames="enemyNames"
+      :isMultiplayer="gameStore.multiplayer.isMultiplayer"
+      :isHost="gameStore.multiplayer.isHost"
+      @start-combat="startCombat"
+      @skip-combat="skipCombat"
+    />
 
-           <!-- Multiplayer Host Note -->
-           <div v-if="gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost" class="mb-4 p-2 bg-blue-50/10 border border-blue-500/30 rounded text-xs text-blue-300">
-              <span class="font-bold">联机提示：</span> 等待房主开启战斗...
-           </div>
-
-           <div class="flex justify-center gap-4">
-              <button @click="startCombat" 
-                :disabled="gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost"
-                class="group relative px-8 py-3 bg-touhou-red hover:bg-red-700 text-white rounded-lg font-bold font-display shadow-lg hover:shadow-touhou-red/40 transform hover:-translate-y-0.5 transition-all overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed">
-                <div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-                <span class="relative flex items-center gap-2">
-                  <span>⚔️</span> {{ (gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost) ? '等待房主' : '符卡展开' }}
-                </span>
-              </button>
-              
-              <button @click="skipCombat" 
-                :disabled="gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost"
-                class="group px-8 py-3 bg-stone-200 dark:bg-stone-700 hover:bg-stone-300 dark:hover:bg-stone-600 text-izakaya-wood dark:text-stone-200 rounded-lg font-bold font-display shadow transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                <span>🕊️</span> 
-                <span>避战</span>
-              </button>
-           </div>
-         </div>
-         
-         <!-- Decorative Borders -->
-         <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-touhou-red to-transparent opacity-50"></div>
-         <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-touhou-red to-transparent opacity-50"></div>
-      </div>
-    </div>
-
-    <!-- Main Combat Container (Sandbox Style) -->
+    <!-- Main Combat Container -->
     <div v-else-if="isActive" class="absolute inset-0 bg-black text-white font-sans overflow-hidden">
       <!-- Dynamic Background Layer -->
       <div class="absolute inset-0 z-0 overflow-hidden">
-         <!-- The Image -->
          <img :src="currentBackground" class="w-full h-full object-cover opacity-50 mix-blend-normal blur-[1px] scale-105" />
-         <!-- P5 Style Overlay Pattern -->
          <div class="absolute inset-0 bg-texture-stardust opacity-10 mix-blend-multiply"></div>
          <div class="absolute inset-0 bg-gradient-to-br from-red-900/40 via-black/60 to-black/80 mix-blend-multiply"></div>
       </div>
 
       <!-- Combat Intro Animation (VS Screen) -->
-      <transition name="intro-fade">
-        <div v-if="showIntro" class="fixed inset-0 z-[100] bg-black overflow-hidden flex items-center justify-center font-display pointer-events-none">
-           <!-- Background Split -->
-           <div class="absolute inset-0 bg-white clip-split-left animate-bg-slide-left z-0"></div>
-           <div class="absolute inset-0 bg-red-600 clip-split-right animate-bg-slide-right z-0"></div>
-           
-           <!-- Halftone Pattern Overlay -->
-           <div class="absolute inset-0 bg-texture-stardust opacity-20 mix-blend-multiply z-10"></div>
-           
-           <!-- Player Side (Left) -->
-          <div class="absolute left-0 bottom-0 h-full w-1/2 flex items-end justify-start z-20">
-             <div class="relative w-full h-full animate-char-slide-left">
-                <!-- Character Sprite -->
-                <img 
-                  :src="getSpriteUrl('主角')" 
-                  @error="(e) => (e.target as HTMLImageElement).src = defaultSprite"
-                  class="absolute bottom-0 left-[-10%] h-[110%] object-cover object-top drop-shadow-2xl brightness-0 contrast-100 grayscale transform skew-x-[-10deg] scale-110"
-                />
-                <!-- Name -->
-                <div class="absolute bottom-1/3 left-10 text-8xl font-black italic text-black tracking-tighter drop-shadow-white rotate-[-5deg]">
-                  <span class="block text-4xl text-red-600 mb-2">PLAYER</span>
-                  {{ player?.name || 'Reimu' }}
-                </div>
-             </div>
-          </div>
+      <CombatIntroScreen
+        :show="showIntro"
+        :playerName="player?.name || 'Reimu'"
+        :playerSpriteUrl="getSpriteUrl('主角')"
+        :enemyName="enemies[0]?.name || 'Unknown'"
+        :enemySpriteUrl="getSpriteUrl(enemies[0]?.name)"
+        :defaultSprite="defaultSprite"
+      />
 
-           <!-- Enemy Side (Right) -->
-           <div class="absolute right-0 top-0 h-full w-1/2 flex items-start justify-end z-20">
-              <div class="relative w-full h-full animate-char-slide-right transform-gpu will-change-transform">
-                 <!-- Character Sprite -->
-                 <img 
-                   :src="getSpriteUrl(enemies[0]?.name)" 
-                   @error="(e) => (e.target as HTMLImageElement).src = defaultSprite"
-                   class="absolute bottom-0 right-[-10%] h-[110%] w-auto object-cover object-top drop-shadow-2xl brightness-0 contrast-100 grayscale transform skew-x-[-10deg] scale-110 transform-gpu" 
-                   style="image-rendering: -webkit-optimize-contrast; backface-visibility: hidden;"
-                 />
-                 <!-- Name -->
-                 <div class="absolute top-1/3 right-10 text-8xl font-black italic text-white tracking-tighter drop-shadow-red rotate-[-5deg] text-right">
-                   <span class="block text-4xl text-black mb-2">ENEMY</span>
-                   {{ enemies[0]?.name || 'Unknown' }}
-                 </div>
-              </div>
-           </div>
-
-           <!-- VS Logo -->
-           <div class="absolute z-50 flex items-center justify-center animate-slam">
-              <div class="relative">
-                 <span class="text-[15rem] font-black italic text-yellow-400 drop-shadow-[10px_10px_0_rgba(0,0,0,1)] tracking-tighter transform -skew-x-12 rotate-[-10deg] block">
-                    VS
-                 </span>
-                 <div class="absolute inset-0 animate-pulse-fast mix-blend-overlay bg-white/50 skew-x-12"></div>
-              </div>
-           </div>
-           
-           <!-- Flash Overlay -->
-           <div class="absolute inset-0 bg-white animate-flash-out z-[60] pointer-events-none"></div>
-        </div>
-      </transition>
-
-      <!-- Ultimate Spell Cut-in Overlay -->
-      <transition name="intro-fade">
-        <div v-if="showUltimateCutin" class="fixed inset-0 z-[200] overflow-hidden pointer-events-none flex items-center justify-center font-display">
-            <!-- Background Flash/Speed Lines -->
-            <div class="absolute inset-0 bg-black/80 animate-flash-fade z-0"></div>
-            <!-- Speed Lines Effect (CSS only, no texture required) -->
-            <div class="absolute inset-0 opacity-30 animate-pulse-fast mix-blend-overlay z-10 radial-speed-lines"></div>
-            
-            <!-- Character Portrait Slide-in -->
-            <div class="absolute h-full w-full flex items-center z-20" :class="ultimateCutinData.isPlayer ? 'justify-start' : 'justify-end'">
-                <div class="relative h-full w-2/3 transition-all duration-500" :class="ultimateCutinData.isPlayer ? 'animate-slide-in-left' : 'animate-slide-in-right'">
-                    <div class="w-full h-full animate-portrait-move origin-center">
-                        <img 
-                          :src="ultimateCutinData.spriteUrl" 
-                          class="h-full w-full object-cover object-top drop-shadow-[0_0_50px_rgba(255,255,255,0.5)] transform"
-                          :class="ultimateCutinData.isPlayer ? 'skew-x-12' : '-skew-x-12 scale-x-[-1]'"
-                        />
-                         <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent mix-blend-overlay"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Spell Name Text -->
-            <div class="absolute z-30 flex flex-col items-center justify-center w-full">
-                <div class="text-6xl md:text-8xl font-black italic text-white drop-shadow-[0_0_20px_rgba(255,0,0,1)] tracking-tighter animate-slam font-display transform -rotate-6 border-y-8 border-yellow-400 py-4 bg-black/50 backdrop-blur-md px-20">
-                    <span class="block text-3xl text-yellow-400 mb-2 tracking-[1em] text-center uppercase">Spell Card</span>
-                    {{ ultimateCutinData.spellName }}
-                </div>
-                <div class="mt-4 text-3xl text-white font-serif tracking-widest animate-fade-in">
-                   {{ ultimateCutinData.charName }}
-                </div>
-            </div>
-        </div>
-      </transition>
-
-      <!-- Skill Cut-in (Simple) -->
-      <transition enter-active-class="transition duration-300 ease-out" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition duration-200 ease-in" leave-from-class="opacity-100" leave-to-class="opacity-0">
-        <div v-if="showSkillCutin" class="fixed inset-0 z-[190] pointer-events-none flex flex-col justify-center overflow-hidden font-display">
-            <!-- Strip Background -->
-            <div class="absolute w-full h-40 md:h-56 bg-black/60 backdrop-blur-sm border-y-4 border-white/20 flex items-center animate-slide-in-fast origin-left"
-                 :class="[
-                    !skillCutinData.isPlayer ? 'bg-gradient-to-l from-red-900/90 to-transparent' : 
-                    skillCutinData.isSpecial ? 'bg-gradient-to-r from-amber-500 via-yellow-400 to-transparent' : 
-                    'bg-gradient-to-r from-purple-900/95 via-rose-900/90 to-transparent'
-                 ]">
-                 
-                 <!-- Sprite (masked) -->
-                 <div class="absolute top-[-50%] h-[200%] w-1/2 md:w-1/3 opacity-90 mix-blend-normal"
-                      :class="skillCutinData.isPlayer ? 'left-0 md:left-20 animate-slide-in-left' : 'right-0 md:right-20 animate-slide-in-right'">
-                     <img :src="skillCutinData.spriteUrl" class="h-full w-full object-cover object-top mask-image-fade-bottom" />
-                 </div>
-        
-                 <!-- Text -->
-                 <div class="w-full px-10 md:px-32 flex flex-col justify-center relative z-10" :class="skillCutinData.isPlayer ? 'items-end text-right' : 'items-start text-left'">
-                     <div class="text-4xl md:text-6xl text-white font-black italic drop-shadow-[0_0_10px_rgba(255,255,255,0.5)] animate-fade-in-up">{{ skillCutinData.spellName }}</div>
-                     <div class="text-xl md:text-2xl text-white/80 font-serif mt-1 tracking-widest">{{ skillCutinData.charName }}</div>
-                 </div>
-            </div>
-        </div>
-      </transition>
-
-      <!-- Combat Flow Animation Overlay -->
-      <Teleport to="body">
-          <div v-if="showCombatFlowAnim" class="fixed inset-0 z-[200] flex items-center justify-center overflow-hidden pointer-events-none font-display">
-              <!-- Background: Deep Void -->
-              <div class="absolute inset-0 bg-black animate-fade-in duration-500"></div>
-              
-              <!-- Moving Purple Fog/Nebula -->
-              <div class="absolute inset-0 bg-gradient-to-br from-purple-900/60 via-transparent to-black mix-blend-screen animate-pulse-slow"></div>
-              
-              <!-- Character Cut-in (Centered, Glowing) -->
-              <div class="absolute inset-0 flex items-center justify-center z-10 transition-all duration-1000"
-                   :class="combatFlowPhase === 'start' ? 'opacity-0 scale-150 blur-sm' : 'opacity-100 scale-100 blur-0'">
-                  <img :src="getSpriteUrl('主角')" class="h-[80vh] object-contain drop-shadow-[0_0_50px_rgba(168,85,247,0.8)] filter brightness-125 contrast-125 animate-float-slow" />
-              </div>
-    
-              <!-- Text Layer -->
-              <div class="absolute z-20 flex flex-col items-center justify-center gap-4 mix-blend-hard-light"
-                   v-if="combatFlowPhase === 'impact' || combatFlowPhase === 'end'">
-                  <h1 class="text-8xl md:text-9xl font-black italic text-transparent bg-clip-text bg-gradient-to-t from-white to-purple-300 font-display animate-glitch-slam tracking-tighter drop-shadow-[0_0_20px_rgba(255,255,255,0.8)]">
-                      COMBAT FLOW
-                  </h1>
-                  <div class="h-1 w-0 bg-white animate-expand-width shadow-[0_0_10px_white]"></div>
-                  <p class="text-2xl md:text-3xl text-purple-200 font-mono tracking-[1em] animate-fade-in-up uppercase">Zone Activated</p>
-              </div>
-              
-              <!-- Vignette & Speed lines -->
-              <div class="absolute inset-0 bg-[radial-gradient(circle,transparent_40%,#000_100%)] z-30"></div>
-              <div class="absolute inset-0 z-10 opacity-30 animate-pulse-fast bg-[repeating-linear-gradient(90deg,transparent,transparent_50px,rgba(168,85,247,0.1)_50px,rgba(168,85,247,0.1)_51px)]" v-if="combatFlowPhase === 'impact'"></div>
-          </div>
-      </Teleport>
+      <!-- Cut-in Overlays (Ultimate, Skill, Combat Flow) -->
+      <CombatCutins
+        :showUltimate="showUltimateCutin"
+        :ultimateData="ultimateCutinData"
+        :showSkill="showSkillCutin"
+        :skillData="skillCutinData"
+        :showCombatFlow="showCombatFlowAnim"
+        :combatFlowPhase="combatFlowPhase"
+        :playerSpriteUrl="getSpriteUrl('主角')"
+      />
 
       <!-- Layer 0: Background -->
       <div class="absolute inset-0 bg-gradient-to-br from-red-900/20 via-black to-blue-900/20 z-0">
         <div class="absolute inset-0 bg-texture-stardust opacity-10 mix-blend-overlay"></div>
-        <!-- Dynamic Lines/Patterns -->
         <div class="absolute inset-0 overflow-hidden">
            <div class="absolute -left-20 top-1/2 w-[200%] h-40 bg-red-600/20 -rotate-12 blur-3xl transform-gpu animate-pulse"></div>
            <div class="absolute -right-20 top-1/4 w-[200%] h-20 bg-blue-600/10 rotate-12 blur-2xl transform-gpu"></div>
         </div>
       </div>
 
-      <!-- Layer 1: Battlefield (Characters) -->
+      <!-- Layer 1: Battlefield (Characters + Effects) -->
       <div class="absolute inset-0 z-10 overflow-hidden pointer-events-none transition-transform duration-100" :class="{ 'animate-shake': isScreenShaking }">
         
         <!-- Effect Overlay -->
-        <!-- 1. Point-based Effects (Slash / Enemy Hit / Talk / Hit / Single Spell) -->
-        <div v-if="activeEffect.show && !['spell_aoe', 'ultimate_impact', 'hit_aoe'].includes(activeEffect.type)" 
-             class="absolute z-[60] pointer-events-none flex items-center justify-center"
-             :style="{ left: activeEffect.x + 'px', top: activeEffect.y + 'px' }"
-        >
-            <!-- Single Spell Effect (Focused Beam) -->
-            <div v-if="activeEffect.type === 'spell_single'" class="relative flex items-center justify-center">
-                 <div class="absolute w-[100px] h-[400px] bg-cyan-400 blur-md animate-slash mix-blend-screen origin-bottom"></div>
-                 <div class="absolute w-[200px] h-[200px] border-4 border-cyan-200 rounded-full animate-ping-fast"></div>
-                 <div class="absolute w-[150px] h-[150px] bg-white opacity-50 blur-lg animate-flash-fade"></div>
-            </div>
+        <CombatEffects :activeEffect="activeEffect" />
 
-            <!-- Slash Effect (Combo) -->
-            <div v-if="activeEffect.type === 'slash'" class="relative w-[300px] h-[300px]">
-                <div class="absolute inset-0 bg-white clip-shard-diag-1 animate-slash-combo-1 mix-blend-overlay"></div>
-                <div class="absolute inset-0 bg-blue-100 clip-shard-diag-2 animate-slash-combo-2 mix-blend-screen"></div>
-                <div class="absolute inset-0 bg-white clip-rect-left animate-slash-combo-3 mix-blend-overlay"></div>
-            </div>
+        <!-- Player Side -->
+        <CombatPlayerCard
+          :player="player"
+          :allies="allies"
+          :sortedAllies="sortedAllies"
+          :defaultSprite="defaultSprite"
+          :getSpriteUrl="getSpriteUrl"
+          :getPlayerHpStyle="getPlayerHpStyle"
+          :getEffectName="getEffectName"
+          @activate-ally="activateAlly"
+        />
 
-            <!-- Enemy Hit Effect (Spark) - P5 Style -->
-            <div v-if="activeEffect.type === 'enemy' || activeEffect.type === 'hit'" class="w-[300px] h-[300px] flex items-center justify-center">
-               <!-- 1. Background Black/Red Flash -->
-               <div class="absolute w-[120%] h-[120%] bg-black clip-starburst animate-flash-fade opacity-80"></div>
-               <!-- 2. Core Yellow Spark -->
-               <div class="absolute w-full h-full bg-yellow-300 clip-starburst animate-hit-spark mix-blend-screen drop-shadow-[0_0_10px_rgba(255,255,0,0.8)]"></div>
-               <!-- 3. Red Inner jagged -->
-               <div class="absolute w-[80%] h-[80%] bg-red-600 clip-jagged-slash-2 animate-hit-spark mix-blend-multiply delay-75"></div>
-               <!-- 4. Expanding Ring (Jagged) -->
-               <div class="absolute w-[150%] h-[150%] border-[10px] border-white clip-starburst animate-ping-slow opacity-80"></div>
-            </div>
-
-            <!-- Talk Effect (Word Projectile) -->
-            <div v-if="activeEffect.type === 'talk'" class="relative flex items-center justify-center w-[800px] pointer-events-none">
-                <div class="text-7xl md:text-9xl font-black italic text-white drop-shadow-[0_0_20px_rgba(255,0,0,0.8)] animate-word-projectile whitespace-nowrap transform -rotate-12 border-y-4 border-white/50 py-2 bg-black/30 backdrop-blur-sm">
-                   {{ activeEffect.extra || '异议！' }}
-                </div>
-            </div>
-        </div>
-
-        <!-- 2. Fullscreen Spell Effect (Magic Circle) -->
-        <div v-if="activeEffect.show && activeEffect.type === 'spell_aoe'" class="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none overflow-hidden">
-             <!-- Background Dim & Flash -->
-             <div class="absolute inset-0 bg-black/40 animate-fade-in-fast backdrop-blur-[2px]"></div>
-             
-             <!-- Magic Circle Container -->
-             <div class="relative w-[min(90vw,90vh)] h-[min(90vw,90vh)] flex items-center justify-center animate-scale-in-elastic">
-                
-                <!-- Layer 0: Rotating Background Rays -->
-                <div class="absolute inset-[-50%] animate-spin-slow opacity-30">
-                    <div class="w-full h-full bg-[conic-gradient(from_0deg,transparent_0deg,purple_20deg,transparent_40deg,purple_60deg,transparent_80deg,purple_100deg,transparent_120deg,purple_140deg,transparent_160deg,purple_180deg,transparent_200deg,purple_220deg,transparent_240deg,purple_260deg,transparent_280deg,purple_300deg,transparent_320deg,purple_340deg,transparent_360deg)] opacity-20 mix-blend-screen"></div>
-                </div>
-
-                <!-- Shockwave Ring -->
-                <div class="absolute inset-0 border-[50px] border-purple-400 opacity-50 rounded-full animate-shockwave mix-blend-screen"></div>
-
-                <!-- Layer 1: Outer Runes Ring -->
-                <div class="absolute w-full h-full border-[2px] border-purple-500/40 rounded-full animate-spin-slow shadow-[0_0_30px_rgba(168,85,247,0.3)]">
-                    <div class="absolute inset-2 border border-dashed border-purple-300/30 rounded-full"></div>
-                    <!-- Cardinal Points Decor -->
-                    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-8 bg-purple-500 rotate-45 border-4 border-white shadow-[0_0_20px_white]"></div>
-                    <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-8 bg-purple-500 rotate-45 border-4 border-white shadow-[0_0_20px_white]"></div>
-                    <div class="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 bg-purple-500 rotate-45 border-4 border-white shadow-[0_0_20px_white]"></div>
-                    <div class="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 bg-purple-500 rotate-45 border-4 border-white shadow-[0_0_20px_white]"></div>
-                </div>
-
-                <!-- Layer 2: Middle Geometry (Hexagram Simulation) -->
-                <div class="absolute w-[75%] h-[75%] animate-spin-reverse-slow">
-                     <div class="absolute inset-0 border-[6px] border-purple-400/60 rounded-full"></div>
-                     <!-- Triangle 1 -->
-                     <div class="absolute inset-0 border-[3px] border-purple-200/50 rotate-0 clip-triangle"></div>
-                     <!-- Triangle 2 -->
-                     <div class="absolute inset-0 border-[3px] border-purple-200/50 rotate-180 clip-triangle"></div>
-                     
-                     <div class="absolute inset-[15%] border-4 border-dotted border-white/40 rounded-full"></div>
-                </div>
-
-                <!-- Layer 3: Inner Core Ring -->
-                <div class="absolute w-[40%] h-[40%] border-[8px] border-white/90 rounded-full animate-spin shadow-[0_0_50px_#d8b4fe]">
-                    <div class="absolute inset-0 border-t-[8px] border-t-purple-600 rounded-full"></div>
-                </div>
-                
-                <!-- Layer 4: Central Energy Blast -->
-                <div class="absolute w-[10%] h-[10%] bg-white rounded-full animate-pulse shadow-[0_0_80px_#fff,0_0_120px_#a855f7]"></div>
-                
-                <!-- Layer 5: Expanding Shockwaves -->
-                <div class="absolute inset-0 border-[2px] border-purple-100 rounded-full animate-ping-slow opacity-60"></div>
-                <div class="absolute inset-[20%] border-[20px] border-purple-500/10 rounded-full animate-pulse"></div>
-                
-                <!-- Layer 6: Cross Beams -->
-                <div class="absolute w-[150%] h-[4px] bg-gradient-to-r from-transparent via-white to-transparent rotate-45 animate-pulse opacity-80"></div>
-                <div class="absolute w-[150%] h-[4px] bg-gradient-to-r from-transparent via-white to-transparent -rotate-45 animate-pulse delay-75 opacity-80"></div>
-            </div>
-            
-            <!-- Extra Particles -->
-            <div class="absolute inset-0 bg-texture-stardust opacity-50 animate-pulse mix-blend-screen pointer-events-none"></div>
-        </div>
-
-        <!-- 3. AOE Hit Effect (Massive Explosion) -->
-        <div v-if="activeEffect.show && activeEffect.type === 'hit_aoe'" class="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
-             <!-- Background Flash -->
-             <div class="absolute inset-0 bg-red-600 opacity-20 animate-flash-fade mix-blend-overlay"></div>
-             
-             <!-- 1. Expanding Shockwave Ring -->
-             <div class="absolute w-[120vw] h-[120vw] border-[100px] border-white/80 rounded-full animate-shockwave opacity-80 mix-blend-screen"></div>
-             
-             <!-- 2. Inner Explosion Core -->
-             <div class="absolute w-[50vw] h-[50vw] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-yellow-100 via-orange-500 to-transparent animate-ping-fast opacity-90 mix-blend-screen"></div>
-
-             <!-- 3. Burst Rays -->
-             <div class="absolute inset-0 animate-spin opacity-60 mix-blend-screen">
-                 <div class="absolute top-1/2 left-1/2 w-[200vw] h-[10vh] bg-gradient-to-r from-transparent via-white to-transparent -translate-y-1/2 -translate-x-1/2 rotate-0"></div>
-                 <div class="absolute top-1/2 left-1/2 w-[200vw] h-[10vh] bg-gradient-to-r from-transparent via-white to-transparent -translate-y-1/2 -translate-x-1/2 rotate-45"></div>
-                 <div class="absolute top-1/2 left-1/2 w-[200vw] h-[10vh] bg-gradient-to-r from-transparent via-white to-transparent -translate-y-1/2 -translate-x-1/2 rotate-90"></div>
-                 <div class="absolute top-1/2 left-1/2 w-[200vw] h-[10vh] bg-gradient-to-r from-transparent via-white to-transparent -translate-y-1/2 -translate-x-1/2 rotate-135"></div>
-             </div>
-
-             <!-- 4. Screen Whiteout -->
-             <div class="absolute inset-0 bg-white opacity-60 animate-flash-out mix-blend-screen"></div>
-        </div>
-        
-        <!-- 3. Ultimate Impact (Fullscreen Beam) -->
-        <div v-if="activeEffect.show && activeEffect.type === 'ultimate_impact'" class="fixed inset-0 z-[250] flex items-center justify-center pointer-events-none overflow-hidden">
-             <!-- Flash -->
-             <div class="absolute inset-0 bg-white animate-flash-fade"></div>
-             
-             <!-- Beam -->
-             <div class="absolute w-full h-[50vh] bg-gradient-to-r from-yellow-200 via-white to-yellow-200 mix-blend-overlay animate-beam-expand blur-xl"></div>
-             <div class="absolute w-full h-[20vh] bg-white animate-beam-expand shadow-[0_0_100px_rgba(255,255,255,0.8)]"></div>
-             
-             <!-- Shatter Overlay -->
-             <div class="absolute inset-0 border-[50px] border-white/50 animate-ping-slow"></div>
-             
-             <!-- Screen Distortion -->
-             <div class="absolute inset-0 backdrop-blur-[2px] animate-screen-shatter"></div>
-        </div>
-
-        <!-- Player Side (Bottom Left) -->
-        <div class="absolute bottom-0 left-0 w-[45%] h-[70%] flex flex-col justify-end items-start pl-10 pb-10">
-          <div class="relative group w-full h-full flex flex-col justify-end items-center transition-all duration-500 hover:scale-105 transform translate-y-10 -translate-x-10">
-              <!-- Character Sprite Placeholder -->
-              <div class="relative w-full h-full flex items-end justify-center pointer-events-auto">
-                 <!-- Alive State -->
-                <div v-if="player && player.hp > 0" class="w-80 h-[500px] relative animate-float transform skew-x-[-5deg]">
-                   <!-- Ally Sprite (Blurred Background) with Transition -->
-                   <transition name="ally-fade" mode="out-in">
-                      <div v-if="sortedAllies[0]" :key="sortedAllies[0].id" class="absolute -top-32 -left-32 w-[110%] h-[100%] z-[-1] pointer-events-none opacity-50 blur-[2px] grayscale-[0.1] brightness-90 scale-105">
-                         <img 
-                            :src="getSpriteUrl(sortedAllies[0].name)" 
-                            @error="(e) => (e.target as HTMLImageElement).src = defaultSprite"
-                            class="w-full h-full object-cover object-top" 
-                            :alt="sortedAllies[0].name" 
-                         />
-                         <!-- Glow behind ally -->
-                         <div class="absolute inset-0 bg-blue-400/10 mix-blend-screen rounded-full blur-2xl"></div>
-                      </div>
-                   </transition>
-
-                   <!-- 1. Card Base (Background & Border) -->
-                    <div class="absolute inset-0 rounded-t-3xl overflow-hidden backdrop-blur-sm border-b-4 border-red-500 shadow-[0_0_50px_rgba(220,38,38,0.3)] bg-gradient-to-t from-red-900/40 to-transparent z-0">
-                    </div>
-
-                    <!-- 2. Character Sprite (Popping out) -->
-                    <div class="absolute -bottom-0 -left-12 w-[130%] h-[115%] z-10 pointer-events-none flex items-end">
-                       <img 
-                          :src="getSpriteUrl('主角')" 
-                          @error="(e) => (e.target as HTMLImageElement).src = defaultSprite"
-                          class="w-full h-full object-cover object-top drop-shadow-2xl transition-transform duration-500 group-hover:scale-[1.02]" 
-                          alt="Player" 
-                       />
-                    </div>
-
-                    <!-- 3. Overlay & Text (Clipped to Card Shape) -->
-                    <div class="absolute inset-0 rounded-t-3xl overflow-hidden z-20 pointer-events-none">
-                       <div class="absolute inset-0 bg-gradient-to-t from-red-600/60 to-transparent mix-blend-overlay"></div>
-                       <span class="absolute bottom-10 left-0 w-full text-center text-5xl font-bold font-display text-white drop-shadow-[0_0_10px_rgba(255,0,0,0.8)] tracking-widest">
-                         {{ player?.name }}
-                       </span>
-                    </div>
-                 </div>
-
-                 <!-- Dead State (Shattered) -->
-                 <div v-else-if="player" class="w-80 h-[500px] relative transform skew-x-[-5deg] pointer-events-none">
-                     <!-- Shard 1 -->
-                     <div class="absolute inset-0 w-full h-full rounded-t-3xl backdrop-blur-sm border-b-4 border-red-500 animate-shatter-1 overflow-hidden" 
-                          style="clip-path: polygon(0 0, 100% 0, 60% 100%, 0% 80%);">
-                        <div class="absolute -bottom-0 -left-12 w-[130%] h-[115%] flex items-end">
-                            <img 
-                                :src="getSpriteUrl('主角')" 
-                                @error="(e) => (e.target as HTMLImageElement).src = defaultSprite"
-                                class="w-full h-full object-cover object-top" 
-                            />
-                        </div>
-                        <div class="absolute inset-0 bg-gradient-to-t from-red-600/60 to-transparent mix-blend-overlay"></div>
-                        <span class="absolute bottom-10 left-0 w-full text-center text-5xl font-bold font-display text-white drop-shadow-[0_0_10px_rgba(255,0,0,0.8)] tracking-widest">
-                          {{ player?.name }}
-                        </span>
-                     </div>
-                     <!-- Shard 2 -->
-                     <div class="absolute inset-0 w-full h-full rounded-t-3xl backdrop-blur-sm border-b-4 border-red-500 animate-shatter-2 overflow-hidden" 
-                          style="clip-path: polygon(100% 0, 100% 100%, 0% 100%, 60% 100%, 0% 80%);">
-                        <div class="absolute -bottom-0 -left-12 w-[130%] h-[115%] flex items-end">
-                            <img 
-                                :src="getSpriteUrl('主角')" 
-                                @error="(e) => (e.target as HTMLImageElement).src = defaultSprite"
-                                class="w-full h-full object-cover object-top" 
-                            />
-                        </div>
-                        <div class="absolute inset-0 bg-gradient-to-t from-red-600/60 to-transparent mix-blend-overlay"></div>
-                     </div>
-                 </div>
-                 
-                 <!-- Damage Popup for Player -->
-                 <div v-for="p in player?.popups" :key="p.id" 
-                      class="absolute top-1/3 left-1/2 transform -translate-x-1/2 z-50 text-6xl font-black italic font-display animate-damage-pop pointer-events-none whitespace-nowrap"
-                      :class="{
-                         'text-green-400 drop-shadow-[0_0_10px_rgba(74,222,128,0.8)]': p.type === 'heal',
-                         'text-blue-400 drop-shadow-[0_0_10px_rgba(96,165,250,0.8)]': p.type === 'buff',
-                         'text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]': p.type === 'damage' || p.type === 'crit'
-                      }"
-                 >
-                   {{ p.text }}
-                 </div>
-              </div>
-              
-              <!-- Player Status HUD -->
-              <div v-if="player" class="absolute -right-20 top-[46%] flex flex-col gap-3 transform skew-x-[-10deg] pointer-events-auto">
-                 <!-- HP Bar Wrapper -->
-                 <div class="relative transition-transform hover:scale-110 group">
-                    <div 
-                      class="bg-black/80 border-l-8 pl-6 pr-10 py-3 text-3xl font-bold font-mono clip-hud-left relative"
-                      :style="getPlayerHpStyle(player.hp, player.maxHp)"
-                    >
-                      HP <span class="text-white">{{ player.hp }}</span> <span class="text-sm text-gray-400">/ {{ player.maxHp }}</span>
-                      
-                      <!-- Shield Indicator -->
-                      <div v-if="player.shield > 0" class="absolute -top-6 right-0 text-cyan-400 text-lg font-bold flex items-center gap-1 drop-shadow-md animate-pulse">
-                          <Shield class="w-5 h-5 fill-cyan-400/20" /> {{ player.shield }}
-                      </div>
-                    </div>
-                    
-                    <!-- AP Display (Action Points) - Moved to HP top-left -->
-                    <div class="absolute -left-2 -top-12 flex gap-2 pointer-events-none transform skew-x-[10deg] z-50">
-                        <div 
-                            v-for="i in (player.maxActionPoints || 2)" :key="i"
-                            class="w-8 h-8 rounded-full border-2 border-white shadow-[0_0_15px_rgba(255,255,255,0.6)] transition-all duration-500"
-                            :class="(player.actionPoints !== undefined ? player.actionPoints : 2) >= i 
-                                ? 'bg-yellow-300 shadow-[0_0_20px_rgba(253,224,71,1)] scale-110 animate-pulse-slow' 
-                                : 'bg-gray-900/80 border-gray-600 opacity-60 scale-90'"
-                        ></div>
-                    </div>
-                 </div>
-
-                 <!-- MP Bar Wrapper -->
-                 <div class="relative ml-8 transition-transform hover:scale-110 group">
-                   <!-- Background & Text (Clipped) -->
-                   <div class="bg-black/80 border-l-8 border-blue-500 pl-6 pr-8 py-2 text-2xl font-bold font-mono text-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.4)] clip-hud-left">
-                     MP <span class="text-white">{{ player.mp }}</span> <span class="text-sm text-gray-400">/ {{ player.maxMp }}</span>
-                   </div>
-                 </div>
-
-                 <!-- P Point Gauge (Charging Ring) -->
-                 <div class="absolute -left-24 top-0 w-20 h-20 bg-black/80 rounded-full border-2 flex items-center justify-center transition-transform hover:scale-110"
-                      :class="[
-                        (player.pPoints || 0) >= 80 
-                          ? 'border-orange-500 animate-burning z-[60]' 
-                          : 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]'
-                      ]">
-                    <!-- Burning Aura -->
-                    <div v-if="(player.pPoints || 0) >= 80" class="absolute inset-[-4px] rounded-full border-4 border-orange-400/30 blur-sm animate-pulse"></div>
-                    
-                    <svg class="w-full h-full transform -rotate-90 p-1" viewBox="0 0 100 100">
-                        <!-- Background -->
-                        <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.1)" stroke-width="8" fill="none" />
-                        <!-- Progress -->
-                        <circle cx="50" cy="50" r="40" 
-                            :stroke="(player.pPoints || 0) >= 80 ? '#ff8c00' : '#ef4444'" 
-                            stroke-width="8" fill="none"
-                            stroke-linecap="round"
-                            :stroke-dasharray="251.2"
-                            :stroke-dashoffset="251.2 * (1 - ((player.pPoints || 0) / 100))"
-                            class="transition-all duration-500 ease-out"
-                            :class="{ 'animate-fire-flicker': (player.pPoints || 0) >= 80 }"
-                        />
-                    </svg>
-                    <div class="absolute inset-0 flex flex-col items-center justify-center font-bold font-mono">
-                        <span class="text-[10px] leading-none" :class="(player.pPoints || 0) >= 80 ? 'text-orange-400' : 'text-red-400'">P</span>
-                        <span class="text-xl text-white leading-none" :class="{ 'drop-shadow-[0_0_5px_rgba(255,140,0,0.8)]': (player.pPoints || 0) >= 80 }">
-                            {{ (player.pPoints || 0).toFixed(0) }}
-                        </span>
-                    </div>
-                 </div>
-
-                 <!-- New: Shield & Dodge Stats -->
-                 <div class="flex gap-2 ml-12">
-                     <!-- Shield -->
-                     <div class="bg-black/80 border-l-4 border-cyan-400 pl-4 pr-4 py-1 text-lg font-bold font-mono text-cyan-400 clip-hud-left flex items-center gap-2">
-                         <Shield class="w-4 h-4" />
-                         <span class="text-white">{{ player.shield }}</span>
-                     </div>
-                     <!-- Dodge -->
-                     <div class="bg-black/80 border-l-4 border-green-400 pl-4 pr-4 py-1 text-lg font-bold font-mono text-green-400 clip-hud-left flex items-center gap-2">
-                         <Zap class="w-4 h-4" />
-                         <span class="text-white">{{ Math.round((player.dodgeRate || 0) * 100) }}%</span>
-                     </div>
-                 </div>
-                 
-                 <!-- Buffs -->
-                 <div class="flex flex-wrap gap-1 mt-2 ml-16 max-w-[280px] transform skew-x-[10deg] pointer-events-auto min-h-[32px] justify-start">
-                    <div v-for="buff in player.buffs" :key="buff.id" class="relative group/buff">
-                       <div class="w-8 h-8 rounded bg-black/60 border border-gray-500 flex items-center justify-center text-xs text-white cursor-help overflow-hidden transition-transform hover:scale-110">
-                           <span class="scale-75">{{ buff.name.substring(0, 1) }}</span>
-                       </div>
-                       <!-- Tooltip -->
-                       <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-black/90 border border-gray-600 text-white text-xs p-2 rounded pointer-events-none opacity-0 group-hover/buff:opacity-100 transition-opacity z-[100] shadow-xl">
-                           <div class="font-bold text-yellow-400 mb-1">{{ buff.name }}</div>
-                           <div class="mb-1 text-gray-300 leading-tight">{{ buff.description }}</div>
-                           
-                           <!-- Effects Detail -->
-                           <div v-if="buff.effects && buff.effects.length > 0" class="mt-1 mb-1 border-t border-gray-700 pt-1">
-                               <div v-for="(eff, idx) in buff.effects" :key="idx" class="flex justify-between text-gray-400">
-                                   <span>{{ getEffectName(eff) }}</span>
-                                   <span :class="eff.value > 0 ? 'text-green-400' : 'text-red-400'">
-                                       {{ eff.value > 0 ? '+' : '' }}{{ 
-                                           (eff.isPercentage === false || ['heal', 'heal_mp', 'shield', 'damage_over_time'].includes(eff.type))
-                                           ? Math.round(eff.value) 
-                                           : Math.round(eff.value * 100) + '%' 
-                                       }}
-                                   </span>
-                               </div>
-                           </div>
-
-                           <div class="text-blue-400 font-mono text-[10px] text-right">剩余 {{ buff.duration }} 轮</div>
-                           </div>
-                        </div>
-                     </div>
-
-                     <!-- Allies Stack (Parallel Folded Cards) -->
-                     <div v-if="allies.length > 0" class="relative mt-2 ml-12 w-[280px] h-[140px] transform skew-x-[10deg] pointer-events-none perspective-[1000px]">
-                        <transition-group name="list-complete" tag="div" class="relative w-full h-full">
-                            <div 
-                                v-for="(ally, index) in sortedAllies" 
-                                :key="ally.id" 
-                                class="absolute top-0 left-0 w-full transition-all duration-500 ease-out pointer-events-auto cursor-pointer group/ally"
-                                :style="{
-                                    zIndex: 100 - index,
-                                    transform: `translateY(${index * 18}px) translateZ(${-index * 20}px) scale(${1 - index * 0.04})`,
-                                    opacity: index === 0 ? 1 : Math.max(0.3, 0.8 - (index * 0.15)),
-                                    filter: index === 0 ? 'none' : 'blur(0.5px) grayscale(30%)'
-                                }"
-                                @click.stop="activateAlly(ally.id)"
-                            >
-                                <div 
-                                    class="w-full bg-black/90 border-l-4 p-2 flex items-center gap-3 shadow-lg backdrop-blur-md relative"
-                                    :class="[
-                                        index === 0 ? 'border-blue-500 bg-gradient-to-r from-blue-900/40 to-black' : 'border-gray-600 bg-gray-900/80 hover:border-blue-400 hover:bg-gray-800',
-                                        { 'opacity-50 grayscale': ally.hp <= 0 }
-                                    ]"
-                                >
-                                    <!-- Sprite -->
-                                    <div class="w-10 h-10 rounded overflow-hidden border bg-blue-900/20 flex-shrink-0 transition-colors duration-300"
-                                         :class="index === 0 ? 'border-blue-400' : 'border-gray-600'">
-                                            <img :src="getSpriteUrl(ally.name)" @error="(e) => (e.target as HTMLImageElement).src = defaultSprite" class="w-full h-full object-cover object-top" />
-                                    </div>
-                                    
-                                    <!-- Info -->
-                                    <div class="flex-1 min-w-0">
-                                            <div class="flex justify-between items-center">
-                                                <span class="font-bold truncate text-xs transition-colors duration-300" 
-                                                      :class="index === 0 ? 'text-white' : 'text-gray-400 group-hover/ally:text-white'">
-                                                      {{ ally.name }}
-                                                </span>
-                                                <span v-if="index === 0" class="text-[10px] text-blue-300 font-mono">{{ ally.hp }}/{{ ally.maxHp }}</span>
-                                            </div>
-                                            <!-- HP -->
-                                            <div class="w-full h-1.5 bg-gray-700 rounded-full mt-1 overflow-hidden">
-                                                <div class="h-full transition-all duration-500" 
-                                                     :class="ally.hp < ally.maxHp * 0.3 ? 'bg-red-500' : 'bg-blue-500'"
-                                                     :style="{ width: `${(ally.hp / ally.maxHp) * 100}%` }">
-                                                </div>
-                                            </div>
-                                    </div>
-
-                                    <!-- Active Indicator (Top Card Only) -->
-                                    <div v-if="index === 0" class="absolute -right-1 -top-1 w-3 h-3 bg-blue-400 rounded-full animate-ping"></div>
-                                </div>
-                                
-                                <!-- Buffs Display (Top Card Only) -->
-                                <div v-if="index === 0 && ally.buffs && ally.buffs.length > 0" class="flex flex-wrap gap-1 mt-1 pl-2 animate-fade-in relative z-[101]">
-                                        <div v-for="buff in ally.buffs" :key="buff.id" class="relative group/buff">
-                                            <div class="w-6 h-6 rounded bg-black/80 border border-blue-500 flex items-center justify-center text-[10px] text-white cursor-help overflow-hidden shadow-md hover:scale-110 transition-transform">
-                                                <span class="scale-90 font-bold">{{ buff.name.substring(0, 1) }}</span>
-                                            </div>
-                                            <!-- Tooltip -->
-                                            <div class="absolute bottom-full left-0 mb-2 w-40 bg-black/95 border border-blue-500 text-white text-xs p-2 rounded pointer-events-none opacity-0 group-hover/buff:opacity-100 transition-opacity z-[200] shadow-[0_0_15px_rgba(59,130,246,0.5)]">
-                                                <div class="font-bold text-yellow-400 mb-1 flex justify-between">
-                                                    <span>{{ buff.name }}</span>
-                                                </div>
-                                                <div class="mb-1 text-gray-300 leading-tight border-b border-gray-700 pb-1">{{ buff.description }}</div>
-                                                <div class="text-blue-400 font-mono text-[10px] text-right mt-1">剩余 {{ buff.duration }} 轮</div>
-                                            </div>
-                                        </div>
-                                </div>
-            
-                                <!-- Damage Popup (All Cards) -->
-                                <div v-for="p in ally.popups" :key="p.id" 
-                                        class="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full z-50 text-xl font-black italic font-display animate-damage-pop pointer-events-none whitespace-nowrap"
-                                        :style="{ zIndex: 200 }"
-                                        :class="{
-                                            'text-green-400 drop-shadow-md': p.type === 'heal',
-                                            'text-blue-400 drop-shadow-md': p.type === 'buff',
-                                            'text-red-500 drop-shadow-md': p.type === 'damage'
-                                        }"
-                                >
-                                    {{ p.text }}
-                                </div>
-                            </div>
-                        </transition-group>
-                     </div>
-                  </div>
-              </div>
-        </div>
-
-        <!-- Enemy Side (Top Right) -->
-        <div class="absolute top-0 right-0 w-[60%] h-[60%] flex flex-row justify-end items-start pr-10 pt-10 gap-8 pointer-events-none">
-           
-           <!-- Reserve Enemies (Compact Mode) -->
-           <div v-if="reserveEnemies.length > 0" class="flex flex-col gap-2 pt-4 pointer-events-auto mr-4 animate-fade-in">
-              <div 
-                 v-for="(en) in reserveEnemies" 
-                 :key="en.id"
-                 @click="selectTarget(en)"
-                 class="relative w-48 bg-black/80 border-l-4 border-purple-500 p-3 transform transition-all duration-300 hover:scale-105 hover:bg-purple-900/40 cursor-pointer group"
-                 :class="{
-                    'opacity-50 cursor-not-allowed': isActing || (phase === 'enemy'),
-                    'border-red-500 bg-red-900/20': selectionMode
-                 }"
-              >
-                  <div class="flex justify-between items-center mb-1">
-                      <span class="font-bold font-display text-white truncate text-sm">{{ en.name }}</span>
-                      <span class="text-xs font-mono text-purple-300">WAITING</span>
-                  </div>
-                  <!-- HP Bar -->
-                  <div class="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                      <div class="h-full bg-purple-500 transition-all duration-500" :style="{ width: `${(en.hp / en.maxHp) * 100}%` }"></div>
-                  </div>
-                  <div class="text-right text-[10px] font-mono text-gray-400 mt-1">HP {{ en.hp }}</div>
-
-                  <!-- Hover Tooltip/Preview -->
-                  <div class="absolute right-full top-0 mr-2 w-20 h-20 hidden group-hover:block z-50 border-2 border-purple-500 rounded bg-black">
-                      <img :src="getSpriteUrl(en.name)" class="w-full h-full object-cover object-top" />
-                  </div>
-              </div>
-           </div>
-
-           <!-- Active Enemies (Full Card Mode) -->
-           <div 
-              v-for="(en, idx) in activeEnemies" 
-              :key="en.id"
-              @click="selectTarget(en)"
-              @mouseenter="hoveredEnemyId = en.id"
-              @mouseleave="hoveredEnemyId = null"
-              class="relative flex-1 min-w-0 max-w-[220px] h-full flex flex-col justify-start items-center transform transition-all duration-500 pointer-events-auto"
-              :class="{ 
-                'hover:scale-105': en.hp > 0 && !selectionMode && !isActing,
-                'cursor-crosshair hover:scale-105 hover:brightness-125': selectionMode && en.hp > 0 && !isActing,
-                'cursor-not-allowed opacity-80': isActing || (phase === 'enemy')
-              }"
-              :style="{ 
-                 transform: `translateY(${idx * 30}px)`,
-                 zIndex: hoveredEnemyId === en.id ? 50 : (activeEnemies.length - idx)
-              }"
-           >
-               <!-- Enemy Sprite / Card -->
-               <div class="relative w-full h-full flex items-start justify-center animate-float-delayed">
-                  <!-- Alive State -->
-                  <div v-if="en.hp > 0" 
-                       class="w-full h-full relative group"
-                       :class="{'grayscale brightness-50': en.hp <= 0}"
-                  >
-                     <!-- 1. Card Base -->
-                     <div class="absolute inset-0 rounded-b-3xl overflow-hidden backdrop-blur-sm border-t-4 border-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.3)] bg-gradient-to-b from-purple-900/40 to-transparent z-0"></div>
-
-                     <!-- 2. Character Sprite (Pop Out) -->
-                     <div class="absolute -top-4 left-0 w-full h-[115%] z-10 pointer-events-none flex items-start justify-center">
-                        <img 
-                            :src="getSpriteUrl(en.name)" 
-                            @error="(e) => (e.target as HTMLImageElement).src = defaultSprite"
-                            class="w-full h-full object-cover object-top drop-shadow-2xl transition-transform duration-500 group-hover:scale-[1.02]" 
-                            alt="Enemy" 
-                        />
-                     </div>
-
-                     <!-- 3. Overlay & Text -->
-                     <div class="absolute inset-0 rounded-b-3xl overflow-hidden z-20 pointer-events-none">
-                        <div class="absolute inset-0 bg-gradient-to-b from-purple-600/60 to-transparent mix-blend-overlay"></div>
-                        <span class="absolute top-10 left-0 w-full text-center text-2xl font-bold font-display text-white drop-shadow-[0_0_10px_rgba(168,85,247,0.8)] tracking-widest px-2 break-words">
-                          {{ en.name }}
-                        </span>
-                     </div>
-                  </div>
-
-                  <!-- Dead State (Shattered) -->
-                  <div v-else class="absolute inset-0 w-full h-full pointer-events-none">
-                     <!-- Shard 1 -->
-                   <div class="absolute inset-0 w-full h-full rounded-b-3xl backdrop-blur-sm border-t-4 border-purple-500 animate-shatter-1 overflow-hidden" 
-                        style="clip-path: polygon(0 0, 100% 0, 60% 100%, 0% 80%);">
-                      <div class="absolute -top-4 left-0 w-full h-[115%] flex items-start justify-center">
-                          <img 
-                              :src="getSpriteUrl(en.name)" 
-                              @error="(e) => (e.target as HTMLImageElement).src = defaultSprite"
-                              class="w-full h-full object-cover object-top" 
-                          />
-                      </div>
-                      <div class="absolute inset-0 bg-gradient-to-b from-purple-600/60 to-transparent mix-blend-overlay"></div>
-                      <span class="absolute top-10 left-0 w-full text-center text-2xl font-bold font-display text-white drop-shadow-[0_0_10px_rgba(168,85,247,0.8)] tracking-widest px-2 break-words">
-                        {{ en.name }}
-                      </span>
-                   </div>
-                   <!-- Shard 2 -->
-                   <div class="absolute inset-0 w-full h-full rounded-b-3xl backdrop-blur-sm border-t-4 border-purple-500 animate-shatter-2 overflow-hidden" 
-                        style="clip-path: polygon(100% 0, 100% 100%, 0% 100%, 60% 100%, 0% 80%);">
-                      <div class="absolute -top-4 left-0 w-full h-[115%] flex items-start justify-center">
-                          <img 
-                              :src="getSpriteUrl(en.name)" 
-                              @error="(e) => (e.target as HTMLImageElement).src = defaultSprite"
-                              class="w-full h-full object-cover object-top" 
-                          />
-                      </div>
-                      <div class="absolute inset-0 bg-gradient-to-b from-purple-600/60 to-transparent mix-blend-overlay"></div>
-                   </div>
-                  </div>
-                  
-                  <!-- Damage Popup for Enemy -->
-                  <div v-for="p in en.popups" :key="p.id" 
-                       class="absolute top-10 left-1/2 transform -translate-x-1/2 z-50 text-5xl font-black italic font-display animate-damage-pop pointer-events-none whitespace-nowrap"
-                       :class="{
-                          'text-green-400': p.type === 'heal',
-                          'text-blue-400 drop-shadow-[0_0_10px_rgba(96,165,250,0.8)]': p.type === 'buff',
-                          'text-yellow-400 drop-shadow-[0_0_10px_rgba(234,179,8,0.8)]': p.type === 'damage' || p.type === 'crit'
-                       }"
-                  >
-                    {{ p.text }}
-                  </div>
-               </div>
-               
-               <!-- Enemy Status HUD -->
-               <div 
-                 class="absolute -left-10 bottom-10 flex flex-col gap-2 transform skew-x-[10deg] items-end w-full transition-all duration-500"
-                 :class="en.hp > 0 ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-10 pointer-events-none'"
-               >
-                  <div 
-                    class="border-r-4 pr-4 pl-6 py-1 text-lg font-bold font-mono clip-hud-right w-full text-right transition-all duration-300"
-                    :style="getEnemyHpStyle(en.hp, en.maxHp)"
-                  >
-                    HP <span class="text-white">{{ en.hp }}</span>
-                  </div>
-
-                  <!-- New: Shield & Dodge Stats (Enemy) -->
-                  <div class="flex gap-2 justify-end w-full">
-                      <!-- Dodge -->
-                      <div class="bg-black/80 border-r-4 border-green-400 pr-2 pl-2 py-0.5 text-xs font-bold font-mono text-green-400 clip-hud-right flex items-center gap-1">
-                          <span class="text-white">{{ Math.round((getEnemyEffectiveDodge(en) || 0) * 100) }}%</span>
-                          <Zap class="w-3 h-3" />
-                      </div>
-                      <!-- Shield -->
-                      <div class="bg-black/80 border-r-4 border-cyan-400 pr-2 pl-2 py-0.5 text-xs font-bold font-mono text-cyan-400 clip-hud-right flex items-center gap-1">
-                          <span class="text-white">{{ en.shield || 0 }}</span>
-                          <Shield class="w-3 h-3" />
-                      </div>
-                  </div>
-
-                  <!-- Buffs -->
-                  <div class="flex flex-wrap gap-1 justify-end max-w-[150px]">
-                     <div v-for="buff in en.buffs" :key="buff.id" class="relative group/buff">
-                        <div class="w-6 h-6 rounded bg-black/60 border border-gray-500 flex items-center justify-center text-[10px] text-white cursor-help overflow-hidden">
-                            <span class="scale-75">{{ buff.name.substring(0, 1) }}</span>
-                        </div>
-                        <!-- Tooltip -->
-                        <div class="absolute bottom-full right-0 mb-2 w-32 bg-black/90 border border-gray-600 text-white text-xs p-2 rounded pointer-events-none opacity-0 group-hover/buff:opacity-100 transition-opacity z-[100] shadow-xl text-right">
-                            <div class="font-bold text-yellow-400 mb-1">{{ buff.name }}</div>
-                            <div class="mb-1 text-gray-300 leading-tight">{{ buff.description }}</div>
-
-                            <!-- Effects Detail -->
-                            <div v-if="buff.effects && buff.effects.length > 0" class="mt-1 mb-1 border-t border-gray-700 pt-1">
-                                <div v-for="(eff, idx) in buff.effects" :key="idx" class="flex justify-between text-gray-400 text-[10px]">
-                                    <span>{{ getEffectName(eff) }}</span>
-                                    <span :class="eff.value > 0 ? 'text-green-400' : 'text-red-400'">
-                                        {{ eff.value > 0 ? '+' : '' }}{{ 
-                                            (eff.isPercentage === false || ['heal', 'heal_mp', 'shield', 'damage_over_time'].includes(eff.type))
-                                            ? Math.round(eff.value) 
-                                            : Math.round(eff.value * 100) + '%' 
-                                        }}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div class="text-blue-400 font-mono text-[10px]">剩余 {{ buff.duration }} 轮</div>
-                        </div>
-                     </div>
-                  </div>
-               </div>
-           </div>
-        </div>
-
+        <!-- Enemy Side -->
+        <CombatEnemyCard
+          :activeEnemies="activeEnemies"
+          :reserveEnemies="reserveEnemies"
+          :selectionMode="selectionMode"
+          :isActing="isActing"
+          :phase="phase"
+          :hoveredEnemyId="hoveredEnemyId"
+          :defaultSprite="defaultSprite"
+          :getSpriteUrl="getSpriteUrl"
+          :getEnemyHpStyle="getEnemyHpStyle"
+          :getEnemyEffectiveDodge="getEnemyEffectiveDodge"
+          :getEffectName="getEffectName"
+          @select-target="selectTarget"
+          @hover-enemy="(id) => hoveredEnemyId = id"
+        />
       </div>
 
-      <!-- Layer 2: HUD & Interface -->
+      <!-- Layer 2: UI Overlay -->
       <div class="absolute inset-0 z-20 pointer-events-none">
-         <!-- Force show test buff for debugging if player has no buffs but shield > 0 -->
-         <!-- Note: This is just a comment, logic is in <script> -->
-         
-         <!-- Top Bar -->
-         <div class="absolute top-0 left-0 w-full p-6 flex justify-between items-start bg-gradient-to-b from-black/80 to-transparent">
-            <div class="flex flex-col">
-               <div class="text-6xl font-black italic font-display text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-600 drop-shadow-lg tracking-tighter">
-                  TURN {{ turn }}
-               </div>
-               <div class="text-sm text-gray-400 font-mono mt-1 tracking-widest uppercase">
-                  Phase: {{ phase === 'player' ? 'PLAYER ACTION' : 'ENEMY TURN' }} 
-                  <span v-if="selectionMode" class="text-red-500 font-bold animate-pulse ml-4">&gt;&gt; SELECT TARGET &lt;&lt;</span>
-                  <span v-if="isActing" class="text-yellow-500 font-bold animate-pulse ml-4">&gt;&gt; EXECUTING... &lt;&lt;</span>
-               </div>
-               
-               <!-- Message Carousel/Log HUD -->
-               <div 
-                  class="mt-4 w-[450px] flex flex-col gap-1 transition-all duration-300 ease-out origin-top-left relative group/log"
-                  :class="[
-                      isLogExpanded 
-                        ? 'pointer-events-auto h-[500px] overflow-y-auto bg-black/90 border border-white/20 backdrop-blur-md p-4 rounded-lg z-[100] shadow-2xl custom-scrollbar' 
-                        : 'pointer-events-auto mask-image-fade min-h-[100px] max-h-[150px] overflow-hidden cursor-pointer hover:bg-black/20 rounded'
-                  ]"
-                  @click="isLogExpanded = !isLogExpanded"
-               >
-                  <div v-if="isLogExpanded" class="flex justify-between items-center mb-2 sticky top-0 bg-black/95 pb-2 border-b border-white/10 z-10">
-                      <span class="text-white font-bold font-display italic">COMBAT LOG</span>
-                      <span class="text-xs text-gray-400 font-mono hover:text-white transition-colors">[CLICK TO CLOSE]</span>
-                  </div>
-                  
-                  <transition-group name="log-fade" tag="div" class="flex flex-col gap-1">
-                     <!-- 正在输入的流式文本 -->
-                     <div v-if="streamingNarrative" class="text-sm font-mono text-shadow-sm flex gap-2 items-start text-blue-300 animate-pulse">
-                        <span class="font-bold whitespace-nowrap drop-shadow-md">[NARRATOR]</span>
-                        <span class="drop-shadow-md leading-tight">{{ streamingNarrative }}<span class="inline-block w-1 h-4 bg-blue-400 animate-blink ml-1"></span></span>
-                     </div>
-                     <div v-for="log in (isLogExpanded ? combatLogs : combatLogs.slice(0, 5))" :key="log.id" class="text-sm font-mono text-shadow-sm flex gap-2 items-start">
-                        <span class="text-yellow-400 font-bold whitespace-nowrap drop-shadow-md">TURN {{ log.turn }}</span>
-                        <span class="text-white/90 drop-shadow-md leading-tight">{{ log.content }}</span>
-                     </div>
-                  </transition-group>
-                  
-                  <div v-if="!isLogExpanded" class="absolute bottom-0 w-full text-center pb-1 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover/log:opacity-100 transition-opacity pointer-events-none">
-                      <span class="text-[10px] text-gray-300 font-mono tracking-widest uppercase">Click to expand</span>
-                  </div>
-               </div>
-            </div>
-            
-            <!-- Close Debug Button (Replaced with End Game if Over) -->
-            <button v-if="isGameOver" @click="closeCombat" class="pointer-events-auto px-4 py-2 bg-white/10 hover:bg-red-600 text-white rounded font-bold transition-colors border border-white/20 animate-bounce-in">
-               FINISH
-            </button>
-         </div>
+        <!-- Top Bar -->
+        <CombatTopBar
+          :turn="turn"
+          :phase="phase"
+          :selectionMode="selectionMode"
+          :isActing="isActing"
+          :isLogExpanded="isLogExpanded"
+          :streamingNarrative="streamingNarrative"
+          :combatLogs="combatLogs"
+          :isGameOver="isGameOver"
+          @toggle-log="isLogExpanded = !isLogExpanded"
+          @close-combat="closeCombat"
+        />
 
-         <!-- Action Wheel (Bottom Right - Persona 5 Style) -->
-         <div class="absolute bottom-10 right-20 pointer-events-auto perspective-1000" 
-              :class="{ 'opacity-50 blur-[2px] pointer-events-none': selectionMode || isActing || phase !== 'player' || isGameOver }">
-            
-            <!-- Main Menu -->
-            <div 
-              v-if="currentMenu === 'main'"
-              class="relative w-64 h-64 transition-all duration-500 transform-style-3d flex items-center justify-center"
-              @mouseenter="isMenuOpen = true"
-              @mouseleave="isMenuOpen = false"
-            >
-               
-               <!-- Center: Attack (Pentagon) -->
-               <button 
-                 @click="handleAction('attack')"
-                 @mouseenter="audioManager.playHover()"
-                 class="absolute z-50
-                        w-40 h-40 bg-red-600 hover:bg-red-500 text-white font-black text-3xl italic font-display
-                        shadow-[0_0_40px_rgba(220,38,38,0.8)]
-                        flex items-center justify-center pt-4
-                        transition-all duration-500 ease-out group clip-pentagon-core animate-pulse-slow disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
-                 :class="{ 'rotate-[360deg] scale-110': isMenuOpen }"
-                 :disabled="!canAttack"
-               >
-                 <span class="transform transition-transform drop-shadow-md" :class="isMenuOpen ? '-rotate-[360deg]' : ''">ATTACK</span>
-               </button>
+        <!-- Action Menu -->
+        <CombatActionMenu
+          :currentMenu="currentMenu"
+          :selectionMode="selectionMode"
+          :isActing="isActing"
+          :phase="phase"
+          :isGameOver="isGameOver"
+          :canAttack="canAttack"
+          :spells="spells"
+          :items="items"
+          :playerMp="player?.mp || 0"
+          :playerPPoints="player?.pPoints || 0"
+          :playerActionPoints="player?.actionPoints ?? 2"
+          :isProcessingTalk="isProcessingTalk"
+          :talkInput="talkInput"
+          :specialSkills="specialSkills"
+          :getSpellCostFn="(spell) => getSpellCost(spell, player)"
+          @action="handleAction"
+          @switch-menu="switchMenu"
+          @special-action="handleSpecialAction"
+          @handle-talk="handleTalk"
+          @hover-sound="audioManager.playHover()"
+          @update:talkInput="(v) => talkInput = v"
+        />
 
-               <!-- Surrounding Buttons (Disabled/Hidden per requirement) -->
-               
-               <!-- 1. Spell (Top Right, 36deg) -->
-               <button 
-                  @click="switchMenu('spell')"
-                  @mouseenter="audioManager.playHover()"
-                  class="absolute z-20 w-32 h-32 -ml-16 -mt-16 bg-black border-2 border-purple-400 hover:bg-purple-600 hover:border-white text-purple-400 hover:text-white font-bold text-lg font-display italic flex items-center justify-center clip-wedge transition-all duration-500 ease-out hover:z-40 group"
-                  :style="{ 
-                    transform: isMenuOpen ? 'rotate(36deg) translateY(-105px) scale(1)' : 'rotate(216deg) translateY(0px) scale(0.5)',
-                    opacity: isMenuOpen ? 1 : 0,
-                    pointerEvents: isMenuOpen ? 'auto' : 'none'
-                  }"
-               >
-                  <span class="transform -rotate-[36deg] group-hover:scale-110 transition-transform text-xl block">SPELL</span>
-               </button>
-
-               <!-- 2. Item (Bottom Right, 108deg) -->
-               <button 
-                  @click="switchMenu('item')"
-                  @mouseenter="audioManager.playHover()"
-                  class="absolute z-20 w-32 h-32 -ml-16 -mt-16 bg-black border-2 border-blue-400 hover:bg-blue-600 hover:border-white text-blue-400 hover:text-white font-bold text-lg font-display italic flex items-center justify-center clip-wedge transition-all duration-500 ease-out hover:z-40 group"
-                  :style="{ 
-                    transform: isMenuOpen ? 'rotate(108deg) translateY(-105px) scale(1)' : 'rotate(288deg) translateY(0px) scale(0.5)',
-                    opacity: isMenuOpen ? 1 : 0,
-                    pointerEvents: isMenuOpen ? 'auto' : 'none'
-                  }"
-               >
-                  <span class="transform -rotate-[108deg] group-hover:scale-110 transition-transform text-xl block">ITEM</span>
-               </button>
-
-               <!-- 3. Special (Was Guard) -->
-               <button 
-                  @click="switchMenu('special')"
-                  @mouseenter="audioManager.playHover()"
-                  class="absolute z-20 w-32 h-32 -ml-16 -mt-16 bg-black border-2 border-yellow-400 hover:bg-yellow-600 hover:border-white text-yellow-400 hover:text-white font-bold text-lg font-display italic flex items-center justify-center clip-wedge transition-all duration-500 ease-out hover:z-40 group"
-                  :style="{ 
-                    transform: isMenuOpen ? 'rotate(180deg) translateY(-105px) scale(1)' : 'rotate(360deg) translateY(0px) scale(0.5)',
-                    opacity: isMenuOpen ? 1 : 0,
-                    pointerEvents: isMenuOpen ? 'auto' : 'none'
-                  }"
-               >
-                  <span class="transform -rotate-[180deg] group-hover:scale-110 transition-transform text-xl block">SPECIAL</span>
-               </button>
-
-               <!-- 4. Escape (Disabled) -->
-               <button 
-                  class="absolute z-20 w-32 h-32 -ml-16 -mt-16 bg-black border-2 border-gray-700 text-gray-700 font-bold text-lg font-display italic flex items-center justify-center clip-wedge transition-all duration-500 ease-out cursor-not-allowed"
-                  :style="{ 
-                    transform: isMenuOpen ? 'rotate(252deg) translateY(-105px) scale(1)' : 'rotate(432deg) translateY(0px) scale(0.5)',
-                    opacity: isMenuOpen ? 0.5 : 0
-                  }"
-               >
-                  <span class="transform -rotate-[252deg] text-xl block">ESCAPE</span>
-               </button>
-
-               <!-- 5. Talk (Previously Jutsu) -->
-               <button 
-                  @click="switchMenu('talk')"
-                  @mouseenter="audioManager.playHover()"
-                  class="absolute z-20 w-32 h-32 -ml-16 -mt-16 bg-black border-2 border-green-400 hover:bg-green-600 hover:border-white text-green-400 hover:text-white font-bold text-lg font-display italic flex items-center justify-center clip-wedge transition-all duration-500 ease-out hover:z-40 group"
-                  :style="{ 
-                    transform: isMenuOpen ? 'rotate(324deg) translateY(-105px) scale(1)' : 'rotate(504deg) translateY(0px) scale(0.5)',
-                    opacity: isMenuOpen ? 1 : 0,
-                    pointerEvents: isMenuOpen ? 'auto' : 'none'
-                  }"
-               >
-                  <span class="transform -rotate-[324deg] group-hover:scale-110 transition-transform text-xl block">TALK</span>
-               </button>
-            </div>
-
-            <!-- Sub Menu: Spells -->
-            <div v-else-if="currentMenu === 'spell'" class="relative w-80 min-h-[300px] flex flex-col gap-2 items-end animate-slide-in-right">
-              <div class="text-3xl font-black italic text-purple-400 mb-4 drop-shadow-glow font-display">SPELL CARDS</div>
-              
-              <!-- Hover Info Panel -->
-              <div v-if="hoveredSpell" class="absolute right-[110%] top-0 w-64 bg-black/80 border border-purple-500/50 p-4 rounded-lg backdrop-blur-md shadow-[0_0_20px_rgba(168,85,247,0.3)] animate-fade-in-fast z-50 pointer-events-none">
-                 <h3 class="text-xl font-bold text-purple-300 mb-2 border-b border-purple-500/30 pb-1">{{ hoveredSpell.name }}</h3>
-                 <div class="text-sm text-gray-300 space-y-2">
-                     <p class="italic text-gray-400 text-xs">{{ hoveredSpell.description }}</p>
-                     <div class="flex justify-between text-purple-200">
-                         <span>消耗 MP:</span>
-                         <span class="font-mono font-bold">{{ hoveredSpell.cost }}</span>
-                     </div>
-                     <div v-if="hoveredSpell.damage" class="flex justify-between text-red-300">
-                         <span>威力:</span>
-                         <span class="font-mono font-bold">{{ hoveredSpell.damage }}</span>
-                     </div>
-                     <div class="flex justify-between text-blue-300">
-                         <span>类型:</span>
-                         <span>{{ getSpellTypeName(hoveredSpell.type || '') }}</span>
-                     </div>
-                     <div v-if="hoveredSpell.buffDetails" class="text-xs text-green-300 border-t border-white/10 pt-1 mt-1">
-                         <div class="font-bold mb-0.5">附加效果:</div>
-                         <div>{{ hoveredSpell.buffDetails.description || hoveredSpell.buffDetails.name }}</div>
-                         <div class="opacity-70">持续 {{ hoveredSpell.buffDetails.duration }} 回合</div>
-                     </div>
-                 </div>
-              </div>
-              
-              <button 
-                 v-for="(spell, idx) in spells" :key="idx"
-                 @click="(player && player.mp >= getSpellCost(spell, player)) ? handleAction('spell', spell) : null"
-                 @mouseenter="audioManager.playHover(); hoveredSpell = spell"
-                 @mouseleave="hoveredSpell = null"
-                 class="w-full text-right px-6 py-3 border-r-4 transition-all clip-rect-left"
-                 :class="[
-                    (player && player.mp >= getSpellCost(spell, player))
-                    ? 'bg-black/80 border-purple-500 hover:bg-purple-900/50 hover:border-white text-white hover:-translate-x-4 cursor-pointer' 
-                    : 'bg-gray-900/80 border-gray-700 text-gray-500 cursor-not-allowed opacity-60'
-                 ]"
-              >
-                 {{ spell.name }} <span class="text-xs ml-2" :class="(player && player.mp >= getSpellCost(spell, player)) ? 'text-purple-300' : 'text-gray-600'">MP {{ getSpellCost(spell, player) }}</span>
-              </button>
-              
-              <button @click="currentMenu = 'main'" @mouseenter="audioManager.playHover()" class="mt-4 text-gray-400 hover:text-white font-bold italic transition-colors">BACK</button>
-            </div>
-
-            <!-- Sub Menu: Items -->
-            <div v-else-if="currentMenu === 'item'" class="relative w-80 min-h-[300px] flex flex-col gap-2 items-end animate-slide-in-right">
-              <div class="text-3xl font-black italic text-blue-400 mb-4 drop-shadow-glow font-display">ITEMS</div>
-              
-              <button 
-                 v-for="(item, idx) in items" :key="idx"
-                 @click="item.count > 0 ? handleAction('item', item) : null"
-                 @mouseenter="audioManager.playHover()"
-                 class="w-full text-right px-6 py-3 border-r-4 transition-all clip-rect-left"
-                 :class="[
-                    item.count > 0
-                    ? 'bg-black/80 border-blue-500 hover:bg-blue-900/50 hover:border-white text-white hover:-translate-x-4 cursor-pointer'
-                    : 'bg-gray-900/80 border-gray-700 text-gray-500 cursor-not-allowed opacity-60'
-                 ]"
-              >
-                 {{ item.name }} <span class="text-xs text-blue-300 ml-2">x{{ item.count }}</span>
-              </button>
-              
-              <button @click="currentMenu = 'main'" @mouseenter="audioManager.playHover()" class="mt-4 text-gray-400 hover:text-white font-bold italic transition-colors">BACK</button>
-            </div>
-
-            <!-- Sub Menu: Talk -->
-            <div v-else-if="currentMenu === 'talk'" class="relative w-96 min-h-[300px] flex flex-col gap-2 items-end animate-slide-in-right">
-              <div class="text-3xl font-black italic text-green-400 mb-4 drop-shadow-glow font-display flex items-center gap-2">
-                 <MessageSquare class="w-8 h-8" />
-                 PERSUASION
-              </div>
-              
-              <div class="w-full bg-black/80 border-2 border-green-500 p-4 relative">
-                 <textarea 
-                    v-model="talkInput"
-                    placeholder="说点什么来动摇对方..."
-                    class="w-full h-32 bg-transparent !text-yellow-400 caret-yellow-400 font-bold resize-none outline-none font-sans text-lg placeholder:text-gray-500 drop-shadow-md"
-                    :disabled="isProcessingTalk"
-                    @keydown.enter.prevent="handleTalk"
-                 ></textarea>
-                 
-                 <div v-if="isProcessingTalk" class="absolute inset-0 bg-black/50 flex items-center justify-center">
-                    <span class="text-green-400 animate-pulse font-bold">思考中...</span>
-                 </div>
-              </div>
-
-              <div class="flex gap-4 w-full justify-end mt-2 items-center">
-                 <div v-if="player && (player.pPoints || 0) < 15" class="text-red-500 text-xs font-bold bg-black/50 px-2 py-1 rounded border border-red-500/50">需要 15 P 点</div>
-                 <button 
-                     @click="handleTalk"
-                     :disabled="!talkInput.trim() || isProcessingTalk || ((player?.pPoints || 0) < 15)"
-                     class="flex items-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold transition-colors clip-rect-left"
-                  >
-                    <Send class="w-4 h-4" />
-                    SEND <span class="text-xs ml-1 opacity-90 font-mono">(15P)</span>
-                 </button>
-              </div>
-              
-              <button @click="currentMenu = 'main'" @mouseenter="audioManager.playHover()" class="mt-4 text-gray-400 hover:text-white font-bold italic transition-colors">BACK</button>
-            </div>
-
-            <!-- Sub Menu: Special -->
-            <div v-else-if="currentMenu === 'special'" class="relative w-80 min-h-[300px] flex flex-col gap-2 items-end animate-slide-in-right">
-              <div class="text-3xl font-black italic text-yellow-400 mb-4 drop-shadow-glow font-display">SPECIAL</div>
-              <div class="w-full h-[300px] overflow-y-auto pr-2 custom-scrollbar flex flex-col gap-2">
-                 <button 
-                    v-for="skill in specialSkills" :key="skill.id"
-                    @click="handleSpecialAction(skill)"
-                    @mouseenter="audioManager.playHover()"
-                    class="w-full text-right px-6 py-3 border-r-4 transition-all clip-rect-left flex flex-col items-end group"
-                    :class="[
-                       (player && (player.pPoints || 0) >= skill.costP && (player.actionPoints !== undefined ? player.actionPoints : 2) >= skill.costAP)
-                       ? `bg-black/80 ${getSkillThemeClasses(skill.theme).border} ${getSkillThemeClasses(skill.theme).hoverBg} hover:border-white text-white hover:-translate-x-4 cursor-pointer` 
-                       : 'bg-gray-900/80 border-gray-700 text-gray-500 cursor-not-allowed opacity-60'
-                    ]"
-                 >
-                    <div class="flex items-center gap-2">
-                        <span class="font-bold italic">{{ skill.name }}</span>
-                        <span class="text-xs font-mono" :class="(player && (player.pPoints || 0) >= skill.costP) ? getSkillThemeClasses(skill.theme).textP : 'text-red-500'">{{ skill.costP }}P</span>
-                        <span class="text-xs font-mono" :class="(player && (player.actionPoints !== undefined ? player.actionPoints : 2) >= skill.costAP) ? 'text-blue-300' : 'text-red-500'">{{ skill.costAP }}AP</span>
-                    </div>
-                    <div class="text-[10px] opacity-70 group-hover:opacity-100 transition-opacity">{{ skill.description }}</div>
-                 </button>
-              </div>
-              
-              <button @click="currentMenu = 'main'" @mouseenter="audioManager.playHover()" class="mt-4 text-gray-400 hover:text-white font-bold italic transition-colors">BACK</button>
-            </div>
-         </div>
+        <!-- Game Over Overlay -->
+        <div v-if="isGameOver" class="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm z-30 animate-fade-in pointer-events-auto">
+           <div class="text-8xl font-black italic font-display mb-4 animate-slam tracking-tighter"
+                :class="gameResult === 'win' ? 'text-yellow-400 drop-shadow-[0_0_30px_rgba(234,179,8,0.8)]' : 'text-red-600 drop-shadow-[0_0_30px_rgba(220,38,38,0.8)]'">
+              {{ gameResult === 'win' ? 'VICTORY' : 'DEFEATED' }}
+           </div>
+           <div class="text-xl text-white/80 font-serif tracking-widest animate-fade-in-up">
+              {{ gameResult === 'win' ? '战斗胜利' : '战斗失败' }}
+           </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1131,7 +144,6 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, reactive, onUnmounted, onMounted } from 'vue';
-  import { Zap, Shield, MessageSquare, Send } from 'lucide-vue-next';
   import type { Combatant, SpellCard, Buff, BuffEffect } from '@/types/combat';
   import type { Item } from '@/types/game';
   import { calculateDamage, processPersuasion, calculatePPointGain, getBaseDamage, getEffectiveStats } from '@/services/combatLogic';
@@ -1143,6 +155,17 @@ import { ref, computed, watch, reactive, onUnmounted, onMounted } from 'vue';
   import { findBattleSprite } from '@/services/characterMapping';
   import defaultSprite from '@/assets/images/battle_sprites/其他角色.png';
   import { multiplayerService } from '@/services/MultiplayerService';
+
+  // Sub-components
+  import CombatRequestDialog from '@/components/combat/CombatRequestDialog.vue';
+  import CombatIntroScreen from '@/components/combat/CombatIntroScreen.vue';
+  import CombatCutins from '@/components/combat/CombatCutins.vue';
+  import CombatEffects from '@/components/combat/CombatEffects.vue';
+  import CombatTopBar from '@/components/combat/CombatTopBar.vue';
+  import CombatActionMenu from '@/components/combat/CombatActionMenu.vue';
+  import CombatPlayerCard from '@/components/combat/CombatPlayerCard.vue';
+  import CombatEnemyCard from '@/components/combat/CombatEnemyCard.vue';
+
 
   const gameStore = useGameStore();
   
@@ -1814,9 +837,7 @@ const items = computed(() => {
 });
 
 // Animation Refs
-const hoveredSpell = ref<SpellCard | null>(null);
 const currentMenu = ref<'main' | 'spell' | 'item' | 'talk' | 'special'>('main');
-const isMenuOpen = ref(false);
 const isScreenShaking = ref(false);
 const showIntro = ref(false); // New Intro State
 const isActing = ref(false); 
@@ -2064,16 +1085,7 @@ function getEffectName(effect: BuffEffect): string {
     return '效果';
 }
 
-function getSpellTypeName(type: string): string {
-    const map: Record<string, string> = {
-        'attack': '攻击',
-        'buff': '增益',
-        'debuff': '减益',
-        'shield': '护盾',
-        'heal': '治疗'
-    };
-    return map[type] || '特殊';
-}
+
 
 function addPopup(target: UICombatant, value: number | string, type: 'damage' | 'heal' | 'crit' | 'buff' | 'debuff' = 'damage', isRemote: boolean = false) {
   if (!isRemote && gameStore.multiplayer.isHost && gameStore.multiplayer.isMultiplayer) {
@@ -2659,16 +1671,7 @@ const specialSkills = [
     { id: 'combat_flow', name: '战斗心流', costP: 100, costAP: 1, description: '3回合内增加40%增伤、40%减伤及40%闪避率，且MP消耗降低20%', theme: 'purple' }
 ];
 
-function getSkillThemeClasses(theme: string) {
-    const map: Record<string, any> = {
-        blue: { border: 'border-cyan-500', hoverBg: 'hover:bg-cyan-900/50', textP: 'text-cyan-300' },
-        red: { border: 'border-red-500', hoverBg: 'hover:bg-red-900/50', textP: 'text-red-300' },
-        orange: { border: 'border-orange-500', hoverBg: 'hover:bg-orange-900/50', textP: 'text-orange-300' },
-        purple: { border: 'border-purple-500', hoverBg: 'hover:bg-purple-900/50', textP: 'text-purple-300' },
-        yellow: { border: 'border-yellow-500', hoverBg: 'hover:bg-yellow-900/50', textP: 'text-yellow-300' }
-    };
-    return map[theme] || map.yellow;
-}
+
 
 async function handleSpecialAction(skill: any) {
     const p = player.value;

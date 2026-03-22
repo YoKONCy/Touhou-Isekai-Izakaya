@@ -29,23 +29,23 @@ class GameLoopService {
   isAborting = ref(false);
   isBackgroundProcessing = ref(false);
 
-  // Streaming content buffer
+  // 流式内容缓冲
   streamedContent = ref('');
   
-  // Abort controller for cancellation
+  // 用于取消操作的终止控制器
   private abortController: AbortController | null = null;
 
   async initializeNewGame() {
      const gameStore = useGameStore();
      const charStore = useCharacterStore();
      
-     // Ensure characters are loaded
+     // 确保角色已加载
      await charStore.loadCharacters();
      
-     // 1. Reset Runtime State
+     // 1. 重置运行时状态
      gameStore.resetState();
      
-     // 2. Iterate Lorebook for "Character" type entries with initial variables
+     // 2. 遍历设定集中带有初始变量的"Character"（角色）类型条目
      const characters = charStore.characters;
      
      for (const char of characters) {
@@ -59,7 +59,7 @@ class GameLoopService {
            }
            if (char.initialMaxHp) {
               initialData.max_hp = char.initialMaxHp;
-              initialData.hp = char.initialMaxHp; // Full HP on init
+              initialData.hp = char.initialMaxHp; // 初始化时设为满血
               hasInitData = true;
            }
            if (char.initialResidence) {
@@ -68,9 +68,9 @@ class GameLoopService {
            }
            
            if (hasInitData) {
-              // Write to game state
-              // We construct a fake action to reuse logic or directly write to state
-              // Direct write is safer/faster for init
+              // 写入游戏状态
+              // 构造伪操作以复用逻辑或直接写入状态
+              // 初始化时直接写入更安全/快捷
               if (!gameStore.state.npcs[char.uuid]) {
                  gameStore.state.npcs[char.uuid] = { id: char.uuid, name: char.name } as any;
               }
@@ -89,7 +89,7 @@ class GameLoopService {
     const gameStore = useGameStore();
     const toastStore = useToastStore();
 
-    // Scheme C: Prevent Guest from performing actions
+    // 方案 C: 阻止客机执行操作
     if (gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost) {
       toastStore.addToast('客机模式下仅供观察，无法进行操作', 'warning');
       console.warn('[游戏循环] 操作被阻止：客机模式仅为只读');
@@ -111,12 +111,12 @@ class GameLoopService {
     this.startLoop();
     
     try {
-      // 0. Update Turn & Retrieve Memory
+      // 0. 更新回合 & 检索记忆
       const gameStore = useGameStore();
       gameStore.incrementTurn();
 
-      // Clear pending triggers if user chose to type instead of clicking them
-      // This prevents "Enter Duel" or "Quest Offer" buttons from persisting across rounds
+      // 如果用户选择输入而不是点击，则清除待处理的触发器
+      // 这可以防止“进入决斗”或“任务提供”按钮在回合之间持续存在
       if (gameStore.state.system.combat?.isPending) {
         gameStore.setCombatState(null);
         console.log('[GameLoop] Cleared pending combat trigger because user performed a different action.');
@@ -130,7 +130,7 @@ class GameLoopService {
       const settingsStore = useSettingsStore();
       const currentSaveSlotId = settingsStore.currentSaveSlotId || 1;
       
-      // Scheme B: Multiplayer Input Aggregation (Host Side)
+      // 方案 B: 多人输入聚合（房主端）
       let finalUserContent = userContent;
       
       if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost) {
@@ -150,27 +150,27 @@ class GameLoopService {
               finalUserContent = aggregatedContent;
               console.log('[GameLoop] Aggregated Multiplayer Input:\n', finalUserContent);
               
-              // Clear pending inputs after consuming
+              // 获取后清除待处理的多人输入
               multiplayerService.clearPendingGuestInputs();
           }
       }
 
       const retrievedMemories = await memoryService.retrieve(currentSaveSlotId, finalUserContent, gameStore.state.system.turn_count);
 
-      // 1. Prepare Context
+      // 1. 准备上下文
       this.currentStage.value = 'preparing';
       const promptContext = await promptService.build(finalUserContent, retrievedMemories);
       
-      // DEBUG: Log Context Composition
+      // DEBUG: 打印上下文组成
       console.log('[Prompt Debug] Context Composition:', promptContext.sections.map(s => `${s.id}: ${s.tokenCount} tokens`).join(', '));
       console.log('[Prompt Debug] Total Tokens:', promptContext.totalTokens);
 
       const messages = promptService.toOpenAIMessages(promptContext);
       
-      // DEBUG: Log LLM1 Prompt
+      // DEBUG: 打印 LLM1 提示词
       console.log('【LLM1 Debug】Prompt Messages:', JSON.parse(JSON.stringify(messages)));
 
-      // 2. LLM #1: Story Generation (Streaming)
+      // 2. LLM #1: 故事生成（流式）
       this.currentStage.value = 'generating_story';
       // const settingsStore = useSettingsStore(); // Already declared above
       const chatConfig = settingsStore.getEffectiveConfig('chat');
@@ -188,7 +188,7 @@ class GameLoopService {
       const completionOptions = {
         model: chatConfig.model || 'gpt-3.5-turbo',
         messages: messages as any,
-        stream: chatConfig.stream !== false, // Default true - but now properly saved
+        stream: chatConfig.stream !== false, // 默认为 true - 但现在被正确保存
         temperature: chatConfig.temperature ?? 0.7,
         top_p: chatConfig.top_p,
         frequency_penalty: chatConfig.frequency_penalty,
@@ -210,7 +210,7 @@ class GameLoopService {
       this.streamedContent.value = '';
       let rawContent = '';
 
-      // Host Side: Broadcast starting generation to Guests
+      // 房主端: 向客机广播开始生成
       if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost) {
         multiplayerService.send('STORY_GENERATING', { stage: 'generating_story' });
       }
@@ -220,29 +220,29 @@ class GameLoopService {
           const stream = await openai.chat.completions.create(completionOptions, requestOptions) as any;
           
           for await (const chunk of stream) {
-            // Check if aborted
+            // 检查是否已中止
             if (this.abortController?.signal.aborted) {
               throw new Error('Operation aborted by user');
             }
             const delta = chunk.choices[0]?.delta?.content || '';
             rawContent += delta;
 
-            // Host Side: Broadcast token to Guests
+            // 房主端: 向客机广播 token
             if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost && delta) {
               multiplayerService.sendLLMToken(delta);
             }
             
-            // Clean CoT from display (handle both <think> and <thinking>)
+            // 从显示中清理 CoT（处理 <think> 和 <thinking>）
             this.streamedContent.value = rawContent
               .replace(/<think>[\s\S]*?<\/think>/gi, '')
-              .replace(/<think>[\s\S]*/gi, '') // Hide incomplete tag
+              .replace(/<think>[\s\S]*/gi, '') // 隐藏不完整的标签
               .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
               .replace(/<thinking>[\s\S]*/gi, '');
           }
         } else {
           let response = await openai.chat.completions.create({ ...completionOptions, stream: false }, requestOptions);
           
-          // Fallback: If response is a string (e.g. from a proxy), try to parse it
+          // 后备: 如果响应是字符串（如来自代理），则尝试解析
           if (typeof response === 'string') {
              try {
                  response = JSON.parse(response);
@@ -258,7 +258,7 @@ class GameLoopService {
 
           rawContent = response.choices[0]?.message?.content || '';
 
-          // Host Side: Broadcast full content to Guests if not streaming
+          // 房主端: 如果未使用流式传输，则向客机广播完整内容
           if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost && rawContent) {
             multiplayerService.sendLLMToken(rawContent);
           }
@@ -270,30 +270,30 @@ class GameLoopService {
       } catch (error: any) {
         if (error.message === 'Operation aborted by user' || error.name === 'AbortError') {
           console.log('[游戏循环] 剧情生成已中止');
-          return; // Exit early without committing
+          return; // 提前退出而不提交
         }
-        throw error; // Re-throw other errors
+        throw error; // 重新抛出其他错误
       }
       
-      // Use rawContent for extraction to ensure we capture the thought even if it was hidden
+      // 使用 rawContent 进行提取，确保即使被隐藏也能捕获内部思考
       let finalStory = rawContent;
       
-      // DEBUG: Log LLM1 Response
+      // DEBUG: 打印 LLM1 响应
       console.log('【LLM1 调试】原始响应:', rawContent);
 
-      // Extract and strip COT content
+      // 提取并剥离 COT 内容
       let thoughtContent = '';
-      // Match both <thinking> and <think>
+      // 同时匹配 <thinking> 和 <think>
       const thoughtMatch = finalStory.match(/<(thinking|think)>([\s\S]*?)<\/\1>/i);
       if (thoughtMatch) {
         thoughtContent = thoughtMatch[2]?.trim() || '';
         finalStory = finalStory.replace(/<(thinking|think)>[\s\S]*?<\/\1>/gi, '').trim();
         
-        // Also update streamedContent for UI consistency (if we want to hide it immediately)
+        // 同步更新 streamedContent 以保证 UI 一致性（如果要立即隐藏）
         this.streamedContent.value = finalStory; 
       }
 
-      // Extract and strip Combat Trigger
+      // 提取并剥离战斗触发器（Combat Trigger）
       let combatTriggerData: any = null;
       const combatMatch = finalStory.match(/<combat_trigger>([\s\S]*?)<\/combat_trigger>/);
       if (combatMatch) {
@@ -311,7 +311,7 @@ class GameLoopService {
         }
       }
 
-      // Extract and strip Quest Trigger
+      // 提取并剥离任务触发器（Quest Trigger）
       let questTriggerData: any = null;
       const questMatch = finalStory.match(/<quest_trigger>([\s\S]*?)<\/quest_trigger>/);
       if (questMatch) {
@@ -329,7 +329,7 @@ class GameLoopService {
         }
       }
 
-      // Extract and strip Quest Update
+      // 提取并剥离任务更新（Quest Update）
       let questUpdateData: any = null;
       const questUpdateMatch = finalStory.match(/<quest_update>([\s\S]*?)<\/quest_update>/);
       if (questUpdateMatch) {
@@ -347,7 +347,7 @@ class GameLoopService {
         }
       }
 
-      // Extract and strip Prediction Trigger
+      // 提取并剥离预测触发器（Prediction Trigger）
       let predictionTriggerData: any = null;
       const predictionMatch = finalStory.match(/<prediction_trigger>([\s\S]*?)<\/prediction_trigger>/);
       if (predictionMatch) {
@@ -365,7 +365,7 @@ class GameLoopService {
         }
       }
 
-      // Extract and strip Promise Trigger
+      // 提取并剥离约定触发器（Promise Trigger）
       let promiseTriggerData: any = null;
       const promiseMatch = finalStory.match(/<promise_trigger>([\s\S]*?)<\/promise_trigger>/);
       if (promiseMatch) {
@@ -383,7 +383,7 @@ class GameLoopService {
         }
       }
 
-      // Extract and strip Promise Update
+      // 提取并剥离约定更新（Promise Update）
       let promiseUpdateData: any = null;
       const promiseUpdateMatch = finalStory.match(/<promise_update>([\s\S]*?)<\/promise_update>/);
       if (promiseUpdateMatch) {
@@ -401,7 +401,7 @@ class GameLoopService {
         }
       }
 
-      // Extract and strip Management Trigger
+      // 提取并剥离经营触发器（Management Trigger）
       let managementTriggerData: any = null;
       const managementMatch = finalStory.match(/<management_trigger>([\s\S]*?)<\/management_trigger>/);
       if (managementMatch) {
@@ -419,19 +419,19 @@ class GameLoopService {
         }
       }
 
-      // Host Side: Broadcast story finished to Guests
+      // 房主端：向客机广播故事已完成
       if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost) {
         multiplayerService.send('STORY_FINISHED', {});
       }
 
-      // 3. Immediately commit the story message to chat
+      // 3. 立即将故事消息提交到聊天中
       const chatStore = useChatStore();
       const toastStore = useToastStore();
       
-      // A. Add User Message
+      // A. 添加用户消息
       await chatStore.addMessage('user', finalUserContent);
 
-      // Host Side: Broadcast User Message to Guests
+      // 房主端：向客机广播用户消息
       if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost) {
         multiplayerService.send('SYNC_CHAT_MESSAGE', {
           role: 'user',
@@ -441,11 +441,11 @@ class GameLoopService {
         });
       }
       
-      // B. Add Assistant Message (without debug info for now)
+      // B. 添加助手消息（目前暂不包含调试信息）
       const assistantMsgId = await chatStore.addMessage('assistant', finalStory);
 
-      // Host Side: Broadcast the final committed message content to ensure guest's local chat history is in sync
-      // (Guests might have missed some tokens during streaming or had slightly different cleaned results)
+      // 房主端：广播最终提交的消息内容，以确保客机的本地聊天记录同步
+      // （客机可能在流式传输期间遗漏了某些 token，或者清理结果略有不同）
       if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost) {
         multiplayerService.send('SYNC_CHAT_MESSAGE', {
           role: 'assistant',
@@ -463,44 +463,44 @@ class GameLoopService {
         window.dispatchEvent(new CustomEvent('mp-reset-draft'));
       }
       
-      // Play notification sound
+      // 播放通知音效
       audioManager.playChime();
       
-      // C. Update thought content if exists
+      // C. 如果存在，更新思考内容
       if (thoughtContent && assistantMsgId) {
          await chatStore.updateMessage(assistantMsgId, { thought_content: thoughtContent });
       }
 
-      // D. Trigger Combat if needed
+      // D. 取决于是否需要，触发战斗
       if (combatTriggerData && combatTriggerData.trigger) {
         this.initializeCombat(combatTriggerData);
       }
 
-      // Trigger Management if needed
+      // 取决于是否需要，触发经营
       if (managementTriggerData && managementTriggerData.trigger) {
         this.initializeManagement(managementTriggerData);
       }
 
-      // E. Trigger Quest if needed
+      // E. 取决于是否需要，触发任务
       if (questTriggerData && questTriggerData.trigger && questTriggerData.quests && questTriggerData.quests.length > 0) {
         const gameStore = useGameStore();
-        // Take the first quest as pending
+        // 将第一个任务设为待处理
         const quest = questTriggerData.quests[0];
         if (!quest.id) quest.id = uuidv4();
-        // Ensure default status
-        quest.status = 'active'; // Will be set to active upon acceptance, but for now just data
-        // Actually, status should be decided upon acceptance. 
-        // But the store expects a Quest object. Let's set it to 'active' conceptually, 
-        // but it is just a proposal until accepted.
+        // 确保默认状态
+        quest.status = 'active'; // 接受后将设置为 active，但目前只是数据
+        // 实际上，状态应在接受时决定。
+        // 但是 store 需要一个 Quest 对象。让我们在概念上将其设置为 'active'，
+        // 但在被接受之前，它只是一个提议。
         
         gameStore.setPendingQuest(quest);
       }
 
-      // F. Update Quest if needed
+      // F. 取决于是否需要，更新任务
       if (questUpdateData && (questUpdateData.update || questUpdateData.status || questUpdateData.log) && questUpdateData.quest_name) {
          const gameStore = useGameStore();
-         // Find quest by name since LLM doesn't know IDs
-         // We check for active quests that match the name
+         // 通过名称查找任务，因为 LLM 不知道 ID
+         // 我们检查名称匹配并且是 active（进行中）的任务
          const quest = gameStore.state.system.quests?.find(q => q.name === questUpdateData.quest_name && q.status === 'active');
          
          if (quest) {
@@ -510,13 +510,13 @@ class GameLoopService {
                 log: questUpdateData.log
              });
              
-             // Toast notification
+             // Toast 提示通知
              if (questUpdateData.status === 'completed' || questUpdateData.status === 'failed') {
                 const statusText = questUpdateData.status === 'completed' ? '完成' : '失败';
                 const type = questUpdateData.status === 'completed' ? 'success' : 'error';
                 toastStore.addToast(`任务${statusText}：${quest.name}`, type);
              } else if (questUpdateData.log) {
-                // Log update toast
+                // 记录更新的 Toast 提示
                 toastStore.addToast(`任务进度更新：${quest.name}`, 'info');
              }
          } else {
@@ -524,7 +524,7 @@ class GameLoopService {
          }
       }
 
-      // G. Trigger Promise if needed
+      // G. 取决于是否需要，触发约定
       if (promiseTriggerData && promiseTriggerData.trigger && promiseTriggerData.promises && promiseTriggerData.promises.length > 0) {
         const gameStore = useGameStore();
         
@@ -543,12 +543,12 @@ class GameLoopService {
         }
       }
 
-      // H. Update Promise if needed
+      // H. 取决于是否需要，更新约定
       if (promiseUpdateData && promiseUpdateData.update && promiseUpdateData.content_keyword) {
         const gameStore = useGameStore();
         const promises = gameStore.state.system.promises || [];
         
-        // Fuzzy match content
+        // 模糊匹配内容
         const targetPromise = promises.find(p => p.status === 'active' && p.content.includes(promiseUpdateData.content_keyword));
         
         if (targetPromise) {
@@ -565,27 +565,27 @@ class GameLoopService {
         }
       }
 
-      // I. Update Prediction
+      // I. 更新预测
       if (predictionTriggerData && predictionTriggerData.trigger && Array.isArray(predictionTriggerData.next_round_characters)) {
           gameStore.state.system.predicted_next_round_chars = predictionTriggerData.next_round_characters;
           console.log('[GameLoop] Updated predicted characters:', predictionTriggerData.next_round_characters);
       } else {
-          // Clear predictions if no trigger or invalid data
-          // This ensures old predictions don't persist if not renewed
+          // 如果没有触发器或数据无效，则清除预测
+          // 这可以确保旧的预测如果不更新就不会续存
           if (gameStore.state.system.predicted_next_round_chars && gameStore.state.system.predicted_next_round_chars.length > 0) {
               console.log('[GameLoop] Clearing predicted characters (no new prediction)');
               gameStore.state.system.predicted_next_round_chars = [];
           }
       }
 
-      // Reset UI processing state but mark background processing
+      // 重置 UI 处理状态，但标记正在进行后台处理
       this.streamedContent.value = '';
       this.currentStage.value = 'background_processing';
-      this.isProcessing.value = false; // Allow UI to be responsive
-      this.isBackgroundProcessing.value = true; // But block new messages
+      this.isProcessing.value = false; // 允许 UI 保持响应
+      this.isBackgroundProcessing.value = true; // 但会阻止新消息的产生
 
-      // 4. Background Processing: LLM #2 & LLM #3 (Non-blocking)
-      // CRITICAL: Only proceed if we have a valid story and not aborted
+      // 4. 后台处理：LLM #2 & LLM #3（非阻塞）
+      // 关键提示：仅在我们有有效故事且未被中止时才继续
       if (!this.abortController?.signal.aborted && finalStory.trim()) {
         this.processBackgroundTasks(finalUserContent, finalStory, currentSaveSlotId, assistantMsgId, this.abortController?.signal);
       } else {
@@ -597,7 +597,7 @@ class GameLoopService {
     } catch (e: any) {
       console.error('Game Loop Error:', e);
       
-      // Don't treat abort as an error
+      // 不要将中止（abort）作为错误处理
       if (e.message === 'Operation aborted by user' || e.name === 'AbortError') {
         this.error.value = null;
         this.currentStage.value = 'idle';
@@ -625,19 +625,19 @@ class GameLoopService {
     try {
       const gameStore = useGameStore();
       const toastStore = useToastStore();
-      const chatStore = useChatStore(); // Ensure chatStore is available for the whole function scope
+      const chatStore = useChatStore(); // 确保在整个函数作用域内可以使用 chatStore
       
-      // Capture Input for Debug
+      // 捕获输入以进行调试
       const logicInputSnapshot = JSON.stringify({
          current_state: {
              player: logicService.sanitizePlayer(gameStore.state.player),
              scene_npcs: gameStore.state.system.current_scene_npcs.map((id: string) => gameStore.state.npcs[id] || { id, name: id })
          },
          user_action: userContent,
-         story_narrative: finalStory // Use cleaned story
+         story_narrative: finalStory // 使用清理后的故事
       }, null, 2);
 
-      // LLM #2: Logic Calculation
+      // LLM #2: 逻辑计算
       const logicResult = await logicService.processLogic(
         userContent, 
         finalStory, // Use cleaned story
@@ -645,8 +645,8 @@ class GameLoopService {
         signal
       );
 
-      // Clear Minigame Result after it has been sent to logic model
-      // This prevents the same combat result from being re-processed in subsequent turns
+      // 在发送给逻辑模型后清除小游戏结果
+      // 这可防止在后续回合中重复处理相同的战斗结果
       if (gameStore.state.system.minigame_result || gameStore.state.system.minigame_triggered) {
         gameStore.updateState({
           system: {
@@ -657,18 +657,18 @@ class GameLoopService {
         });
       }
       
-      // Store Quick Replies (regardless of whether we use them immediately)
+      // 存储快捷回复（不管我们是否立即使用它们）
       if (logicResult.quick_replies && Array.isArray(logicResult.quick_replies)) {
          gameStore.setQuickReplies(logicResult.quick_replies);
       } else {
          gameStore.clearQuickReplies();
       }
 
-      // Apply Actions
+      // 应用操作
       if (logicResult.actions && logicResult.actions.length > 0) {
-         // Sort actions: Put SCENE actions at the end.
-         // This ensures that if a character is implicitly added by an UPDATE_NPC action
-         // but explicitly removed by a SCENE action in the same turn, the removal wins.
+         // 对操作进行排序：将 SCENE 操作放在最后。
+         // 这样可以确保如果一个角色在同一回合被 UPDATE_NPC 动作隐式添加，
+         // 但被 SCENE 动作显式移除，则以移除为准。
          const sortedActions = [...logicResult.actions].sort((a, b) => {
             if (a.type === 'SCENE' && b.type !== 'SCENE') return 1;
             if (a.type !== 'SCENE' && b.type === 'SCENE') return -1;
@@ -680,28 +680,28 @@ class GameLoopService {
          }
       }
       
-      // Update the snapshot for the assistant message to reflect new state
+      // 更新助手消息的快照以反映新状态
       if (assistantMsgId) {
-         // Get the message to find its snapshotId
+         // 获取消息以找到其快照 ID (snapshotId)
          const chatStore = useChatStore();
          const msg = chatStore.messages.find(m => m.id === assistantMsgId);
          if (msg && msg.snapshotId) {
             // 重要：获取最新状态的深拷贝，确保不会引用旧对象
             const currentState = JSON.parse(JSON.stringify(gameStore.state));
             
-            // Update snapshot with NEW game state
+            // 使用新游戏状态更新快照
             await dbService.updateSnapshot(msg.snapshotId, {
                gameState: JSON.stringify(currentState)
             });
          }
       }
       
-      // Show Summary Toast
+      // 显示摘要 Toast
       if (logicResult.summary) {
         toastStore.addToast(logicResult.summary, 'info', 5000);
       }
       
-      // Update the assistant message with debug info
+      // 使用调试信息更新助手消息
       if (assistantMsgId) {
         await chatStore.updateMessage(assistantMsgId, { 
           debugLog: {
@@ -712,11 +712,11 @@ class GameLoopService {
         });
       }
 
-      // LLM #5: Drawing (Async)
-      // Fire and forget - don't block background processing state for this
+      // LLM #5: 绘图提取（异步）
+      // 即发即弃 - 不要为此阻塞后台处理状态
       const currentSceneCharacters = gameStore.state.system.current_scene_npcs.map((id: string) => gameStore.state.npcs[id] || { id, name: id });
       
-      // Pass player reference image if exists
+      // 如果存在玩家参考图像，则传递对应参数
       const extraRefImages: string[] = [];
       if (gameStore.state.player.referenceImageUrl) {
         extraRefImages.push(gameStore.state.player.referenceImageUrl);
@@ -736,8 +736,8 @@ class GameLoopService {
         }
       }).catch(err => console.error('[GameLoop] Drawing failed:', err));
       
-      // LLM #3: Memory Extraction (Async)
-      // We don't block the UI commit for this, but we should handle errors
+      // LLM #3: 记忆提取（异步）
+      // 我们不为此阻塞 UI 提交，但应该处理相应的错误
       memoryService.extractAndSave(
         currentSaveSlotId,
         gameStore.state.system.turn_count,
@@ -756,7 +756,7 @@ class GameLoopService {
         signal
       ).catch(err => console.error('Memory Extraction Failed:', err));
 
-      // Scheme C: Sync Host State to Relay Server
+      // 方案 C: 同步房主状态至中继服务器
       if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost) {
         multiplayerService.syncHostState(gameStore.state).catch(err => {
           console.error('[GameLoop] Multiplayer Sync Failed:', err);
@@ -768,7 +768,7 @@ class GameLoopService {
       const toastStore = useToastStore();
       toastStore.addToast('后台处理失败，但对话已保存', 'warning', 5000);
     } finally {
-      // Reset background processing state
+      // 重置后台处理状态
       this.isBackgroundProcessing.value = false;
       this.currentStage.value = 'idle';
       this.abortController = null;
@@ -776,12 +776,12 @@ class GameLoopService {
   }
 
   private initializeManagement(_triggerData: any) {
-    // Force disabled: even if trigger received, ignore it.
+    // 强制禁用：即使收到触发器操作，也直接忽略。
     console.warn('[GameLoop] Management system is temporarily disabled. Ignoring trigger.');
     return;
   }
 
-  // Public method to abort current processing
+  // 中止当前处理过程的公共方法
   abort() {
     if ((this.isProcessing.value || this.isBackgroundProcessing.value) && this.abortController) {
       this.isAborting.value = true;
@@ -801,26 +801,26 @@ class GameLoopService {
 
   public async handleCombatCompletion(resultSummary: string, combatants: Combatant[] = []) {
     try {
-      // Wait for any previous background processing to finish (e.g. Logic/Memory from the turn that triggered combat)
-      // This prevents race conditions and ensures handleUserAction doesn't return early
+      // 等待之前的任何后台处理完成（例如，触发战斗那一回合的逻辑/记忆处理）
+      // 这可以防止竞态条件，并确保 handleUserAction 不会过早返回
       while (this.isBackgroundProcessing.value || this.isProcessing.value) {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
       this.currentStage.value = 'background_processing';
-      this.isBackgroundProcessing.value = true; // Lock UI during narrative generation
+      this.isBackgroundProcessing.value = true; // 生成叙事时锁定 UI
       
-      // 0. Retrieve Context (Last Assistant Message)
+      // 0. 检索上下文（最后一条助手消息）
       const chatStore = useChatStore();
       const lastMsg = chatStore.messages.length > 0 ? chatStore.messages[chatStore.messages.length - 1] : null;
       const contextText = lastMsg ? lastMsg.content : '';
 
-      // 1. Generate Narrative via Logic Model (Narrator Mode)
-      // This is a separate API call as requested
+      // 1. 通过逻辑模型生成叙事（旁白模式）
+      // 根据要求，这是一个单独的 API 调用
       console.log('[GameLoop] Calling generateCombatNarrative...');
       let narrative = await logicService.generateCombatNarrative(resultSummary, combatants, contextText);
       
-      // Secondary fallback check
+      // 次要后备检查
       if (!narrative || narrative.trim() === '') {
         console.warn('[GameLoop] Received empty narrative from LogicService. Using emergency fallback.');
         narrative = `(系统提示：由于技术原因，战斗润色描写失败。以下是战斗原始信息)\n${resultSummary}`;
@@ -828,19 +828,19 @@ class GameLoopService {
       
       console.log('[GameLoop] Narrative received, final length:', narrative.length);
       
-      // 2. Construct User Action for Story Model
+      // 2. 为故事模型构造用户操作
       const content = `【战斗回放】\n${narrative}\n\n(请承接以上战斗结果，继续推进剧情)`;
       console.log('[GameLoop] Final content constructed for handleUserAction.');
       
-      // 3. Proceed with standard User Action handling
-      this.currentStage.value = 'idle'; // Reset stage before calling handleUserAction as it sets its own stages
-      this.isBackgroundProcessing.value = false; // Unlock to allow handleUserAction to proceed
+      // 3. 继续进行标准的用户操作处理
+      this.currentStage.value = 'idle'; // 在调用 handleUserAction 之前重置阶段，因为它会设置自己的阶段状态
+      this.isBackgroundProcessing.value = false; // 解锁以允许 handleUserAction 继续运行
       await this.handleUserAction(content);
       
     } catch (error) {
       console.error('Combat Completion Error:', error);
-      this.isBackgroundProcessing.value = false; // Ensure unlock on error
-      // Fallback
+      this.isBackgroundProcessing.value = false; // 出错时确保解锁 UI
+      // 后备方案
       const content = `(系统提示：战斗结束。以下是结算信息)\n${resultSummary}\n(请根据结算结果继续描写接下来的剧情)`;
       await this.handleUserAction(content);
     }
@@ -851,10 +851,10 @@ class GameLoopService {
     const charStore = useCharacterStore();
     const player = gameStore.state.player;
 
-    // Helper to create SpellCard from string (Legacy/Heuristic)
+    // 从字符串创建符卡的辅助函数（旧版/启发式）
     const createSpellCard = (name: string): SpellCard => {
-      // 0. Try to find in Preset Spellcards (Static Data from spellcards.ts)
-      // Checks both ID (key) and Name
+      // 0. 尝试在预设符卡中查找（来自 spellcards.ts 的静态数据）
+      // 同时检查 ID (key) 和 名称 (Name)
       const preset = PRESET_SPELLCARDS[name] || Object.values(PRESET_SPELLCARDS).find(p => p.name === name);
       if (preset) {
          return {
@@ -871,14 +871,14 @@ class GameLoopService {
          };
       }
 
-      // 1. Try to find in Lorebook (Static DB)
+      // 1. 尝试在设定集（静态数据库）中查找
       const cardEntry = charStore.characters.find(c => 
         (c.type === 'spell_card') && 
         (c.name === name || c.name.includes(name))
       );
 
       if (cardEntry) {
-         // Parse Lorebook data (Numeric values are now directly stored in DB)
+         // 解析设定集数据（数值现在直接存储在数据库中）
          const cost = typeof cardEntry.cost === 'number' ? cardEntry.cost : (parseInt(String(cardEntry.cost || '100').replace(/\D/g, '')) || 100);
          const dmg = typeof cardEntry.damage === 'number' ? cardEntry.damage : (parseInt(String(cardEntry.damage || '0').replace(/\D/g, '')) || 0);
          
@@ -895,7 +895,7 @@ class GameLoopService {
          };
       }
 
-      // 2. Fallback to Heuristic
+      // 2. 后退使用启发式方法
       let multiplier = 2.0;
       let cost = 100;
       let isAoe = false;
@@ -921,19 +921,19 @@ class GameLoopService {
         damage: 0,
         scope: isAoe ? 'aoe' : 'single',
         type: 'attack',
-        isUltimate: multiplier >= 3.5, // Simple heuristic: high multiplier = ultimate
-        hitRate: multiplier >= 3.5 ? 1.0 : 0.1 // Heuristic Hit Rate
+        isUltimate: multiplier >= 3.5, // 简单的启发式算法：高倍率 = 终极技
+        hitRate: multiplier >= 3.5 ? 1.0 : 0.1 // 启发式命中率
       };
     };
 
-    // Helper to find preset cards by ID prefix (Auto-load from spellcards.ts)
+    // 根据 ID 前缀查找预设符卡的辅助函数（自动从 spellcards.ts 加载）
     const findPresetCards = (npcId: string, npcName?: string): SpellCard[] => {
         if (!npcId && !npcName) return [];
         
         let matches: [string, SpellCard][] = [];
         let method = 'none';
 
-        // 1. Try Direct Match by ID Prefix (if ID is provided)
+        // 1. 根据 ID 前缀尝试直接匹配（如果提供了 ID）
         if (npcId) {
             const prefix = npcId.toLowerCase() + '_';
             matches = Object.entries(PRESET_SPELLCARDS)
@@ -942,20 +942,20 @@ class GameLoopService {
             if (matches.length > 0) method = 'id_prefix';
         }
         
-        // 2. If no matches, try Name Mapping (Double Layer Matching)
+        // 2. 如果没有匹配项，尝试使用名称映射（双层匹配）
         if (matches.length === 0 && npcName) {
-            // Debug: Check map availability
+            // 调试：检查映射表是否可用
             if (Object.keys(CHARACTER_NAME_TO_ID_MAP).length === 0) {
                 console.warn('[Combat Init] CHARACTER_NAME_TO_ID_MAP is empty! Check characterMapping.ts export.');
             }
 
-            // Check if npcName is in the map (or trimmed)
+            // 检查 npcName 是否在映射表中（或者去除了空格的名称）
             let mappedId = CHARACTER_NAME_TO_ID_MAP[npcName] || CHARACTER_NAME_TO_ID_MAP[npcName.trim()];
             
-            // 2.1 Fuzzy Search (Substring) - if exact match fails
+            // 2.1 模糊搜索（子字符串）- 如果精确匹配失败
             if (!mappedId) {
                 const cleanName = npcName.trim();
-                // Find any key that is part of the name OR name is part of key
+                // 查找属于名称一部分的任意键，或者名称包含键
                 const foundKey = Object.keys(CHARACTER_NAME_TO_ID_MAP).find(k => 
                     cleanName.includes(k) || k.includes(cleanName)
                 );
@@ -967,7 +967,7 @@ class GameLoopService {
             }
 
             if (mappedId) {
-                // Try finding cards with this mapped ID
+                // 尝试查找使用此映射 ID 的符卡
                 const mappedPrefix = mappedId.toLowerCase() + '_';
                 const allKeys = Object.keys(PRESET_SPELLCARDS);
                 
@@ -979,7 +979,7 @@ class GameLoopService {
                     method = 'name_mapping';
                 } else {
                     console.warn(`[Combat Init] ID '${mappedId}' found but no cards with prefix '${mappedPrefix}'. Sample keys: ${allKeys.slice(0, 5).join(', ')}`);
-                    // Fallback: Try to find ANY key containing the ID
+                    // 后退方案：尝试查找包含该 ID 的任何键
                      matches = Object.entries(PRESET_SPELLCARDS)
                         .filter(([key]) => key.includes(mappedId!.toLowerCase()))
                         .map(([key, val]) => [key, val] as [string, SpellCard]);
@@ -1013,7 +1013,7 @@ class GameLoopService {
             } as SpellCard));
     };
 
-    // 1. Create Player Combatant
+    // 1. 创建玩家战斗者
     const playerCombatant: Combatant = {
       id: 'player',
       name: player.name,
@@ -1023,7 +1023,7 @@ class GameLoopService {
       maxHp: player.max_hp,
       mp: player.mp,
       maxMp: player.max_mp,
-      power: (player.power as PowerLevel) || 'D', // Default fallback
+      power: (player.power as PowerLevel) || 'D', // 默认回退值
       spellCards: (player.spell_cards || []).map((card: any) => {
          if (typeof card === 'string') {
             return createSpellCard(card);
@@ -1039,7 +1039,7 @@ class GameLoopService {
       combatLevel: player.combatLevel || 1
     };
 
-    // 1.5 Apply Initial Buffs from Trigger
+    // 1.5 应用触发器的初始 Buff
     if (triggerData.player_buff_name) {
         const buffValue = typeof triggerData.player_buff_value === 'number' ? triggerData.player_buff_value : undefined;
         const buff = getBuffByName(triggerData.player_buff_name, 0, buffValue);
@@ -1049,18 +1049,18 @@ class GameLoopService {
         }
     }
 
-    // 2. Create Enemy Combatants
+    // 2. 创建敌人战斗者
     const enemies: Combatant[] = (triggerData.enemies || []).map((e: any, index: number) => {
-      // Strategy: Resolve Enemy to a GameStore NPC Entry
-      // 1. Try Runtime Match (Name or ID)
-      // 2. Try Static DB Match (Name or UUID) -> Then use UUID to find Runtime
+      // 策略：将敌人解析为 GameStore NPC 条目
+      // 1. 尝试运行时匹配（名称或 ID）
+      // 2. 尝试静态数据库匹配（名称或 UUID） -> 然后使用 UUID 查找运行时数据
       
       let matchedNPC: any = null;
       const enemyNameRaw = e.name || 'Unknown';
       const enemyNameLower = enemyNameRaw.toLowerCase().trim();
       const allRuntimeNpcs = Object.values(gameStore.state.npcs || {});
 
-      // --- Attempt 1: Direct Runtime Match ---
+      // --- 尝试 1：直接运行时匹配 ---
       matchedNPC = allRuntimeNpcs.find((npc: any) => {
           if (e.id && npc.id === e.id) return true;
           if (npc.name && npc.name.toLowerCase().trim() === enemyNameLower) return true;
@@ -1068,7 +1068,7 @@ class GameLoopService {
           return false;
       });
 
-      // --- Attempt 2: Static DB Lookup (Fallback) ---
+      // --- 尝试 2：静态数据库查找（后备方案） ---
       if (!matchedNPC) {
           const resolvedId = resolveCharacterId(enemyNameLower, charStore.characters, gameStore.state.npcs);
           
@@ -1077,7 +1077,7 @@ class GameLoopService {
               if (runtimeRef) {
                   matchedNPC = runtimeRef;
               } else {
-                  // Not in runtime yet? Use Static Data directly if possible
+                  // 尚未存入运行时？ 如果可行，直接使用静态数据
                   const staticChar = charStore.characters.find(c => c.uuid === resolvedId);
                   if (staticChar) {
                       matchedNPC = {
@@ -1099,41 +1099,41 @@ class GameLoopService {
           console.warn('[Combat Init] Could not resolve enemy:', enemyNameRaw);
       }
 
-      // Determine Power Level: Store > Trigger > Default
+      // 决定能力水平：商店 > 触发器 > 默认值
       let powerLevel: PowerLevel = (e.power as PowerLevel) || (e.power_level as PowerLevel) || 'F';
       
-      // Override with Matched Data if available
+      // 如果匹配到数据，则覆盖它
       if (matchedNPC && matchedNPC.power) {
           powerLevel = matchedNPC.power;
       }
 
-      // Determine HP
+      // 决定 HP 值
       let hp = 1000;
       let maxHp = 1000;
       
-      // If we have runtime HP, use it (allows persistent damage)
+      // 如果我们存在运行时 HP，使用它（允许持久伤害）
       if (matchedNPC && matchedNPC.hp) {
           hp = matchedNPC.hp;
           maxHp = matchedNPC.max_hp || matchedNPC.maxHp || matchedNPC.hp;
       } else {
-         // Heuristic based on Power Level
+         // 基于战力等级的启发式算法
          if (['EX', 'UX', 'OMEGA', '∞'].includes(powerLevel)) { maxHp = 50000; hp = 50000; }
          else if (['S', 'S+', 'SS', 'SSS', 'US'].includes(powerLevel)) { maxHp = 10000; hp = 10000; }
          else if (['A', 'A+', 'B+', 'B'].includes(powerLevel)) { maxHp = 5000; hp = 5000; }
          else { maxHp = 2000; hp = 2000; }
       }
 
-      // Populate Spell Cards
+      // 填充符卡
       const enemySpellCards: SpellCard[] = [];
       
-      // 1. Auto-load from spellcards.ts based on ID or Name
+      // 1. 基于 ID 或名称自动从 spellcards.ts 加载
       const targetId = matchedNPC ? matchedNPC.id : '';
       const targetName = matchedNPC ? matchedNPC.name : enemyNameRaw;
       
       const presets = findPresetCards(targetId, targetName);
       enemySpellCards.push(...presets);
       
-      // 2. Load from Runtime/Lorebook definition (if any specific overrides or additions)
+      // 2. 从运行时/设定集定义中加载（如果存在任何特定重写或附加）
       if (matchedNPC && matchedNPC.spell_cards) {
          const manualCards = matchedNPC.spell_cards.map((c: any) => {
              if (typeof c === 'string') {
@@ -1142,7 +1142,7 @@ class GameLoopService {
              return c as SpellCard;
          });
          
-         // Merge avoiding duplicates (by name)
+         // 合并并避免重复项（根据名称）
          for (const card of manualCards) {
              if (!enemySpellCards.some(p => p.name === card.name)) {
                  enemySpellCards.push(card);
@@ -1167,21 +1167,21 @@ class GameLoopService {
       };
     });
 
-    // 2.5 Create Ally Combatants
+    // 2.5 创建盟友战斗者
     const allies: Combatant[] = (triggerData.allies || []).map((a: any, index: number) => {
-      // Strategy: Resolve Ally to a GameStore NPC Entry (Reusing Enemy Logic)
+      // 策略：将盟友解析为 GameStore NPC 条目（复用敌人逻辑）
       
       let matchedNPC: any = null;
       const allyNameRaw = a.name || 'Unknown Ally';
       const allyNameLower = allyNameRaw.toLowerCase().trim();
 
-      // --- Attempt 1: Resolve Canonical ID using centralized service ---
+      // --- 尝试 1：使用集中服务解析规范化 ID ---
       const resolvedId = resolveCharacterId(a.id || allyNameLower, charStore.characters, gameStore.state.npcs);
       
-      // --- Attempt 2: Runtime Match ---
+      // --- 尝试 2：运行时匹配 ---
       matchedNPC = gameStore.state.npcs[resolvedId];
 
-      // --- Attempt 3: Static DB Lookup (Fallback) ---
+      // --- 尝试 3：静态数据库查询（后备方案） ---
       if (!matchedNPC) {
           const staticChar = charStore.characters.find(c => c.uuid === resolvedId);
 
@@ -1203,13 +1203,13 @@ class GameLoopService {
           }
       }
 
-      // Determine Power Level
+      // 决定能力水平
       let powerLevel: PowerLevel = (a.power as PowerLevel) || (a.power_level as PowerLevel) || 'F';
       if (matchedNPC && matchedNPC.power) {
           powerLevel = matchedNPC.power;
       }
 
-      // Determine HP
+      // 决定 HP 值
       let hp = 1000;
       let maxHp = 1000;
       
@@ -1223,17 +1223,17 @@ class GameLoopService {
          else { maxHp = 2000; hp = 2000; }
       }
 
-      // Populate Spell Cards
+      // 填充符卡
       const allySpellCards: SpellCard[] = [];
       
-      // 1. Auto-load from spellcards.ts based on ID or Name
+      // 1. 基于 ID 或名称自动从 spellcards.ts 加载
       const targetId = matchedNPC ? matchedNPC.id : '';
       const targetName = matchedNPC ? matchedNPC.name : allyNameRaw;
       
       const presets = findPresetCards(targetId, targetName);
       allySpellCards.push(...presets);
 
-      // 2. Load from Runtime/Lorebook definition
+      // 2. 从运行时/设定集定义加载
       if (matchedNPC && matchedNPC.spell_cards) {
          const manualCards = matchedNPC.spell_cards.map((c: any) => {
              if (typeof c === 'string') {
@@ -1242,7 +1242,7 @@ class GameLoopService {
              return c as SpellCard;
          });
          
-         // Merge avoiding duplicates
+         // 合并并避免重复
          for (const card of manualCards) {
              if (!allySpellCards.some(p => p.name === card.name)) {
                  allySpellCards.push(card);
@@ -1253,7 +1253,7 @@ class GameLoopService {
       return {
         id: matchedNPC ? matchedNPC.id : `ally_${index}_${uuidv4().slice(0, 8)}`,
         name: matchedNPC ? matchedNPC.name : allyNameRaw,
-        team: 'player', // Ally is on player team
+        team: 'player', // 盟友处在玩家队伍中
         isPlayer: false,
         hp: hp,
         maxHp: maxHp,
@@ -1267,10 +1267,10 @@ class GameLoopService {
       };
     });
 
-    // 3. Initialize Combat State
+    // 3. 初始化战斗状态
     const combatState: CombatState = {
-      isActive: false, // Wait for user confirmation
-      isPending: true, // Show "Combat Request" dialog
+      isActive: false, // 等待用户确认
+      isPending: true, // 显示“战斗请求”对话框
       turn: 0,
       combatants: [playerCombatant, ...allies, ...enemies],
       logs: [],
@@ -1279,7 +1279,7 @@ class GameLoopService {
 
     gameStore.setCombatState(combatState);
     
-    // Host Side: Broadcast Combat Init to Guests
+    // 房主端：向客机广播战斗初始化
     if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost) {
       multiplayerService.sendCombatInit(combatState);
     }
