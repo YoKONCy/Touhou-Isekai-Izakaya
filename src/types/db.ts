@@ -1,8 +1,8 @@
 export interface GameSnapshot {
   id: number;
   saveSlotId: number; // Foreign Key to SaveSlot
-  chatId: number; 
-  gameState: string; 
+  chatId: number;
+  gameState: string;
   createdAt: number;
 }
 
@@ -14,17 +14,17 @@ export interface ChatMessage {
   timestamp: number;
   snapshotId?: number;
   turnCount?: number; // The game turn this message belongs to
-  
+
   // Debug Info
   debugLog?: {
     logicInput?: string;
     logicOutput?: string;
     logicThinking?: string;
   };
-  
+
   // Chain of Thought Content (Stripped from content)
   thought_content?: string;
-  
+
   // Illustration
   illustrationUrl?: string;
   illustrationPrompt?: string;
@@ -48,11 +48,11 @@ export interface MemoryEntry {
   tags: string[];
   importance: number;
   createdAt: number;
-  
+
   // New Metadata Fields
-  gameDate?: string;    // e.g. "纪元123年1月1日"
-  gameTime?: string;    // e.g. "12:00"
-  location?: string;    // e.g. "博丽神社"
+  gameDate?: string; // e.g. "纪元123年1月1日"
+  gameTime?: string; // e.g. "12:00"
+  location?: string; // e.g. "博丽神社"
   characters?: string[]; // List of NPC names present in the scene
 }
 
@@ -68,13 +68,13 @@ export interface GameSettings {
   useDefaultTilemap?: boolean; // Debug: Use hardcoded map instead of LLM generated one
   theme: 'light' | 'dark' | 'eye-protection';
   currentSaveSlotId?: number; // Active slot
-  
+
   // Audio Settings
   audioVolume?: number;
   enableAudio?: boolean;
   bgmVolume?: number;
   sfxVolume?: number;
-  
+
   // Drawing Settings
   drawingConfig?: {
     enabled: boolean;
@@ -99,9 +99,9 @@ export interface CharacterCard {
   tags: string[];
   category?: string; // Folder name, e.g., '博丽神社'
   gender?: 'female' | 'male' | 'other'; // New field for gender segregation
-  
+
   // New Type Discrimination
-  type?: 'character' | 'spell_card' | 'location' | 'info' | 'other'; 
+  type?: 'character' | 'spell_card' | 'location' | 'info' | 'other';
 
   // Character Specific Fields
   initialPower?: string; // e.g. "S"
@@ -115,9 +115,9 @@ export interface CharacterCard {
   scope?: 'single' | 'aoe'; // 作用范围
   isUltimate?: boolean; // 是否为终极符卡
   hitRate?: number; // 命中率
-  
+
   // Buff Details for Spell Cards of type 'buff'
-  buffDetails?: any; 
+  buffDetails?: any;
 
   creatorNotes?: string;
 }

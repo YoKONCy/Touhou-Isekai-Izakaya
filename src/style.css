@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 @plugin "@tailwindcss/typography";
 
 /* 
@@ -10,39 +10,49 @@
 
 @theme {
   /* 东方配色方案 */
-  --color-touhou-red: #D32F2F; /* 灵梦红 - 沉稳版 */
-  --color-touhou-red-light: #FFCDD2;
-  --color-touhou-red-dark: #B71C1C;
-  
-  --color-marisa-gold: #FBC02D; /* 魔理沙金 */
-  --color-marisa-gold-light: #FFF9C4;
-  
-  --color-izakaya-bg: #FDFBF7; /* 居酒屋米色背景 */
-  --color-izakaya-paper: #FFFDF5; /* 纸张色 */
-  --color-izakaya-wood: #5D4037; /* 深木纹 */
-  --color-izakaya-wood-light: #8D6E63;
-  
+  --color-touhou-red: #d32f2f; /* 灵梦红 - 沉稳版 */
+  --color-touhou-red-light: #ffcdd2;
+  --color-touhou-red-dark: #b71c1c;
+
+  --color-marisa-gold: #fbc02d; /* 魔理沙金 */
+  --color-marisa-gold-light: #fff9c4;
+
+  --color-izakaya-bg: #fdfbf7; /* 居酒屋米色背景 */
+  --color-izakaya-paper: #fffdf5; /* 纸张色 */
+  --color-izakaya-wood: #5d4037; /* 深木纹 */
+  --color-izakaya-wood-light: #8d6e63;
+
   --color-ink: #212121; /* 墨色 */
   --color-ink-light: #757575;
-  
-  --font-display: "Ma Shan Zheng", "Noto Serif SC", serif;
-  --font-serif-display: "Noto Serif SC", "Songti SC", "SimSun", serif;
-  --font-sans-body: "Noto Sans SC", system-ui, sans-serif;
-  
+
+  --font-display: 'Ma Shan Zheng', 'Noto Serif SC', serif;
+  --font-serif-display: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  --font-sans-body: 'Noto Sans SC', system-ui, sans-serif;
+
   --shadow-paper: 0 2px 8px rgba(93, 64, 55, 0.1);
   --shadow-floating: 0 8px 24px rgba(93, 64, 55, 0.15);
 
   /* 动画 */
   --animate-fade-in: fade-in 0.3s ease-out;
   --animate-pop: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  
+
   @keyframes fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
   @keyframes pop {
-    0% { transform: scale(0.9) translateY(5px); opacity: 0; }
-    100% { transform: scale(1) translateY(0); opacity: 1; }
+    0% {
+      transform: scale(0.9) translateY(5px);
+      opacity: 0;
+    }
+    100% {
+      transform: scale(1) translateY(0);
+      opacity: 1;
+    }
   }
 }
 
@@ -51,36 +61,36 @@
 /* Dark Theme (深色主题) */
 html.theme-dark {
   --color-izakaya-bg: #121212;
-  --color-izakaya-paper: #1E1E1E;
-  --color-izakaya-wood: #8D6E63; /* Lighter wood for contrast on dark */
-  --color-izakaya-wood-light: #A1887F;
-  
-  --color-ink: #E0E0E0; /* Light text */
-  --color-ink-light: #9E9E9E;
-  
+  --color-izakaya-paper: #1e1e1e;
+  --color-izakaya-wood: #8d6e63; /* Lighter wood for contrast on dark */
+  --color-izakaya-wood-light: #a1887f;
+
+  --color-ink: #e0e0e0; /* Light text */
+  --color-ink-light: #9e9e9e;
+
   --shadow-paper: 0 2px 8px rgba(0, 0, 0, 0.5);
   --shadow-floating: 0 8px 24px rgba(0, 0, 0, 0.7);
 
   /* Adjust pattern opacity for dark mode */
-  --bg-pattern-asanoha: 
+  --bg-pattern-asanoha:
     repeating-linear-gradient(60deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 18px),
     repeating-linear-gradient(-60deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 18px);
 }
 
 /* Eye Protection Theme (护眼主题) - Warmer, lower contrast */
 html.theme-eye-protection {
-  --color-izakaya-bg: #E3DCC3; /* Greenish-beige (C3) or warmer */
-  --color-izakaya-paper: #F0EAD6; /* Eggshell */
-  
+  --color-izakaya-bg: #e3dcc3; /* Greenish-beige (C3) or warmer */
+  --color-izakaya-paper: #f0ead6; /* Eggshell */
+
   /* Softer ink */
-  --color-ink: #3E3B35;
-  --color-ink-light: #6D6860;
-  
+  --color-ink: #3e3b35;
+  --color-ink-light: #6d6860;
+
   /* Softer Red */
-  --color-touhou-red: #A64444;
-  --color-touhou-red-dark: #8A3333;
-  
-  --bg-pattern-asanoha: 
+  --color-touhou-red: #a64444;
+  --color-touhou-red-dark: #8a3333;
+
+  --bg-pattern-asanoha:
     repeating-linear-gradient(60deg, rgba(93, 64, 55, 0.03) 0 1px, transparent 1px 18px),
     repeating-linear-gradient(-60deg, rgba(93, 64, 55, 0.03) 0 1px, transparent 1px 18px);
 }
@@ -96,8 +106,14 @@ html.theme-eye-protection {
 }
 
 @keyframes writing {
-  0% { transform: rotate(0deg) translateX(0); opacity: 0.7; }
-  100% { transform: rotate(-10deg) translateX(-2px); opacity: 1; }
+  0% {
+    transform: rotate(0deg) translateX(0);
+    opacity: 0.7;
+  }
+  100% {
+    transform: rotate(-10deg) translateX(-2px);
+    opacity: 1;
+  }
 }
 
 /* Highlight effect for jumped messages */
@@ -131,12 +147,14 @@ html.theme-eye-protection {
 
 :root {
   /* 麻叶纹 (Asanoha) 背景图案 - 使用 CSS 渐变模拟 */
-  --bg-pattern-asanoha: 
+  --bg-pattern-asanoha:
     repeating-linear-gradient(60deg, rgba(141, 110, 99, 0.05) 0 1px, transparent 1px 18px),
     repeating-linear-gradient(-60deg, rgba(141, 110, 99, 0.05) 0 1px, transparent 1px 18px);
 }
 
-html, body, #app {
+html,
+body,
+#app {
   margin: 0;
   padding: 0;
   height: 100%;
@@ -148,7 +166,9 @@ body {
   @apply text-ink bg-izakaya-bg font-sans-body;
   background-image: var(--bg-pattern-asanoha);
   background-attachment: fixed;
-  transition: background-color 0.3s, color 0.3s; /* Smooth theme transition */
+  transition:
+    background-color 0.3s,
+    color 0.3s; /* Smooth theme transition */
 }
 
 /* 
@@ -186,7 +206,9 @@ body {
 /* 玻璃拟态 - 和纸风格 */
 .glass-paper {
   @apply bg-izakaya-paper/90 backdrop-blur-sm border border-izakaya-wood/10 shadow-paper;
-  transition: background-color 0.3s, border-color 0.3s;
+  transition:
+    background-color 0.3s,
+    border-color 0.3s;
 }
 
 /* 按钮风格 - 东方风 */
@@ -217,7 +239,9 @@ html.theme-eye-protection .btn-touhou-secondary {
 /* 卡片风格 */
 .card-touhou {
   @apply bg-izakaya-paper/90 backdrop-blur-sm border border-izakaya-wood/10 shadow-paper rounded-lg p-4;
-  transition: background-color 0.3s, border-color 0.3s;
+  transition:
+    background-color 0.3s,
+    border-color 0.3s;
 }
 
 /* 输入框风格 */
@@ -230,11 +254,14 @@ html.theme-dark .input-touhou {
 }
 
 /* 全局输入框深色模式修正 - 已禁用 */
-input, textarea, select {
+input,
+textarea,
+select {
   @apply text-ink; /* 默认亮色模式下的文字颜色 */
 }
 
-input::placeholder, textarea::placeholder {
+input::placeholder,
+textarea::placeholder {
   @apply text-stone-400; /* 增加对比度，原为 text-ink-light/50 太淡 */
 }
 
@@ -259,8 +286,15 @@ input::placeholder, textarea::placeholder {
 }
 
 @keyframes spiritual-breathing {
-  0%, 100% { opacity: 0.05; transform: scale(0.95); }
-  50% { opacity: 0.15; transform: scale(1.05); }
+  0%,
+  100% {
+    opacity: 0.05;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 0.15;
+    transform: scale(1.05);
+  }
 }
 
 .btn-spiritual-link:hover {
@@ -282,7 +316,19 @@ input::placeholder, textarea::placeholder {
 }
 
 @keyframes spiritual-pulse {
-  0% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.5); }
-  70% { transform: scale(1.4); opacity: 0; box-shadow: 0 0 0 8px rgba(211, 47, 47, 0); }
-  100% { transform: scale(1); opacity: 0; box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); }
+  0% {
+    transform: scale(1);
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.5);
+  }
+  70% {
+    transform: scale(1.4);
+    opacity: 0;
+    box-shadow: 0 0 0 8px rgba(211, 47, 47, 0);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+    box-shadow: 0 0 0 0 rgba(211, 47, 47, 0);
+  }
 }

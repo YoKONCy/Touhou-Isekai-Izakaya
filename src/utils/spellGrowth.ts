@@ -9,32 +9,35 @@ export const EXP_PER_LEVEL = 100;
  * @param amount The amount of experience to add
  * @returns Object containing levelUp count and oldLevel for UI notifications
  */
-export function addSpellExp(spell: SpellCard, amount: number): { levelUp: boolean, oldLevel: number, newLevel: number } {
-    if (!spell.level) spell.level = 1;
-    if (spell.experience === undefined) spell.experience = 0;
+export function addSpellExp(
+  spell: SpellCard,
+  amount: number
+): { levelUp: boolean; oldLevel: number; newLevel: number } {
+  if (!spell.level) spell.level = 1;
+  if (spell.experience === undefined) spell.experience = 0;
 
-    if (spell.level >= MAX_SPELL_LEVEL) {
-        return { levelUp: false, oldLevel: spell.level, newLevel: spell.level };
-    }
+  if (spell.level >= MAX_SPELL_LEVEL) {
+    return { levelUp: false, oldLevel: spell.level, newLevel: spell.level };
+  }
 
-    const oldLevel = spell.level;
-    spell.experience += amount;
+  const oldLevel = spell.level;
+  spell.experience += amount;
 
-    while (spell.experience >= EXP_PER_LEVEL && spell.level < MAX_SPELL_LEVEL) {
-        spell.experience -= EXP_PER_LEVEL;
-        spell.level++;
-    }
+  while (spell.experience >= EXP_PER_LEVEL && spell.level < MAX_SPELL_LEVEL) {
+    spell.experience -= EXP_PER_LEVEL;
+    spell.level++;
+  }
 
-    // Cap at max level
-    if (spell.level >= MAX_SPELL_LEVEL) {
-        spell.experience = 0;
-    }
+  // Cap at max level
+  if (spell.level >= MAX_SPELL_LEVEL) {
+    spell.experience = 0;
+  }
 
-    return { 
-        levelUp: spell.level > oldLevel, 
-        oldLevel, 
-        newLevel: spell.level 
-    };
+  return {
+    levelUp: spell.level > oldLevel,
+    oldLevel,
+    newLevel: spell.level
+  };
 }
 
 /**
@@ -44,8 +47,8 @@ export function addSpellExp(spell: SpellCard, amount: number): { levelUp: boolea
  * Formula: (level - 1) * 0.01
  */
 export function getLevelCostReduction(level: number): number {
-    if (!level || level <= 1) return 0;
-    return Math.min(0.29, (level - 1) * 0.01);
+  if (!level || level <= 1) return 0;
+  return Math.min(0.29, (level - 1) * 0.01);
 }
 
 /**
@@ -56,7 +59,7 @@ export function getLevelCostReduction(level: number): number {
  * Level 100: 25% (50 * 0.005)
  */
 export function getCombatLevelCostReduction(combatLevel: number): number {
-    if (!combatLevel || combatLevel <= 50) return 0;
-    const effectiveLevel = Math.min(100, combatLevel) - 50;
-    return effectiveLevel * 0.005;
+  if (!combatLevel || combatLevel <= 50) return 0;
+  const effectiveLevel = Math.min(100, combatLevel) - 50;
+  return effectiveLevel * 0.005;
 }

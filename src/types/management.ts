@@ -1,4 +1,3 @@
-
 export interface ManagementTrigger {
   trigger: boolean;
   context: string;
@@ -16,7 +15,7 @@ export interface ManagementStats {
 export interface ManagementState {
   isActive: boolean; // Is the mini-game currently running?
   isTriggered: boolean; // Has the trigger been activated by LLM?
-  
+
   // Session Data (Reset on each run)
   context: string;
   storeDescription?: string; // Explicit store description for map generation
@@ -28,8 +27,8 @@ export interface ManagementState {
   specialGuests: string[];
   difficulty: 'easy' | 'normal' | 'hard';
   stats: ManagementStats;
-  
-  // Persistent Data (Optional, if we want to track overall progress here, 
+
+  // Persistent Data (Optional, if we want to track overall progress here,
   // though GameStore.player.money/reputation handles the main parts)
   unlockedRecipes?: string[];
   shopLevel?: number;
@@ -65,7 +64,15 @@ export interface Customer extends Entity {
   isSpecial: boolean; // Is this a named character?
   dialogue?: string; // Pre-generated dialogue for special guests
   patience: number;
-  state: 'entering' | 'waiting_seat' | 'seated' | 'ordering' | 'waiting_food' | 'eating' | 'paying' | 'leaving';
+  state:
+    | 'entering'
+    | 'waiting_seat'
+    | 'seated'
+    | 'ordering'
+    | 'waiting_food'
+    | 'eating'
+    | 'paying'
+    | 'leaving';
   order?: {
     dishName: string;
     requirements: string[];
@@ -77,7 +84,20 @@ export interface Customer extends Entity {
 
 export interface Furniture extends Entity {
   type: 'furniture';
-  furnitureType: 'table' | 'chair' | 'counter' | 'stove' | 'exit' | 'bed' | 'sofa' | 'lamp' | 'bookshelf' | 'toilet' | 'sink' | 'mirror' | 'prep_table';
+  furnitureType:
+    | 'table'
+    | 'chair'
+    | 'counter'
+    | 'stove'
+    | 'exit'
+    | 'bed'
+    | 'sofa'
+    | 'lamp'
+    | 'bookshelf'
+    | 'toilet'
+    | 'sink'
+    | 'mirror'
+    | 'prep_table';
   interactionPoint?: Position; // Where the player stands to interact
   isOccupied?: boolean;
   occupiedBy?: string; // Customer ID
@@ -108,12 +128,12 @@ export const TileType = {
   MIRROR: 18
 } as const;
 
-export type TileType = typeof TileType[keyof typeof TileType];
+export type TileType = (typeof TileType)[keyof typeof TileType];
 
 export const TileTypeNames: Record<number, string> = {};
 for (const key in TileType) {
-    const value = TileType[key as keyof typeof TileType];
-    TileTypeNames[value] = key;
+  const value = TileType[key as keyof typeof TileType];
+  TileTypeNames[value] = key;
 }
 
 export interface Item {
@@ -134,11 +154,11 @@ export interface Ingredient {
 
 export interface CookingSession {
   dishName: string;
-  ingredients: { 
-      ingredient: Ingredient; 
-      timeAdded: number;
-      cookedDuration: number; // Time cooked in seconds
-      sequence: number; // Order of addition
+  ingredients: {
+    ingredient: Ingredient;
+    timeAdded: number;
+    cookedDuration: number; // Time cooked in seconds
+    sequence: number; // Order of addition
   }[];
   startTime: number;
   totalDuration: number;

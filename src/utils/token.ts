@@ -7,6 +7,6 @@ export function estimateTokens(text: string): number {
   const cjk = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
   // Count other characters
   const other = text.length - cjk;
-  
+
   return cjk + Math.ceil(other / 4);
 }

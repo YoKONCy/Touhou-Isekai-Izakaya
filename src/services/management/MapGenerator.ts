@@ -10,29 +10,29 @@ export interface MapData {
 }
 
 export const DEFAULT_MAP_DATA: MapData = {
-  theme: "default",
-  description: "Standard Izakaya Layout",
+  theme: 'default',
+  description: 'Standard Izakaya Layout',
   layout: [
-    "####################",
-    "#,,,,S,O,B,,,,,,,,,#",
-    "#,,,,,,,,P,,,,,,,,,#",
-    "#CCCCCCCCCC........#",
-    "#..........T..T....#",
-    "#..........h..h....#",
-    "#..................#",
-    "#...T..T...........#",
-    "#...h..h...........#",
-    "#..................#",
-    "#..................#",
-    "#..................#",
-    "#..................#",
-    "#..................#",
-    "##########E#########"
+    '####################',
+    '#,,,,S,O,B,,,,,,,,,#',
+    '#,,,,,,,,P,,,,,,,,,#',
+    '#CCCCCCCCCC........#',
+    '#..........T..T....#',
+    '#..........h..h....#',
+    '#..................#',
+    '#...T..T...........#',
+    '#...h..h...........#',
+    '#..................#',
+    '#..................#',
+    '#..................#',
+    '#..................#',
+    '#..................#',
+    '##########E#########'
   ]
 };
 
 // Zone Types from LLM
-export type ZoneChar = '#' | '.' | 'K' | 'D' | 'W' | 'E' | 'L' | 'R'; 
+export type ZoneChar = '#' | '.' | 'K' | 'D' | 'W' | 'E' | 'L' | 'R';
 // #: Wall, .: Floor (Generic), K: Kitchen, D: Dining, W: Walkway, E: Entrance, L: Lounge, R: Restroom
 
 const MAP_GENERATION_PROMPT = `
@@ -95,75 +95,79 @@ Return ONLY a JSON object.
 \`\`\`
 `;
 
-export async function generateMap(theme: string = "cozy wooden izakaya", context: string = "", previousMap?: MapData, throwOnError: boolean = false): Promise<MapData> {
+export async function generateMap(
+  theme: string = 'cozy wooden izakaya',
+  context: string = '',
+  previousMap?: MapData,
+  throwOnError: boolean = false
+): Promise<MapData> {
   const settingsStore = useSettingsStore();
-  
+
   // Debug: Use default map if enabled
   if (settingsStore.useDefaultTilemap) {
-      console.log("[地图生成器] 调试模式: 使用默认地图数据。");
-      return JSON.parse(JSON.stringify(DEFAULT_MAP_DATA));
+    console.log('[地图生成器] 调试模式: 使用默认地图数据。');
+    return JSON.parse(JSON.stringify(DEFAULT_MAP_DATA));
   }
 
   try {
     let userContent = `Generate a ZONE map with the theme: ${theme}`;
     if (context) {
-        userContent += `\nContext: ${context}`;
+      userContent += `\nContext: ${context}`;
     }
-    
+
     if (previousMap) {
-        userContent += `\n\n**RENOVATION TASK**: Redesign the zones based on the new theme. Previous layout is irrelevant as we are rezoning.`;
+      userContent += `\n\n**RENOVATION TASK**: Redesign the zones based on the new theme. Previous layout is irrelevant as we are rezoning.`;
     }
 
     console.log(`[地图生成器] 开始生成区域... 主题: "${theme}"`);
 
     const response = await generateCompletion({
-      modelType: 'misc', 
+      modelType: 'misc',
       systemPrompt: MAP_GENERATION_PROMPT,
-      messages: [
-        { role: 'user', content: userContent }
-      ],
+      messages: [{ role: 'user', content: userContent }],
       jsonMode: false,
       temperature: 0.7
     });
 
-    console.log("[地图生成器] LLM 原始响应:", response);
+    console.log('[地图生成器] LLM 原始响应:', response);
 
     let jsonStr = response;
-    const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/i) || response.match(/```\s*([\s\S]*?)\s*```/);
+    const jsonMatch =
+      response.match(/```json\s*([\s\S]*?)\s*```/i) || response.match(/```\s*([\s\S]*?)\s*```/);
     if (jsonMatch && jsonMatch[1]) {
-        jsonStr = jsonMatch[1];
+      jsonStr = jsonMatch[1];
     } else {
-        jsonStr = jsonStr.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '').trim();
-        const firstBrace = jsonStr.indexOf('{');
-        const lastBrace = jsonStr.lastIndexOf('}');
-        if (firstBrace !== -1 && lastBrace !== -1) {
-            jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
-        }
+      jsonStr = jsonStr.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '').trim();
+      const firstBrace = jsonStr.indexOf('{');
+      const lastBrace = jsonStr.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
+      }
     }
 
-    if (!jsonStr || jsonStr.length < 10) throw new Error("Invalid JSON");
+    if (!jsonStr || jsonStr.length < 10) throw new Error('Invalid JSON');
 
     let data;
     try {
-        // Remove comments (// ...)
-        jsonStr = jsonStr.replace(/\/\/.*$/gm, '');
-        // Remove multi-line comments (/* ... */)
-        jsonStr = jsonStr.replace(/\/\*[\s\S]*?\*\//g, '');
+      // Remove comments (// ...)
+      jsonStr = jsonStr.replace(/\/\/.*$/gm, '');
+      // Remove multi-line comments (/* ... */)
+      jsonStr = jsonStr.replace(/\/\*[\s\S]*?\*\//g, '');
 
-        // Simple cleanup
-        jsonStr = jsonStr.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
-        data = JSON.parse(jsonStr);
+      // Simple cleanup
+      jsonStr = jsonStr.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+      data = JSON.parse(jsonStr);
     } catch (e) {
-        console.error("JSON 解析错误", e);
-        throw e;
+      console.error('JSON 解析错误', e);
+      throw e;
     }
 
     if (!data || !Array.isArray(data.layout)) {
-        throw new Error("Invalid map data: Missing layout.");
+      throw new Error('Invalid map data: Missing layout.');
     }
 
     // --- POPULATE ZONES ---
-    console.log("[地图生成器] 正在填充一楼...");
+    console.log('[地图生成器] 正在填充一楼...');
     const populator1 = new ZonePopulator(data.layout); // Ground Floor
     data.layout = populator1.generate();
 
@@ -174,19 +178,18 @@ export async function generateMap(theme: string = "cozy wooden izakaya", context
     //         data.floors[key] = populator.generate();
     //     }
     // }
-    
-    console.log("[地图生成器] 地图生成成功。");
+
+    console.log('[地图生成器] 地图生成成功。');
 
     return data;
-
   } catch (error) {
-    console.error("地图生成失败:", error);
-    
+    console.error('地图生成失败:', error);
+
     if (throwOnError) {
-        throw error;
+      throw error;
     }
 
-    console.log("由于错误使用回退地图。");
+    console.log('由于错误使用回退地图。');
     // Fallback map (Standard Tile Map)
     return JSON.parse(JSON.stringify(DEFAULT_MAP_DATA));
   }

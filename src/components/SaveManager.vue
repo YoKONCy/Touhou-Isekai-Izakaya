@@ -5,7 +5,18 @@ import { useGameStore } from '@/stores/game';
 import { useChatStore } from '@/stores/chat';
 import NewGameWizard from './NewGameWizard.vue';
 import { gameLoop } from '@/services/gameLoop';
-import { X, Plus, Trash2, Edit2, Play, Check, Download, Upload, RefreshCw, FileText } from 'lucide-vue-next';
+import {
+  X,
+  Plus,
+  Trash2,
+  Edit2,
+  Play,
+  Check,
+  Download,
+  Upload,
+  RefreshCw,
+  FileText
+} from 'lucide-vue-next';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
@@ -38,11 +49,13 @@ const showMigrationButton = ref(false);
 
 const saves = computed(() => saveStore.saves);
 const currentSaveId = computed(() => saveStore.currentSaveId);
-const isGuest = computed(() => gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost);
+const isGuest = computed(
+  () => gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost
+);
 const isMultiplayerActive = computed(() => gameStore.multiplayer.isMultiplayer);
 
-const singlePlayerSaves = computed(() => saves.value.filter(s => !s.isMultiplayer));
-const multiplayerSaves = computed(() => saves.value.filter(s => s.isMultiplayer));
+const singlePlayerSaves = computed(() => saves.value.filter((s) => !s.isMultiplayer));
+const multiplayerSaves = computed(() => saves.value.filter((s) => s.isMultiplayer));
 
 const isCreating = ref(false);
 const isCreatingMultiplayer = ref(false);
@@ -54,23 +67,29 @@ const showWizard = ref(false);
 const tempSaveName = ref('');
 const tempIsMultiplayer = ref(false);
 
-watch(() => props.isOpen, async (val) => {
-  if (val) {
-    if (saves.value.length === 0) {
-      isCreating.value = true;
+watch(
+  () => props.isOpen,
+  async (val) => {
+    if (val) {
+      if (saves.value.length === 0) {
+        isCreating.value = true;
+      }
+      // Check if migration might be needed
+      const needed = await checkMigrationNeeded(true); // pass true to skip localStorage check
+      showMigrationButton.value = needed;
     }
-    // Check if migration might be needed
-    const needed = await checkMigrationNeeded(true); // pass true to skip localStorage check
-    showMigrationButton.value = needed;
   }
-});
+);
 
 async function handleManualMigration() {
-  const ok = await confirm('检测到旧版（Dexie）中存有数据，是否尝试迁移到新版（SQLite）？迁移不会删除旧数据。', {
-    title: '迁移旧版存档',
-    confirmText: '开始迁移',
-    cancelText: '取消'
-  });
+  const ok = await confirm(
+    '检测到旧版（Dexie）中存有数据，是否尝试迁移到新版（SQLite）？迁移不会删除旧数据。',
+    {
+      title: '迁移旧版存档',
+      confirmText: '开始迁移',
+      cancelText: '取消'
+    }
+  );
 
   if (!ok) return;
 
@@ -104,13 +123,13 @@ async function onWizardComplete(data: any) {
   isCreating.value = false;
   isCreatingMultiplayer.value = false;
   newSaveName.value = '';
-  
+
   // 1. Create Save
   const id = await saveStore.createSave(tempSaveName.value, tempIsMultiplayer.value);
-  
+
   // 2. Switch to it (Resets state)
   await saveStore.switchSave(id);
-  
+
   // 3. Apply Wizard Data
   gameStore.updatePlayer({
     name: data.name,
@@ -133,62 +152,61 @@ async function onWizardComplete(data: any) {
 
   // 3.1 Update System Config (Difficulty)
   if (data.difficulty) {
-      const currentSystem = gameStore.state.system;
-      gameStore.updateState({
-          system: {
-              ...currentSystem,
-              difficulty: data.difficulty
-          }
-      });
+    const currentSystem = gameStore.state.system;
+    gameStore.updateState({
+      system: {
+        ...currentSystem,
+        difficulty: data.difficulty
+      }
+    });
   }
-  
+
   // 4. Send initial message if provided (Store Start)
   // Define mapPromise outside to track background generation
   let mapPromise: Promise<any> = Promise.resolve(null);
 
   if (data.initialMessage) {
-    console.log("[SaveManager] Checking store description:", data.storeDescription);
+    console.log('[SaveManager] Checking store description:', data.storeDescription);
     if (data.storeDescription) {
-        // Generate initial map from store description (Parallel execution)
-        console.log("[SaveManager] Starting initial map generation (Background)...");
-        mapPromise = generateMap("New Izakaya", data.storeDescription)
-            .catch(e => {
-                console.error("Failed to generate initial map", e);
-                return null;
-            });
+      // Generate initial map from store description (Parallel execution)
+      console.log('[SaveManager] Starting initial map generation (Background)...');
+      mapPromise = generateMap('New Izakaya', data.storeDescription).catch((e) => {
+        console.error('Failed to generate initial map', e);
+        return null;
+      });
     }
   }
 
   // 5. Create initial snapshot to persist the configured state
   await chatStore.createInitialSnapshot();
-  
+
   // Close UI immediately to show game interface
   emit('close');
 
   // 6. Trigger LLM response if needed
   if (data.initialMessage) {
-    console.log("[SaveManager] Triggering initial LLM response with message:", data.initialMessage);
-    gameLoop.handleUserAction(data.initialMessage).catch(e => {
-        console.error("[SaveManager] Failed to trigger initial action:", e);
+    console.log('[SaveManager] Triggering initial LLM response with message:', data.initialMessage);
+    gameLoop.handleUserAction(data.initialMessage).catch((e) => {
+      console.error('[SaveManager] Failed to trigger initial action:', e);
     });
   } else {
-    console.log("[SaveManager] No initial message provided, skipping LLM trigger.");
+    console.log('[SaveManager] No initial message provided, skipping LLM trigger.');
   }
 
   // 7. Handle Map Completion (Update state when ready)
   if (data.storeDescription) {
-      mapPromise.then((initialMap) => {
-        if (initialMap) {
-            console.log("[SaveManager] Map generated in background, updating state...");
-            const currentSystem = gameStore.state.system;
-            gameStore.updateState({
-                system: {
-                    ...currentSystem,
-                    customMap: initialMap
-                }
-            });
-        }
-      });
+    mapPromise.then((initialMap) => {
+      if (initialMap) {
+        console.log('[SaveManager] Map generated in background, updating state...');
+        const currentSystem = gameStore.state.system;
+        gameStore.updateState({
+          system: {
+            ...currentSystem,
+            customMap: initialMap
+          }
+        });
+      }
+    });
   }
 }
 
@@ -197,15 +215,18 @@ async function handleExport(save: any) {
     alert('无效的存档，无法导出');
     return;
   }
-  
+
   try {
     console.log(`[SaveManager] Exporting save ${save.id} (${save.name})...`);
     const blob = await saveStore.exportSave(save.id);
     // const blob = new Blob([json], { type: 'application/json' }); // exportSave now returns Blob directly
-    
+
     // Check size
-    if (blob.size > 100 * 1024 * 1024) { // 100MB
-       console.warn(`[SaveManager] Large save file detected: ${(blob.size / 1024 / 1024).toFixed(2)}MB`);
+    if (blob.size > 100 * 1024 * 1024) {
+      // 100MB
+      console.warn(
+        `[SaveManager] Large save file detected: ${(blob.size / 1024 / 1024).toFixed(2)}MB`
+      );
     }
 
     const url = URL.createObjectURL(blob);
@@ -214,13 +235,13 @@ async function handleExport(save: any) {
     a.download = `TouhouSave_${save.name.replace(/[\\/:*?"<>|]/g, '_')}_${dayjs().format('YYYYMMDD_HHmmss')}.json`;
     document.body.appendChild(a);
     a.click();
-    
+
     // Cleanup after a delay to ensure the browser has started the download
     setTimeout(() => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }, 100);
-    
+
     console.log('[存档管理器] 导出触发成功');
   } catch (error: any) {
     console.error('Export failed:', error);
@@ -244,9 +265,11 @@ async function handleImport(event: Event) {
     try {
       const content = e.target?.result as ArrayBuffer;
       if (!content) throw new Error('读取文件失败');
-      
-      console.log(`[SaveManager] Importing file size: ${(content.byteLength / 1024 / 1024).toFixed(2)}MB`);
-      
+
+      console.log(
+        `[SaveManager] Importing file size: ${(content.byteLength / 1024 / 1024).toFixed(2)}MB`
+      );
+
       await saveStore.importSave(content);
       alert('存档导入成功！');
     } catch (error: any) {
@@ -320,28 +343,32 @@ async function saveEdit(id: number) {
 function formatTime(timestamp: number) {
   return dayjs(timestamp).fromNow();
 }
-
 </script>
 
 <template>
   <Teleport to="body">
-    <NewGameWizard 
-      v-if="showWizard" 
-      @complete="onWizardComplete" 
-      @cancel="onWizardCancel" 
-    />
-    <div v-if="isOpen && !showWizard" class="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/80 backdrop-blur-sm p-4 animate-fade-in font-sans">
-      <div class="relative bg-stone-50 dark:bg-stone-900 w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] border-2 border-izakaya-wood/30">
+    <NewGameWizard v-if="showWizard" @complete="onWizardComplete" @cancel="onWizardCancel" />
+    <div
+      v-if="isOpen && !showWizard"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/80 backdrop-blur-sm p-4 animate-fade-in font-sans"
+    >
+      <div
+        class="relative bg-stone-50 dark:bg-stone-900 w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] border-2 border-izakaya-wood/30"
+      >
         <!-- Texture Overlay -->
-        <div class="absolute inset-0 pointer-events-none opacity-40 bg-texture-rice-paper z-0"></div>
+        <div
+          class="absolute inset-0 pointer-events-none opacity-40 bg-texture-rice-paper z-0"
+        ></div>
 
         <!-- Header -->
-        <div class="relative z-10 p-4 border-b border-izakaya-wood/10 flex justify-between items-center bg-touhou-red text-white shadow-md">
+        <div
+          class="relative z-10 p-4 border-b border-izakaya-wood/10 flex justify-between items-center bg-touhou-red text-white shadow-md"
+        >
           <div class="flex items-center gap-3">
             <h2 class="text-xl font-bold font-display flex items-center gap-3 tracking-wide">
               <span>💾</span> 存档管理
             </h2>
-            <button 
+            <button
               v-if="showMigrationButton"
               @click="handleManualMigration"
               class="flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 dark:text-amber-300 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 rounded-full border border-amber-200 dark:border-amber-800 transition-colors shadow-sm"
@@ -351,62 +378,97 @@ function formatTime(timestamp: number) {
               发现旧存档
             </button>
           </div>
-          <button @click="emit('close')" class="p-1.5 hover:bg-white/20 rounded-full transition-colors text-white">
+          <button
+            @click="emit('close')"
+            class="p-1.5 hover:bg-white/20 rounded-full transition-colors text-white"
+          >
             <X class="w-6 h-6" />
           </button>
         </div>
 
         <!-- Migration Progress Overlay -->
-        <div v-if="isMigrating" class="absolute inset-0 z-50 bg-white/90 dark:bg-stone-900/90 flex flex-col items-center justify-center p-6 text-center">
+        <div
+          v-if="isMigrating"
+          class="absolute inset-0 z-50 bg-white/90 dark:bg-stone-900/90 flex flex-col items-center justify-center p-6 text-center"
+        >
           <RefreshCw class="w-12 h-12 text-touhou-red animate-spin mb-4" />
           <h3 class="text-lg font-bold text-stone-900 dark:text-white mb-2">正在迁移存档数据</h3>
           <p class="text-sm text-stone-500 dark:text-stone-400 mb-4">{{ migrationMessage }}</p>
-          <div class="w-full max-w-xs bg-stone-200 dark:bg-stone-700 rounded-full h-2.5 mb-2 overflow-hidden">
-            <div class="bg-touhou-red h-2.5 rounded-full transition-all duration-300" :style="{ width: `${migrationProgress}%` }"></div>
+          <div
+            class="w-full max-w-xs bg-stone-200 dark:bg-stone-700 rounded-full h-2.5 mb-2 overflow-hidden"
+          >
+            <div
+              class="bg-touhou-red h-2.5 rounded-full transition-all duration-300"
+              :style="{ width: `${migrationProgress}%` }"
+            ></div>
           </div>
           <p class="text-xs text-stone-400">{{ Math.round(migrationProgress) }}%</p>
           <p class="mt-4 text-xs text-touhou-red font-medium">请勿关闭页面，迁移完成后将自动刷新</p>
         </div>
 
         <!-- Content -->
-        <div class="relative z-10 p-4 md:p-6 overflow-y-auto flex-1 space-y-6 custom-scrollbar bg-stone-100/50 dark:bg-stone-800/50 overscroll-contain" style="-webkit-overflow-scrolling: touch;">
-          
+        <div
+          class="relative z-10 p-4 md:p-6 overflow-y-auto flex-1 space-y-6 custom-scrollbar bg-stone-100/50 dark:bg-stone-800/50 overscroll-contain"
+          style="-webkit-overflow-scrolling: touch"
+        >
           <!-- Guest Mode Status -->
-          <div v-if="isGuest" class="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-6 flex flex-col items-center justify-center text-center space-y-4 animate-fade-in">
-            <div class="w-16 h-16 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400">
+          <div
+            v-if="isGuest"
+            class="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-6 flex flex-col items-center justify-center text-center space-y-4 animate-fade-in"
+          >
+            <div
+              class="w-16 h-16 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400"
+            >
               <RefreshCw class="w-8 h-8 animate-spin-slow" />
             </div>
             <div>
-              <h3 class="text-lg font-bold text-blue-900 dark:text-blue-100">当前处于远程联机模式</h3>
-              <p class="text-sm text-blue-700/70 dark:text-blue-300/70 mt-1">您正在作为客机参与其他玩家的世界，本地存档已暂时卸载。</p>
+              <h3 class="text-lg font-bold text-blue-900 dark:text-blue-100">
+                当前处于远程联机模式
+              </h3>
+              <p class="text-sm text-blue-700/70 dark:text-blue-300/70 mt-1">
+                您正在作为客机参与其他玩家的世界，本地存档已暂时卸载。
+              </p>
             </div>
-            <div class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-lg shadow-blue-600/20">
+            <div
+              class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-lg shadow-blue-600/20"
+            >
               状态：已连接 (远程)
             </div>
-            <p class="text-[10px] text-blue-400 uppercase tracking-widest font-bold">Remote Multiplayer Session</p>
+            <p class="text-[10px] text-blue-400 uppercase tracking-widest font-bold">
+              Remote Multiplayer Session
+            </p>
           </div>
 
           <!-- Create New -->
           <div v-if="!isCreating && !isGuest" class="flex flex-wrap justify-end gap-3">
-            <div v-if="isMultiplayerActive" class="flex-1 flex items-center px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-700 dark:text-amber-400 font-medium">
+            <div
+              v-if="isMultiplayerActive"
+              class="flex-1 flex items-center px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-700 dark:text-amber-400 font-medium"
+            >
               <span>⚠️ 联机进行中，无法创建、切换或修改本地存档</span>
             </div>
-            <button 
+            <button
               @click="triggerImport"
               :disabled="isMultiplayerActive"
               class="flex items-center gap-2 px-4 py-2 bg-stone-200 hover:bg-stone-300 dark:bg-stone-700 dark:hover:bg-stone-600 text-izakaya-wood dark:text-stone-200 rounded-lg transition-all shadow hover:shadow-lg text-xs font-bold font-display disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Download class="w-3.5 h-3.5" /> 导入存档
             </button>
-            <button 
-              @click="isCreating = true; isCreatingMultiplayer = false"
+            <button
+              @click="
+                isCreating = true;
+                isCreatingMultiplayer = false;
+              "
               :disabled="isMultiplayerActive"
               class="flex items-center gap-2 px-4 py-2 bg-stone-700 hover:bg-stone-800 text-white rounded-lg transition-all shadow hover:shadow-lg text-xs font-bold font-display disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus class="w-3.5 h-3.5" /> 新建单机
             </button>
-            <button 
-              @click="isCreating = true; isCreatingMultiplayer = true"
+            <button
+              @click="
+                isCreating = true;
+                isCreatingMultiplayer = true;
+              "
               :disabled="isMultiplayerActive"
               class="flex items-center gap-2 px-4 py-2 bg-touhou-red hover:bg-red-700 text-white rounded-lg transition-all shadow hover:shadow-lg text-xs font-bold font-display disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -414,29 +476,43 @@ function formatTime(timestamp: number) {
             </button>
           </div>
 
-          <div v-else class="bg-white/80 dark:bg-stone-800/80 p-5 rounded-xl border-2 animate-in fade-in slide-in-from-top-2 shadow-sm" :class="isCreatingMultiplayer ? 'border-touhou-red' : 'border-stone-400'">
+          <div
+            v-else
+            class="bg-white/80 dark:bg-stone-800/80 p-5 rounded-xl border-2 animate-in fade-in slide-in-from-top-2 shadow-sm"
+            :class="isCreatingMultiplayer ? 'border-touhou-red' : 'border-stone-400'"
+          >
             <div class="flex items-center gap-2 mb-3">
-              <span v-if="isCreatingMultiplayer" class="px-2 py-0.5 bg-touhou-red text-white text-[10px] rounded-full font-bold uppercase">联机存档 (房主)</span>
-              <span v-else class="px-2 py-0.5 bg-stone-500 text-white text-[10px] rounded-full font-bold uppercase">单机存档</span>
-              <label class="text-sm font-bold text-izakaya-wood dark:text-stone-300">新存档名称</label>
+              <span
+                v-if="isCreatingMultiplayer"
+                class="px-2 py-0.5 bg-touhou-red text-white text-[10px] rounded-full font-bold uppercase"
+                >联机存档 (房主)</span
+              >
+              <span
+                v-else
+                class="px-2 py-0.5 bg-stone-500 text-white text-[10px] rounded-full font-bold uppercase"
+                >单机存档</span
+              >
+              <label class="text-sm font-bold text-izakaya-wood dark:text-stone-300"
+                >新存档名称</label
+              >
             </div>
             <div class="flex gap-3">
-              <input 
+              <input
                 v-model="newSaveName"
                 @keydown.enter="handleCreate"
-                type="text" 
+                type="text"
                 placeholder="例如：幻想乡异闻录"
                 class="flex-1 bg-white dark:bg-stone-900 dark:text-stone-100 text-stone-900 dark:border-stone-700 dark:placeholder-stone-500 border border-izakaya-wood/20 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-touhou-red outline-none transition-all shadow-inner"
                 autoFocus
               />
-              <button 
+              <button
                 @click="handleCreate"
                 :disabled="!newSaveName.trim()"
                 class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50 font-bold shadow-sm transition-colors"
               >
                 创建
               </button>
-              <button 
+              <button
                 @click="isCreating = false"
                 class="px-4 py-2 bg-stone-200 hover:bg-stone-300 dark:bg-stone-700 dark:hover:bg-stone-600 text-izakaya-wood dark:text-stone-200 rounded-lg font-bold transition-colors"
               >
@@ -449,7 +525,9 @@ function formatTime(timestamp: number) {
           <div v-if="!isGuest" class="space-y-8">
             <!-- Multiplayer Saves -->
             <div v-if="multiplayerSaves.length > 0" class="space-y-4">
-              <h3 class="text-xs font-bold text-touhou-red uppercase tracking-widest flex items-center gap-2 px-1">
+              <h3
+                class="text-xs font-bold text-touhou-red uppercase tracking-widest flex items-center gap-2 px-1"
+              >
                 <span class="w-2 h-2 rounded-full bg-touhou-red animate-pulse"></span>
                 联机存档 (房主视角)
               </h3>
@@ -459,19 +537,26 @@ function formatTime(timestamp: number) {
                   :key="save.id"
                   class="group relative flex flex-col md:flex-row md:items-center justify-between p-4 rounded-xl border-2 transition-all duration-300 gap-3"
                   :class="[
-                    save.id === currentSaveId 
-                      ? 'border-touhou-red bg-red-50/80 dark:bg-red-900/20 shadow-md transform scale-[1.01]' 
+                    save.id === currentSaveId
+                      ? 'border-touhou-red bg-red-50/80 dark:bg-red-900/20 shadow-md transform scale-[1.01]'
                       : 'border-izakaya-wood/10 bg-white/80 dark:bg-stone-800/80 hover:border-touhou-red/30 shadow-sm hover:shadow-md'
                   ]"
                 >
                   <!-- Info -->
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 mb-1.5">
-                      <span v-if="save.id === currentSaveId" class="px-2 py-0.5 bg-izakaya-wood text-white text-[10px] rounded-full font-bold uppercase tracking-wider shadow-sm">Current</span>
-                      <span class="px-2 py-0.5 bg-touhou-red/10 text-touhou-red border border-touhou-red/20 text-[10px] rounded-full font-bold uppercase tracking-wider">Multiplayer</span>
-                      
+                      <span
+                        v-if="save.id === currentSaveId"
+                        class="px-2 py-0.5 bg-izakaya-wood text-white text-[10px] rounded-full font-bold uppercase tracking-wider shadow-sm"
+                        >Current</span
+                      >
+                      <span
+                        class="px-2 py-0.5 bg-touhou-red/10 text-touhou-red border border-touhou-red/20 text-[10px] rounded-full font-bold uppercase tracking-wider"
+                        >Multiplayer</span
+                      >
+
                       <div v-if="editingId === save.id" class="flex items-center gap-2 flex-1">
-                        <input 
+                        <input
                           v-model="editName"
                           @keydown.enter="saveEdit(save.id)"
                           @blur="saveEdit(save.id)"
@@ -479,20 +564,32 @@ function formatTime(timestamp: number) {
                           autoFocus
                         />
                       </div>
-                      <h3 v-else class="font-bold text-lg font-display text-izakaya-wood dark:text-stone-100 truncate cursor-pointer hover:text-touhou-red transition-colors" @click="startEdit(save)">
+                      <h3
+                        v-else
+                        class="font-bold text-lg font-display text-izakaya-wood dark:text-stone-100 truncate cursor-pointer hover:text-touhou-red transition-colors"
+                        @click="startEdit(save)"
+                      >
                         {{ save.name }}
                       </h3>
                     </div>
-                    
-                    <div class="text-xs font-serif text-izakaya-wood/60 dark:text-stone-400 flex items-center gap-4">
-                      <span class="flex items-center gap-1"><span class="text-base">📍</span> {{ save.location || '未知地点' }}</span>
-                      <span class="flex items-center gap-1"><span class="text-base">🕒</span> {{ formatTime(save.lastPlayed) }}</span>
+
+                    <div
+                      class="text-xs font-serif text-izakaya-wood/60 dark:text-stone-400 flex items-center gap-4"
+                    >
+                      <span class="flex items-center gap-1"
+                        ><span class="text-base">📍</span> {{ save.location || '未知地点' }}</span
+                      >
+                      <span class="flex items-center gap-1"
+                        ><span class="text-base">🕒</span> {{ formatTime(save.lastPlayed) }}</span
+                      >
                     </div>
                   </div>
 
                   <!-- Actions -->
-                  <div class="flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity focus-within:opacity-100 flex-shrink-0">
-                    <button 
+                  <div
+                    class="flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity focus-within:opacity-100 flex-shrink-0"
+                  >
+                    <button
                       v-if="editingId !== save.id"
                       @click="handleExport(save)"
                       class="p-2 text-izakaya-wood/40 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors"
@@ -501,7 +598,7 @@ function formatTime(timestamp: number) {
                       <Upload class="w-4 h-4" />
                     </button>
 
-                    <button 
+                    <button
                       v-if="editingId !== save.id"
                       @click="handleExportText(save)"
                       class="p-2 text-izakaya-wood/40 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg transition-colors"
@@ -510,7 +607,7 @@ function formatTime(timestamp: number) {
                       <FileText class="w-4 h-4" />
                     </button>
 
-                    <button 
+                    <button
                       v-if="editingId !== save.id"
                       @click="startEdit(save)"
                       :disabled="isMultiplayerActive"
@@ -519,8 +616,8 @@ function formatTime(timestamp: number) {
                     >
                       <Edit2 class="w-4 h-4" />
                     </button>
-                    
-                    <button 
+
+                    <button
                       @click.stop="handleDelete(save.id)"
                       :disabled="isMultiplayerActive"
                       class="p-2 text-izakaya-wood/40 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
@@ -531,7 +628,7 @@ function formatTime(timestamp: number) {
 
                     <div class="w-px h-6 bg-izakaya-wood/10 dark:bg-stone-700 mx-1"></div>
 
-                    <button 
+                    <button
                       v-if="save.id !== currentSaveId"
                       @click="handleSwitch(save.id)"
                       :disabled="isMultiplayerActive"
@@ -539,7 +636,10 @@ function formatTime(timestamp: number) {
                     >
                       <Play class="w-3 h-3 fill-current" /> 读取
                     </button>
-                    <div v-else class="flex items-center gap-1 px-4 py-1.5 bg-red-100/50 dark:bg-red-900/30 text-touhou-red dark:text-red-400 rounded-lg text-xs font-bold cursor-default border border-red-200/50 dark:border-red-900/50">
+                    <div
+                      v-else
+                      class="flex items-center gap-1 px-4 py-1.5 bg-red-100/50 dark:bg-red-900/30 text-touhou-red dark:text-red-400 rounded-lg text-xs font-bold cursor-default border border-red-200/50 dark:border-red-900/50"
+                    >
                       <Check class="w-3 h-3" /> 进行中
                     </div>
                   </div>
@@ -549,7 +649,10 @@ function formatTime(timestamp: number) {
 
             <!-- Single Player Saves -->
             <div class="space-y-4">
-              <h3 v-if="multiplayerSaves.length > 0" class="text-xs font-bold text-stone-500 uppercase tracking-widest px-1">
+              <h3
+                v-if="multiplayerSaves.length > 0"
+                class="text-xs font-bold text-stone-500 uppercase tracking-widest px-1"
+              >
                 单机存档
               </h3>
               <div class="space-y-4">
@@ -558,18 +661,22 @@ function formatTime(timestamp: number) {
                   :key="save.id"
                   class="group relative flex flex-col md:flex-row md:items-center justify-between p-4 rounded-xl border-2 transition-all duration-300 gap-3"
                   :class="[
-                    save.id === currentSaveId 
-                      ? 'border-izakaya-wood bg-izakaya-wood/5 dark:bg-stone-800 shadow-md transform scale-[1.01]' 
+                    save.id === currentSaveId
+                      ? 'border-izakaya-wood bg-izakaya-wood/5 dark:bg-stone-800 shadow-md transform scale-[1.01]'
                       : 'border-izakaya-wood/10 bg-white/80 dark:bg-stone-800/80 hover:border-izakaya-wood/30 shadow-sm hover:shadow-md'
                   ]"
                 >
                   <!-- Info -->
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 mb-1.5">
-                      <span v-if="save.id === currentSaveId" class="px-2 py-0.5 bg-touhou-red text-white text-[10px] rounded-full font-bold uppercase tracking-wider shadow-sm">Current</span>
-                      
+                      <span
+                        v-if="save.id === currentSaveId"
+                        class="px-2 py-0.5 bg-touhou-red text-white text-[10px] rounded-full font-bold uppercase tracking-wider shadow-sm"
+                        >Current</span
+                      >
+
                       <div v-if="editingId === save.id" class="flex items-center gap-2 flex-1">
-                        <input 
+                        <input
                           v-model="editName"
                           @keydown.enter="saveEdit(save.id)"
                           @blur="saveEdit(save.id)"
@@ -577,20 +684,32 @@ function formatTime(timestamp: number) {
                           autoFocus
                         />
                       </div>
-                      <h3 v-else class="font-bold text-lg font-display text-izakaya-wood dark:text-stone-100 truncate cursor-pointer hover:text-touhou-red transition-colors" @click="startEdit(save)">
+                      <h3
+                        v-else
+                        class="font-bold text-lg font-display text-izakaya-wood dark:text-stone-100 truncate cursor-pointer hover:text-touhou-red transition-colors"
+                        @click="startEdit(save)"
+                      >
                         {{ save.name }}
                       </h3>
                     </div>
-                    
-                    <div class="text-xs font-serif text-izakaya-wood/60 dark:text-stone-400 flex items-center gap-4">
-                      <span class="flex items-center gap-1"><span class="text-base">📍</span> {{ save.location || '未知地点' }}</span>
-                      <span class="flex items-center gap-1"><span class="text-base">🕒</span> {{ formatTime(save.lastPlayed) }}</span>
+
+                    <div
+                      class="text-xs font-serif text-izakaya-wood/60 dark:text-stone-400 flex items-center gap-4"
+                    >
+                      <span class="flex items-center gap-1"
+                        ><span class="text-base">📍</span> {{ save.location || '未知地点' }}</span
+                      >
+                      <span class="flex items-center gap-1"
+                        ><span class="text-base">🕒</span> {{ formatTime(save.lastPlayed) }}</span
+                      >
                     </div>
                   </div>
 
                   <!-- Actions -->
-                  <div class="flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity focus-within:opacity-100 flex-shrink-0">
-                    <button 
+                  <div
+                    class="flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity focus-within:opacity-100 flex-shrink-0"
+                  >
+                    <button
                       v-if="editingId !== save.id"
                       @click="handleExport(save)"
                       class="p-2 text-izakaya-wood/40 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors"
@@ -599,7 +718,7 @@ function formatTime(timestamp: number) {
                       <Upload class="w-4 h-4" />
                     </button>
 
-                    <button 
+                    <button
                       v-if="editingId !== save.id"
                       @click="handleExportText(save)"
                       class="p-2 text-izakaya-wood/40 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg transition-colors"
@@ -608,7 +727,7 @@ function formatTime(timestamp: number) {
                       <FileText class="w-4 h-4" />
                     </button>
 
-                    <button 
+                    <button
                       v-if="editingId !== save.id"
                       @click="startEdit(save)"
                       :disabled="isMultiplayerActive"
@@ -617,8 +736,8 @@ function formatTime(timestamp: number) {
                     >
                       <Edit2 class="w-4 h-4" />
                     </button>
-                    
-                    <button 
+
+                    <button
                       @click.stop="handleDelete(save.id)"
                       :disabled="isMultiplayerActive"
                       class="p-2 text-izakaya-wood/40 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
@@ -629,7 +748,7 @@ function formatTime(timestamp: number) {
 
                     <div class="w-px h-6 bg-izakaya-wood/10 dark:bg-stone-700 mx-1"></div>
 
-                    <button 
+                    <button
                       v-if="save.id !== currentSaveId"
                       @click="handleSwitch(save.id)"
                       :disabled="isMultiplayerActive"
@@ -637,7 +756,10 @@ function formatTime(timestamp: number) {
                     >
                       <Play class="w-3 h-3 fill-current" /> 读取
                     </button>
-                    <div v-else class="flex items-center gap-1 px-4 py-1.5 bg-red-100/50 dark:bg-red-900/30 text-touhou-red dark:text-red-400 rounded-lg text-xs font-bold cursor-default border border-red-200/50 dark:border-red-900/50">
+                    <div
+                      v-else
+                      class="flex items-center gap-1 px-4 py-1.5 bg-red-100/50 dark:bg-red-900/30 text-touhou-red dark:text-red-400 rounded-lg text-xs font-bold cursor-default border border-red-200/50 dark:border-red-900/50"
+                    >
                       <Check class="w-3 h-3" /> 进行中
                     </div>
                   </div>
@@ -645,16 +767,9 @@ function formatTime(timestamp: number) {
               </div>
             </div>
           </div>
-
         </div>
         <!-- Hidden File Input -->
-        <input 
-          type="file" 
-          ref="fileInput"
-          class="hidden" 
-          accept=".json"
-          @change="handleImport"
-        />
+        <input type="file" ref="fileInput" class="hidden" accept=".json" @change="handleImport" />
       </div>
     </div>
   </Teleport>

@@ -65,7 +65,7 @@ export const SCHEMA_SQL = [
     tags, 
     related_entities
   );`,
-  
+
   `CREATE TABLE IF NOT EXISTS memories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     saveSlotId INTEGER NOT NULL,

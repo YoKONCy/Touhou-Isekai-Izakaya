@@ -1057,62 +1057,62 @@ export const usePromptStore = defineStore('prompt', () => {
     if (saved) {
       try {
         const parsed: PromptBlock[] = JSON.parse(saved);
-        
+
         // Merge strategy:
         // 1. Keep the order from 'parsed' (user's saved order)
         // 2. Add any new blocks from DEFAULT_BLOCKS that are missing in 'parsed'
         // 3. Update metadata (configurable, name, description) from DEFAULT_BLOCKS
         // 4. Keep user's 'enabled' and 'content' (if content exists)
         // 5. Update 'options' from DEFAULT_BLOCKS (so we can update option content via code), but keep 'selectedOptionId'
-        
+
         const mergedBlocks: PromptBlock[] = [];
-        const parsedIds = new Set(parsed.map(b => b.id));
-        
+        const parsedIds = new Set(parsed.map((b) => b.id));
+
         // 1. Process saved blocks
         for (const savedBlock of parsed) {
-           const defaultBlock = DEFAULT_BLOCKS.find(b => b.id === savedBlock.id);
-           if (defaultBlock) {
-             // Exist in current code: Update metadata, keep user state
-             
-             // Merge options if they exist
-             let mergedOptions = defaultBlock.options ? [...defaultBlock.options] : undefined;
-             if (savedBlock.options && mergedOptions) {
-               // Update default options with saved content/name (to keep user edits)
-               mergedOptions = mergedOptions.map(opt => {
-                 const savedOpt = savedBlock.options!.find(o => o.id === opt.id);
-                 return savedOpt ? { ...opt, ...savedOpt } : opt;
-               });
-               
-               // Add custom options that don't exist in DEFAULT_BLOCKS
-               const defaultOptionIds = new Set(defaultBlock.options!.map(o => o.id));
-               const customOptions = savedBlock.options.filter(o => !defaultOptionIds.has(o.id));
-               mergedOptions.push(...customOptions);
-             }
+          const defaultBlock = DEFAULT_BLOCKS.find((b) => b.id === savedBlock.id);
+          if (defaultBlock) {
+            // Exist in current code: Update metadata, keep user state
 
-             mergedBlocks.push({
-               ...defaultBlock, // Get latest metadata/options/content defaults
-               enabled: savedBlock.enabled,
-               content: savedBlock.content ?? defaultBlock.content, // Use saved content if any, else default
-               metadata: { ...defaultBlock.metadata, ...savedBlock.metadata }, // Merge metadata
-               selectedOptionId: savedBlock.selectedOptionId ?? defaultBlock.selectedOptionId, // Keep selected option
-               options: mergedOptions
-             });
-           } else {
-             // Deprecated block? Maybe keep it or drop it. 
-             // For now, let's drop blocks that are no longer in DEFAULT_BLOCKS to avoid issues
-           }
+            // Merge options if they exist
+            let mergedOptions = defaultBlock.options ? [...defaultBlock.options] : undefined;
+            if (savedBlock.options && mergedOptions) {
+              // Update default options with saved content/name (to keep user edits)
+              mergedOptions = mergedOptions.map((opt) => {
+                const savedOpt = savedBlock.options!.find((o) => o.id === opt.id);
+                return savedOpt ? { ...opt, ...savedOpt } : opt;
+              });
+
+              // Add custom options that don't exist in DEFAULT_BLOCKS
+              const defaultOptionIds = new Set(defaultBlock.options!.map((o) => o.id));
+              const customOptions = savedBlock.options.filter((o) => !defaultOptionIds.has(o.id));
+              mergedOptions.push(...customOptions);
+            }
+
+            mergedBlocks.push({
+              ...defaultBlock, // Get latest metadata/options/content defaults
+              enabled: savedBlock.enabled,
+              content: savedBlock.content ?? defaultBlock.content, // Use saved content if any, else default
+              metadata: { ...defaultBlock.metadata, ...savedBlock.metadata }, // Merge metadata
+              selectedOptionId: savedBlock.selectedOptionId ?? defaultBlock.selectedOptionId, // Keep selected option
+              options: mergedOptions
+            });
+          } else {
+            // Deprecated block? Maybe keep it or drop it.
+            // For now, let's drop blocks that are no longer in DEFAULT_BLOCKS to avoid issues
+          }
         }
-        
+
         // 2. Add missing blocks (newly added features)
-        // Insert them in specific positions relative to existing blocks if possible, 
+        // Insert them in specific positions relative to existing blocks if possible,
         // or just append to end (and let user reorder/reset).
         // Since 'resetToDefault' exists, appending is safer than complex insertion logic here.
         for (const defaultBlock of DEFAULT_BLOCKS) {
-           if (!parsedIds.has(defaultBlock.id)) {
-             mergedBlocks.push({ ...defaultBlock });
-           }
+          if (!parsedIds.has(defaultBlock.id)) {
+            mergedBlocks.push({ ...defaultBlock });
+          }
         }
-        
+
         blocks.value = mergedBlocks;
       } catch (e) {
         console.error('Failed to load prompt blocks', e);
@@ -1127,7 +1127,7 @@ export const usePromptStore = defineStore('prompt', () => {
   }
 
   function updateBlockContent(id: string, content: string, metadata?: any) {
-    const block = blocks.value.find(b => b.id === id);
+    const block = blocks.value.find((b) => b.id === id);
     if (block && block.configurable) {
       block.content = content;
       if (metadata) {
@@ -1138,9 +1138,9 @@ export const usePromptStore = defineStore('prompt', () => {
   }
 
   function updateOptionContent(blockId: string, optionId: string, content: string) {
-    const block = blocks.value.find(b => b.id === blockId);
+    const block = blocks.value.find((b) => b.id === blockId);
     if (block && block.options) {
-      const option = block.options.find(o => o.id === optionId);
+      const option = block.options.find((o) => o.id === optionId);
       if (option) {
         option.content = content;
         save();
@@ -1149,7 +1149,7 @@ export const usePromptStore = defineStore('prompt', () => {
   }
 
   function addOption(blockId: string, name: string, content: string) {
-    const block = blocks.value.find(b => b.id === blockId);
+    const block = blocks.value.find((b) => b.id === blockId);
     if (block && block.options) {
       const id = `custom_${Date.now()}`;
       block.options.push({ id, name, content });
@@ -1159,9 +1159,9 @@ export const usePromptStore = defineStore('prompt', () => {
   }
 
   function deleteOption(blockId: string, optionId: string) {
-    const block = blocks.value.find(b => b.id === blockId);
+    const block = blocks.value.find((b) => b.id === blockId);
     if (block && block.options) {
-      const index = block.options.findIndex(o => o.id === optionId);
+      const index = block.options.findIndex((o) => o.id === optionId);
       if (index !== -1) {
         block.options.splice(index, 1);
         if (block.selectedOptionId === optionId) {
@@ -1173,7 +1173,7 @@ export const usePromptStore = defineStore('prompt', () => {
   }
 
   function updateBlockOption(id: string, optionId: string) {
-    const block = blocks.value.find(b => b.id === id);
+    const block = blocks.value.find((b) => b.id === id);
     if (block && block.options) {
       block.selectedOptionId = optionId;
       save();
@@ -1181,13 +1181,13 @@ export const usePromptStore = defineStore('prompt', () => {
   }
 
   function toggleBlock(id: string) {
-    const block = blocks.value.find(b => b.id === id);
+    const block = blocks.value.find((b) => b.id === id);
     if (block) {
       block.enabled = !block.enabled;
       save();
     }
   }
-  
+
   function resetToDefault() {
     blocks.value = JSON.parse(JSON.stringify(DEFAULT_BLOCKS));
     save();

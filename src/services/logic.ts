@@ -352,13 +352,12 @@ const MULTIPLAYER_ACTION = `3. UPDATE_COMPANION: targetName (Character Name), fi
 
 /**
  * GameMaster Logic Service (Instruction Mapper)
- * 
+ *
  * 核心职责：具身智能中的“决策层”。
  * 将 Storyteller 生成的语义叙事转化为游戏世界可执行的确定性指令（JSON）。
  * 实现了意图与执行的完全解耦，确保 LLM 的幻觉不会直接破坏游戏数值系统。
  */
 export class LogicService {
-  
   /**
    * Remove large or unnecessary data from player object before sending to LLM
    */
@@ -373,8 +372,8 @@ export class LogicService {
   }
 
   async processLogic(
-    userContent: string, 
-    storyContent: string, 
+    userContent: string,
+    storyContent: string,
     gameState: any,
     signal?: AbortSignal
   ): Promise<LogicResult> {
@@ -390,20 +389,20 @@ export class LogicService {
         if (e.message === 'Operation aborted by user' || e.name === 'AbortError') throw e;
         console.warn(`Logic process attempt ${attempt} failed:`, e);
       }
-        if (attempt < maxRetries) {
-          // Wait before retry: 1s, 2s, 3s...
-          const delay = attempt * 1000;
-          const toastStore = useToastStore();
-          toastStore.addToast(`逻辑模型处理重试中 (${attempt}/${maxRetries})...`, 'warning', 2000);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
+      if (attempt < maxRetries) {
+        // Wait before retry: 1s, 2s, 3s...
+        const delay = attempt * 1000;
+        const toastStore = useToastStore();
+        toastStore.addToast(`逻辑模型处理重试中 (${attempt}/${maxRetries})...`, 'warning', 2000);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
     }
 
     // If we reach here, all retries failed
     console.error('Logic Processing Failed after all retries:', lastError);
     const toastStore = useToastStore();
     toastStore.addToast(`逻辑模型处理最终失败: ${lastError.message}`, 'error');
-    
+
     // 弹出明显的错误提示
     confirmState.value = {
       isOpen: true,
@@ -416,26 +415,25 @@ export class LogicService {
       },
       resolve: null
     };
-    
+
     // Fallback: return empty result so game doesn't crash
-    return { 
-      actions: [], 
-      quick_replies: [], 
+    return {
+      actions: [],
+      quick_replies: [],
       summary: `Logic Error after ${maxRetries} retries: ${lastError.message}`,
       thinking: `Logic processing failed. Error: ${lastError.message}`
     };
   }
 
   private async _executeLogicRequest(
-    userContent: string, 
-    storyContent: string, 
+    userContent: string,
+    storyContent: string,
     gameState: any,
     signal?: AbortSignal
   ): Promise<LogicResult> {
-    
     const settingsStore = useSettingsStore();
     const config = settingsStore.getEffectiveConfig('logic');
-    
+
     if (!config.apiKey) {
       console.warn('Logic LLM not configured, skipping logic processing.');
       return { thinking: '', actions: [], quick_replies: [], summary: '' };
@@ -446,85 +444,89 @@ export class LogicService {
     // Enhanced: Scan previous 2 turns (approx 4 messages) + current content + predicted characters
     const chatStore = useChatStore();
     const recentMessages = chatStore.messages.slice(-4);
-    const recentContext = recentMessages.map(m => m.content).join('\n');
+    const recentContext = recentMessages.map((m) => m.content).join('\n');
     const predictedCharsList = (gameState.system.predicted_next_round_chars || []).join(', ');
-    const scanText = recentContext + '\n' + userContent + '\n' + storyContent + '\n' + predictedCharsList;
+    const scanText =
+      recentContext + '\n' + userContent + '\n' + storyContent + '\n' + predictedCharsList;
 
     // 1. Get all NPCs already in the runtime state
     const allRuntimeNpcs = gameState.npcs ? Object.values(gameState.npcs) : [];
     const charStore = useCharacterStore();
-    
+
     // 2. Scan text to find mentioned characters (from runtime state OR static lorebook)
     const mentionedNpcMap = new Map<string, any>();
-    
+
     // Strategy A: Check runtime NPCs
     for (const npc of allRuntimeNpcs) {
+      // @ts-expect-error: TODO: fix type error
+      if (npc.name && scanText.includes(npc.name)) {
         // @ts-expect-error: TODO: fix type error
-        if (npc.name && scanText.includes(npc.name)) {
-            // @ts-expect-error: TODO: fix type error
-            mentionedNpcMap.set(npc.id, npc);
-        }
+        mentionedNpcMap.set(npc.id, npc);
+      }
     }
 
     // Strategy B: Check static Lorebook for characters not yet in runtime state OR missing details
     for (const char of charStore.characters) {
-        if (scanText.includes(char.name) || (char.tags && char.tags.some(tag => scanText.includes(tag)))) {
-            if (!mentionedNpcMap.has(char.uuid)) {
-                // Add a "proto-NPC" based on static data (Logic-focused fields only)
-                mentionedNpcMap.set(char.uuid, {
-                    id: char.uuid,
-                    name: char.name,
-                    power: char.initialPower || 'E',
-                    gender: char.gender || 'female',
-                    tags: char.tags || [],
-                    isProto: true // Mark as not yet instantiated in game state
-                });
-            }
+      if (
+        scanText.includes(char.name) ||
+        (char.tags && char.tags.some((tag) => scanText.includes(tag)))
+      ) {
+        if (!mentionedNpcMap.has(char.uuid)) {
+          // Add a "proto-NPC" based on static data (Logic-focused fields only)
+          mentionedNpcMap.set(char.uuid, {
+            id: char.uuid,
+            name: char.name,
+            power: char.initialPower || 'E',
+            gender: char.gender || 'female',
+            tags: char.tags || [],
+            isProto: true // Mark as not yet instantiated in game state
+          });
         }
+      }
     }
 
     // 3. Combine with current scene NPCs
     const currentSceneIds = new Set(gameState.system.current_scene_npcs);
     const relevantNpcs: any[] = [];
-    
+
     // Add current scene NPCs (prioritize runtime state, then Lorebook)
     for (const id of gameState.system.current_scene_npcs) {
-        if (!id) continue;
-        
-        let npcData = gameState.npcs[id];
-        if (!npcData) {
-            // Try to find in Lorebook if missing from runtime state
-            const resolvedId = resolveCharacterId(id, charStore.characters, gameState.npcs);
-            const staticChar = charStore.characters.find(c => c.uuid === resolvedId);
-            if (staticChar) {
-                npcData = {
-                    id: staticChar.uuid,
-                    name: staticChar.name,
-                    power: staticChar.initialPower || 'E',
-                    gender: staticChar.gender || 'female',
-                    tags: staticChar.tags || [],
-                    isProto: true
-                };
-            } else {
-                npcData = { id, name: id };
-            }
+      if (!id) continue;
+
+      let npcData = gameState.npcs[id];
+      if (!npcData) {
+        // Try to find in Lorebook if missing from runtime state
+        const resolvedId = resolveCharacterId(id, charStore.characters, gameState.npcs);
+        const staticChar = charStore.characters.find((c) => c.uuid === resolvedId);
+        if (staticChar) {
+          npcData = {
+            id: staticChar.uuid,
+            name: staticChar.name,
+            power: staticChar.initialPower || 'E',
+            gender: staticChar.gender || 'female',
+            tags: staticChar.tags || [],
+            isProto: true
+          };
+        } else {
+          npcData = { id, name: id };
         }
-        relevantNpcs.push(npcData);
+      }
+      relevantNpcs.push(npcData);
     }
-    
+
     // Add mentioned NPCs that are NOT in the current scene
     for (const [id, npc] of mentionedNpcMap.entries()) {
-        if (!currentSceneIds.has(id)) {
-            relevantNpcs.push(npc);
-        }
+      if (!currentSceneIds.has(id)) {
+        relevantNpcs.push(npc);
+      }
     }
 
     // Inject Difficulty Rules
     const difficulty = gameState.system?.difficulty || 'normal';
     let difficultyRules = '';
-    
+
     if (difficulty === 'gentle') {
-        difficultyRules = `1. **好感度 (Favorability)**:
+      difficultyRules = `1. **好感度 (Favorability)**:
    - 范围：[-100, 100]
    - 默认变化幅度：[-2, +5] (温柔世界：好感度容易提升)
    - 逻辑：NPC性格温和，容易对玩家产生好感。
@@ -538,7 +540,7 @@ export class LogicService {
    - 范围：[-100, 100]
    - 特性：较易获取。行侠仗义或帮助他人即可获得声望。`;
     } else if (difficulty === 'cruel') {
-        difficultyRules = `1. **好感度 (Favorability)**:
+      difficultyRules = `1. **好感度 (Favorability)**:
    - 范围：[-100, 100]
    - 默认变化幅度：[-8, +1] (残酷世界：好感度极难提升)
    - 逻辑：NPC冷漠且多疑，极难建立信任。
@@ -552,7 +554,7 @@ export class LogicService {
    - 范围：[-100, 100]
    - 特性：极难变化。仅在发生震动幻想乡的大事件时才可能变动。`;
     } else {
-        difficultyRules = `1. **好感度 (Favorability)**:
+      difficultyRules = `1. **好感度 (Favorability)**:
    - 范围：[-100, 100]
    - 默认变化幅度：[-5, +2] (除非发生重大事件)
    - 逻辑：好感度很难提升，但容易因为冒犯行为而下降。
@@ -572,19 +574,21 @@ export class LogicService {
     // Inject Multiplayer Rules if active
     const gameStore = useGameStore();
     if (gameStore.multiplayer.isMultiplayer) {
-         finalSystemPrompt = finalSystemPrompt.replace('{{multiplayer_rules}}', MULTIPLAYER_RULES);
-         finalSystemPrompt = finalSystemPrompt.replace('{{multiplayer_actions}}', MULTIPLAYER_ACTION);
+      finalSystemPrompt = finalSystemPrompt.replace('{{multiplayer_rules}}', MULTIPLAYER_RULES);
+      finalSystemPrompt = finalSystemPrompt.replace('{{multiplayer_actions}}', MULTIPLAYER_ACTION);
     } else {
-         finalSystemPrompt = finalSystemPrompt.replace('{{multiplayer_rules}}', '');
-         finalSystemPrompt = finalSystemPrompt.replace('{{multiplayer_actions}}', '');
+      finalSystemPrompt = finalSystemPrompt.replace('{{multiplayer_rules}}', '');
+      finalSystemPrompt = finalSystemPrompt.replace('{{multiplayer_actions}}', '');
     }
 
     const messages = [
-      { role: 'user', content: JSON.stringify({
+      {
+        role: 'user',
+        content: JSON.stringify({
           current_state: {
-             player: this.sanitizePlayer(gameState.player),
-             // Filter NPCs: Send those in current_scene_npcs AND those mentioned in the story
-             scene_npcs: relevantNpcs
+            player: this.sanitizePlayer(gameState.player),
+            // Filter NPCs: Send those in current_scene_npcs AND those mentioned in the story
+            scene_npcs: relevantNpcs
           },
           user_action: userContent,
           story_narrative: storyContent,
@@ -610,8 +614,11 @@ export class LogicService {
       content = content.replace(/<think>[\s\S]*?<\/think>/gi, '');
 
       // Strip Markdown code blocks if present
-      content = content.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
-      
+      content = content
+        .replace(/^```json\s*/, '')
+        .replace(/^```\s*/, '')
+        .replace(/\s*```$/, '');
+
       // Locate the JSON object (first '{' to last '}') to ignore conversational text
       const jsonStart = content.indexOf('{');
       const jsonEnd = content.lastIndexOf('}');
@@ -623,7 +630,7 @@ export class LogicService {
       const sanitizeJson = (str: string): string => {
         // Remove comments (simple C-style)
         str = str.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
-        
+
         let result = '';
         let inString = false;
         let inSingle = false;
@@ -651,30 +658,37 @@ export class LogicService {
             } else if (char === '"') {
               inString = false;
               result += char;
-            } else if (char === '\n') { result += '\\n'; }
-            else if (char === '\r') { result += '\\r'; }
-            else if (char === '\t') { result += '\\t'; }
-            else {
+            } else if (char === '\n') {
+              result += '\\n';
+            } else if (char === '\r') {
+              result += '\\r';
+            } else if (char === '\t') {
+              result += '\\t';
+            } else {
               result += char;
             }
           } else if (inSingle) {
-             if (isEscaped) {
-               isEscaped = false;
-               if (char === "'") result += "'"; // Unescape \' -> '
-               else result += '\\' + char;
-             } else if (char === '\\') {
-               isEscaped = true;
-             } else if (char === "'") {
-               inSingle = false;
-               result += '"'; // Convert single quote end to double
-             } else if (char === '"') {
-               result += '\\"'; // Escape double quote inside
-             } else if (char === '\n') { result += '\\n'; }
-             else if (char === '\r') { result += '\\r'; }
-             else if (char === '\t') { result += '\\t'; }
-             else {
-               result += char;
-             }
+            if (isEscaped) {
+              isEscaped = false;
+              if (char === "'")
+                result += "'"; // Unescape \' -> '
+              else result += '\\' + char;
+            } else if (char === '\\') {
+              isEscaped = true;
+            } else if (char === "'") {
+              inSingle = false;
+              result += '"'; // Convert single quote end to double
+            } else if (char === '"') {
+              result += '\\"'; // Escape double quote inside
+            } else if (char === '\n') {
+              result += '\\n';
+            } else if (char === '\r') {
+              result += '\\r';
+            } else if (char === '\t') {
+              result += '\\t';
+            } else {
+              result += char;
+            }
           }
         }
         return result;
@@ -689,15 +703,14 @@ export class LogicService {
         // If strict parse fails, try one more permissive fix for unquoted keys
         // Use a safer regex that requires preceding '{' or ',' to avoid matching text in strings
         try {
-           const fixed = sanitizedContent.replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3');
-           result = JSON.parse(fixed) as LogicResult;
+          const fixed = sanitizedContent.replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3');
+          result = JSON.parse(fixed) as LogicResult;
         } catch (e2) {
-           throw parseError; // Throw original error if fallback also fails
+          throw parseError; // Throw original error if fallback also fails
         }
       }
 
       return result;
-
     } catch (e: any) {
       // Re-throw to be caught by retry logic in processLogic
       throw e;
@@ -708,7 +721,12 @@ export class LogicService {
    * Generates a narrative description of the combat process based on logs.
    * This uses the Misc Model (LLM4) but with a specific "Narrator" persona.
    */
-  async generateCombatNarrative(combatSummary: string, combatants: Combatant[] = [], contextText: string = '', signal?: AbortSignal): Promise<string> {
+  async generateCombatNarrative(
+    combatSummary: string,
+    combatants: Combatant[] = [],
+    contextText: string = '',
+    signal?: AbortSignal
+  ): Promise<string> {
     if (signal?.aborted) return `(战斗已取消)\n${combatSummary}`;
     const charStore = useCharacterStore();
     const gameStore = useGameStore();
@@ -718,62 +736,69 @@ export class LogicService {
 
       // Inject Context (Pre-combat dialogue)
       if (contextText) {
-          systemPrompt += `\n\n# 战斗前置剧情 (Context)\n以下是触发本次战斗的剧情对话，请根据此语境（如双方的对话、冲突原因、语气）来润色战斗描写，使其自然衔接：\n"""\n${contextText}\n"""\n`;
+        systemPrompt += `\n\n# 战斗前置剧情 (Context)\n以下是触发本次战斗的剧情对话，请根据此语境（如双方的对话、冲突原因、语气）来润色战斗描写，使其自然衔接：\n"""\n${contextText}\n"""\n`;
       }
 
       // Inject Player Persona
       const player = gameStore.state.player;
       if (player) {
-          let playerDesc = "暂无详细设定";
-          let playerGlobalSetting = "无特殊设定";
-          const rawPersona = player.persona || "";
+        let playerDesc = '暂无详细设定';
+        let playerGlobalSetting = '无特殊设定';
+        const rawPersona = player.persona || '';
 
-          // If persona is JSON, extract text like we did in PromptBuilder/PromptService
-          try {
-             const jsonObj = JSON.parse(rawPersona);
-             
-             // 1. Text Persona
-             if (jsonObj["详细人设"]) playerDesc = jsonObj["详细人设"];
-             else if (jsonObj["补充设定"]) playerDesc = jsonObj["补充设定"];
-             else playerDesc = "无特殊描述";
+        // If persona is JSON, extract text like we did in PromptBuilder/PromptService
+        try {
+          const jsonObj = JSON.parse(rawPersona);
 
-             // 2. Global Setting
-             const settingObj = { ...jsonObj };
-             if ('详细人设' in settingObj) delete settingObj['详细人设'];
-             if ('补充设定' in settingObj) delete settingObj['补充设定'];
-             playerGlobalSetting = JSON.stringify(settingObj, null, 2);
+          // 1. Text Persona
+          if (jsonObj['详细人设']) playerDesc = jsonObj['详细人设'];
+          else if (jsonObj['补充设定']) playerDesc = jsonObj['补充设定'];
+          else playerDesc = '无特殊描述';
 
-          } catch(e) {
-             // Not JSON, use as is
-             playerDesc = rawPersona;
-          }
-          
-          systemPrompt += `\n\n# 主角人设 (Player Persona)\n姓名：${player.name}\n描述：${playerDesc}\n`;
-          systemPrompt += `\n## 全局用户设定 (玩家背景/世界信息)\n${playerGlobalSetting}\n`;
+          // 2. Global Setting
+          const settingObj = { ...jsonObj };
+          if ('详细人设' in settingObj) delete settingObj['详细人设'];
+          if ('补充设定' in settingObj) delete settingObj['补充设定'];
+          playerGlobalSetting = JSON.stringify(settingObj, null, 2);
+        } catch (e) {
+          // Not JSON, use as is
+          playerDesc = rawPersona;
+        }
+
+        systemPrompt += `\n\n# 主角人设 (Player Persona)\n姓名：${player.name}\n描述：${playerDesc}\n`;
+        systemPrompt += `\n## 全局用户设定 (玩家背景/世界信息)\n${playerGlobalSetting}\n`;
       }
-      
-      if (combatants && combatants.length > 0) {
-        systemPrompt += "\n\n# 战斗场景其他角色人设 (Other Characters)\n请在描写中参考以下角色的性格与外貌设定：\n";
-        
-        for (const c of combatants) {
-           // Skip Player if they are in the list (handled above)
-           if (c.isPlayer) continue;
 
-           // Try to find static data in Lorebook
-           const resolvedId = resolveCharacterId(c.id || c.name, charStore.characters, gameStore.state.npcs);
-           const staticChar = charStore.characters.find(ch => ch.uuid === resolvedId);
-           
-           const desc = staticChar?.description || "暂无详细设定";
-           // Truncate desc if too long
-           const safeDesc = desc.length > 300 ? desc.substring(0, 300) + "..." : desc;
-           
-           systemPrompt += `- **${c.name}**: ${safeDesc}\n`;
+      if (combatants && combatants.length > 0) {
+        systemPrompt +=
+          '\n\n# 战斗场景其他角色人设 (Other Characters)\n请在描写中参考以下角色的性格与外貌设定：\n';
+
+        for (const c of combatants) {
+          // Skip Player if they are in the list (handled above)
+          if (c.isPlayer) continue;
+
+          // Try to find static data in Lorebook
+          const resolvedId = resolveCharacterId(
+            c.id || c.name,
+            charStore.characters,
+            gameStore.state.npcs
+          );
+          const staticChar = charStore.characters.find((ch) => ch.uuid === resolvedId);
+
+          const desc = staticChar?.description || '暂无详细设定';
+          // Truncate desc if too long
+          const safeDesc = desc.length > 300 ? desc.substring(0, 300) + '...' : desc;
+
+          systemPrompt += `- **${c.name}**: ${safeDesc}\n`;
         }
       }
 
       // 1. Call API (Using LLM4 / Misc Model)
       // Note: We use 'misc' (LLM4) for text polishing as requested
-      console.log('[LogicService] Generating combat narrative. Summary:', combatSummary.substring(0, 100) + '...');
+      console.log(
+        '[LogicService] Generating combat narrative. Summary:',
+        combatSummary.substring(0, 100) + '...'
+      );
       const content = await generateCompletion({
         modelType: 'misc',
         systemPrompt,
@@ -782,18 +807,19 @@ export class LogicService {
         max_tokens: 3000,
         signal
       });
-      
+
       console.log('[LogicService] LLM4 Raw Output Length:', content?.length || 0);
       const trimmedContent = (content || '').trim();
-      
+
       if (!trimmedContent) {
-        console.warn('[LogicService] LLM4 returned empty content! Falling back to original summary.');
+        console.warn(
+          '[LogicService] LLM4 returned empty content! Falling back to original summary.'
+        );
         return `(系统提示：战斗描写生成为空，以下是战斗结算信息)\n${combatSummary}`;
       }
 
       console.log('[LogicService] Successfully generated narrative.');
       return trimmedContent;
-
     } catch (e: any) {
       console.error('Combat Narration Failed:', e);
       const toastStore = useToastStore();

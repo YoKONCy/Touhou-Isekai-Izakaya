@@ -6,35 +6,54 @@ import { useGameStore } from '@/stores/game';
 
 // 1. Power Level Base Damage Configuration
 const POWER_LEVEL_DAMAGE: Record<PowerLevel, number> = {
-  "∞": 999,
-  "OMEGA": 150,
-  "UX": 120,
-  "EX": 100,
-  "US": 90,
-  "SSS": 80,
-  "SS": 70,
-  "S+": 65,
-  "S": 60,
-  "A+": 54,
-  "A": 50,
-  "B+": 46,
-  "B": 42,
-  "C+": 39,
-  "C": 36,
-  "D+": 33,
-  "D": 30,
-  "E+": 28,
-  "E": 26,
-  "F+": 24,
-  "F": 22,
-  "F-": 20
+  '∞': 999,
+  OMEGA: 150,
+  UX: 120,
+  EX: 100,
+  US: 90,
+  SSS: 80,
+  SS: 70,
+  'S+': 65,
+  S: 60,
+  'A+': 54,
+  A: 50,
+  'B+': 46,
+  B: 42,
+  'C+': 39,
+  C: 36,
+  'D+': 33,
+  D: 30,
+  'E+': 28,
+  E: 26,
+  'F+': 24,
+  F: 22,
+  'F-': 20
 };
 
 // Rank mapping for level difference calculation (Index 0 is highest)
 const POWER_RANKS: PowerLevel[] = [
-  "∞", "OMEGA", "UX", "EX", "US", "SSS", "SS", "S+", "S", 
-  "A+", "A", "B+", "B", "C+", "C", "D+", "D", "E+", "E", 
-  "F+", "F", "F-"
+  '∞',
+  'OMEGA',
+  'UX',
+  'EX',
+  'US',
+  'SSS',
+  'SS',
+  'S+',
+  'S',
+  'A+',
+  'A',
+  'B+',
+  'B',
+  'C+',
+  'C',
+  'D+',
+  'D',
+  'E+',
+  'E',
+  'F+',
+  'F',
+  'F-'
 ];
 
 export function getBaseDamage(level: PowerLevel): number {
@@ -54,7 +73,7 @@ import { applyStatModifiers, applyLifecycleHook, checkMechanic } from './combatM
 export function getEffectiveStats(combatant: Combatant) {
   const dodgeMod = 0;
   let atkMod = 1.0;
-  let defMod = 1.0; 
+  let defMod = 1.0;
 
   // --- Base Stat Initialization ---
   let baseDodge = combatant.dodgeRate !== undefined ? combatant.dodgeRate : 0.15;
@@ -62,9 +81,9 @@ export function getEffectiveStats(combatant: Combatant) {
   // --- Proficiency Dodge (Player Only) ---
   // Base Dodge scales from 5% (Lv1) to 30% (Lv100)
   if (combatant.isPlayer && combatant.combatLevel) {
-      const level = Math.max(1, Math.min(100, combatant.combatLevel));
-      // 0.05 + 0.25 * ((L-1)/99)
-      baseDodge = 0.05 + 0.25 * ((level - 1) / 99);
+    const level = Math.max(1, Math.min(100, combatant.combatLevel));
+    // 0.05 + 0.25 * ((L-1)/99)
+    baseDodge = 0.05 + 0.25 * ((level - 1) / 99);
   }
 
   // --- Modifier Hooks ---
@@ -72,13 +91,13 @@ export function getEffectiveStats(combatant: Combatant) {
   baseDodge = applyStatModifiers(baseDodge, 'onCalculateDodge', combatant, context);
   atkMod = applyStatModifiers(atkMod, 'onCalculateAtk', combatant, context);
   defMod = applyStatModifiers(defMod, 'onCalculateDef', combatant, context);
-  
+
   // New: P-Point Gain Modifier
   const pGainMod = applyStatModifiers(1.0, 'onCalculatePPointGain', combatant, context);
-  
+
   // New: Max AP Modifier
   const maxAp = applyStatModifiers(2, 'onCalculateApMax', combatant, context);
-  
+
   return {
     dodgeRate: Math.min(1.0, Math.max(0, baseDodge + dodgeMod)),
     atkMod: Math.max(0, atkMod),
@@ -94,30 +113,30 @@ export function calculatePPointGain(attacker: Combatant, damageDealt: number): n
   const basePowerVal = getBaseDamage(attacker.power);
   // Formula: 2 + 8 * (Base / Damage)
   let gain = 2 + 8 * (basePowerVal / damageDealt);
-  
+
   // Apply Modifiers (e.g., 厚积薄发)
   const stats = getEffectiveStats(attacker);
   gain *= stats.pGainMod;
-  
+
   // Cap at 30 to prevent explosion from very low damage or division by zero
   return Math.min(30, Math.max(0, gain));
 }
 
 export function calculateDamage(
-  attacker: Combatant, 
-  defender: Combatant, 
+  attacker: Combatant,
+  defender: Combatant,
   spell?: SpellCard
 ): DamageResult {
   const context = { attacker, defender, spell };
   const isCrit = false;
   let description = '';
-  
+
   // 0. Handle Non-Attack Types
   if (spell) {
     if (['buff', 'shield', 'heal'].includes(spell.type || '')) {
       return {
         damage: 0,
-        heal: spell.type === 'heal' ? (spell.damage || 0) : 0,
+        heal: spell.type === 'heal' ? spell.damage || 0 : 0,
         isCrit: false,
         isHit: true,
         description: `${attacker.name} 使用了【${spell.name}】，${spell.description || '施加了支援效果'}。`
@@ -131,37 +150,41 @@ export function calculateDamage(
 
   // Check Dodge
   let hitRate = 0; // Default attack hit rate bonus (0 for normal attack)
-  
+
   if (spell) {
-     if (typeof spell.hitRate === 'number') {
-       hitRate = spell.hitRate;
-     } else {
-       // Default Logic: Ultimate = 100%, Normal Spell = 10%
-       hitRate = spell.isUltimate ? 1.0 : 0.1; 
-     }
-   }
+    if (typeof spell.hitRate === 'number') {
+      hitRate = spell.hitRate;
+    } else {
+      // Default Logic: Ultimate = 100%, Normal Spell = 10%
+      hitRate = spell.isUltimate ? 1.0 : 0.1;
+    }
+  }
 
   // Effective Dodge Rate = Defender Dodge - Hit Rate
   const effectiveDodgeRate = Math.max(0, defStats.dodgeRate - hitRate);
 
   if (Math.random() < effectiveDodgeRate) {
-       // New: After Dodge Hook (e.g., 反击架势)
-       applyLifecycleHook('onAfterDodge', defender, { ...context, attacker: defender, defender: attacker });
+    // New: After Dodge Hook (e.g., 反击架势)
+    applyLifecycleHook('onAfterDodge', defender, {
+      ...context,
+      attacker: defender,
+      defender: attacker
+    });
 
-       return {
-        damage: 0,
-        heal: 0,
-        isCrit: false,
-        isHit: false, // Miss
-        description: `${attacker.name} 的攻击被 ${defender.name} 闪避了！`
-      };
+    return {
+      damage: 0,
+      heal: 0,
+      isCrit: false,
+      isHit: false, // Miss
+      description: `${attacker.name} 的攻击被 ${defender.name} 闪避了！`
+    };
   }
 
   // 1. Base Damage Calculation
   // Combine Power Level Base + Spell Flat Damage (before level suppression)
   const powerBaseDmg = getBaseDamage(attacker.power);
-  const spellFlatDmg = (spell && spell.damage) ? spell.damage : 0;
-  
+  const spellFlatDmg = spell && spell.damage ? spell.damage : 0;
+
   let totalBaseDmg = powerBaseDmg + spellFlatDmg;
 
   // New: Apply Flat Damage Modifiers (e.g., 力量训练)
@@ -172,26 +195,26 @@ export function calculateDamage(
   // Range: x1.0 (Lv1) to x1.5 (Lv100)
   if (attacker.isPlayer && attacker.combatLevel) {
     const level = Math.max(1, Math.min(100, attacker.combatLevel));
-    
+
     // New: Spell Level Bonus (e.g., 符卡掌握)
     let effectiveSpellLevel = level;
     if (spell) {
-       effectiveSpellLevel = applyStatModifiers(level, 'onCalculateSpellLevel', attacker, context);
-       effectiveSpellLevel = Math.min(100, effectiveSpellLevel); // Still capped at 100 for formula
+      effectiveSpellLevel = applyStatModifiers(level, 'onCalculateSpellLevel', attacker, context);
+      effectiveSpellLevel = Math.min(100, effectiveSpellLevel); // Still capped at 100 for formula
     }
 
     const profMod = 1.0 + 0.5 * ((effectiveSpellLevel - 1) / 99);
     totalBaseDmg *= profMod;
   }
   // ------------------------------------------
-  
+
   // 2. Level Difference Modifier (Recursive)
   const attackerRankIndex = POWER_RANKS.indexOf(attacker.power);
   const defenderRankIndex = POWER_RANKS.indexOf(defender.power);
   const rankDiff = attackerRankIndex - defenderRankIndex; // Negative = Attacker Stronger
-  
+
   let rankModifier = 1.0;
-  
+
   // New: Check if Level Suppression should be ignored (e.g., 裁决天平)
   const ignoreSuppression = checkMechanic('shouldIgnoreSuppression', attacker, context);
 
@@ -222,34 +245,34 @@ export function calculateDamage(
 
   // New: P-Point Bonus Calculation with Crit Hooks
   if (attacker.pPoints && attacker.pPoints > 0) {
-      const pRatio = Math.min(100, attacker.pPoints) / 100;
-      
-      let maxBonus = 0.5; // Default 50% for enemies/NPCs
-      if (attacker.isPlayer && attacker.combatLevel) {
-          const level = Math.max(1, Math.min(100, attacker.combatLevel));
-          
-          // New: Spell Level Bonus also applies to P-Point Max Bonus calculation
-          let effectiveSpellLevel = level;
-          if (spell) {
-             effectiveSpellLevel = applyStatModifiers(level, 'onCalculateSpellLevel', attacker, context);
-             effectiveSpellLevel = Math.min(100, effectiveSpellLevel);
-          }
+    const pRatio = Math.min(100, attacker.pPoints) / 100;
 
-          // 0.2 + 0.6 * ((L-1)/99) -> 0.2 to 0.8
-          maxBonus = 0.2 + 0.6 * ((effectiveSpellLevel - 1) / 99);
+    let maxBonus = 0.5; // Default 50% for enemies/NPCs
+    if (attacker.isPlayer && attacker.combatLevel) {
+      const level = Math.max(1, Math.min(100, attacker.combatLevel));
+
+      // New: Spell Level Bonus also applies to P-Point Max Bonus calculation
+      let effectiveSpellLevel = level;
+      if (spell) {
+        effectiveSpellLevel = applyStatModifiers(level, 'onCalculateSpellLevel', attacker, context);
+        effectiveSpellLevel = Math.min(100, effectiveSpellLevel);
       }
 
-      // New: Crit Damage Modifier (e.g., 暴击强化)
-      // Note: Our system uses P-points to simulate "critical power".
-      let critMod = applyStatModifiers(1.0, 'onCalculateCritDmg', attacker, context);
-      
-      // New: Defender Crit Resist (e.g., 强韧肉体)
-      critMod = applyStatModifiers(critMod, 'onCalculateCritDmgTaken', defender, context);
+      // 0.2 + 0.6 * ((L-1)/99) -> 0.2 to 0.8
+      maxBonus = 0.2 + 0.6 * ((effectiveSpellLevel - 1) / 99);
+    }
 
-      maxBonus *= critMod;
+    // New: Crit Damage Modifier (e.g., 暴击强化)
+    // Note: Our system uses P-points to simulate "critical power".
+    let critMod = applyStatModifiers(1.0, 'onCalculateCritDmg', attacker, context);
 
-      const pBonus = pRatio * maxBonus; 
-      finalDamage *= (1 + pBonus);
+    // New: Defender Crit Resist (e.g., 强韧肉体)
+    critMod = applyStatModifiers(critMod, 'onCalculateCritDmgTaken', defender, context);
+
+    maxBonus *= critMod;
+
+    const pBonus = pRatio * maxBonus;
+    finalDamage *= 1 + pBonus;
   }
 
   // New: Apply Base Damage Hook (after P-Point bonus but before defense)
@@ -258,8 +281,8 @@ export function calculateDamage(
   // Random Fluctuation for Normal Attacks (0.85 ~ 1.15)
   // Now applies to everyone for consistency, but only for normal attacks
   if (!spell) {
-      const fluctuation = 0.85 + Math.random() * 0.30;
-      finalDamage *= fluctuation;
+    const fluctuation = 0.85 + Math.random() * 0.3;
+    finalDamage *= fluctuation;
   }
 
   // Apply Defense/Damage Reduction Buffs
@@ -272,44 +295,44 @@ export function calculateDamage(
   // Favorability <= 0: 2.5x (Max Vulnerability)
   // Favorability >= 100: 1.0x (No Vulnerability)
   if (!defender.isPlayer && defender.team === 'player') {
-      let multiplier = 2.5;
-      try {
-          const gameStore = useGameStore();
-          const npc = gameStore.state.npcs[defender.id];
-          if (npc) {
-              const fav = npc.favorability || 0;
-              if (fav >= 100) {
-                  multiplier = 1.0;
-              } else if (fav <= 0) {
-                  multiplier = 2.5;
-              } else {
-                  // Linear interpolation: 0 -> 2.5, 100 -> 1.0
-                  multiplier = 2.5 - (fav / 100) * 1.5;
-              }
-          }
-      } catch (e) {
-          // Ignore
+    let multiplier = 2.5;
+    try {
+      const gameStore = useGameStore();
+      const npc = gameStore.state.npcs[defender.id];
+      if (npc) {
+        const fav = npc.favorability || 0;
+        if (fav >= 100) {
+          multiplier = 1.0;
+        } else if (fav <= 0) {
+          multiplier = 2.5;
+        } else {
+          // Linear interpolation: 0 -> 2.5, 100 -> 1.0
+          multiplier = 2.5 - (fav / 100) * 1.5;
+        }
       }
-      finalDamage *= multiplier;
+    } catch (e) {
+      // Ignore
+    }
+    finalDamage *= multiplier;
   }
 
   // --- World Difficulty Correction ---
   if (attacker.isPlayer) {
-      try {
-          const gameStore = useGameStore();
-          const difficulty = gameStore.state.system.difficulty || 'normal';
-          
-          if (difficulty === 'normal') {
-              // -5% correction
-              finalDamage *= 0.95;
-          } else if (difficulty === 'cruel') {
-              // -15% correction
-              finalDamage *= 0.85; 
-          }
-          // gentle: no correction
-      } catch (e) {
-          // Ignore if store not available (e.g. unit testing)
+    try {
+      const gameStore = useGameStore();
+      const difficulty = gameStore.state.system.difficulty || 'normal';
+
+      if (difficulty === 'normal') {
+        // -5% correction
+        finalDamage *= 0.95;
+      } else if (difficulty === 'cruel') {
+        // -15% correction
+        finalDamage *= 0.85;
       }
+      // gentle: no correction
+    } catch (e) {
+      // Ignore if store not available (e.g. unit testing)
+    }
   }
 
   finalDamage = Math.floor(finalDamage);
@@ -365,73 +388,78 @@ export async function processPersuasion(
   // 1. Fetch Character Personas
   const charStore = useCharacterStore();
   const gameStore = useGameStore();
-  
+
   if (charStore.characters.length === 0) {
-      await charStore.loadCharacters();
+    await charStore.loadCharacters();
   }
-  
+
   const getPersona = (name: string, id?: string) => {
     // Resolve ID properly using service
     const resolvedId = resolveCharacterId(id || name, charStore.characters, gameStore.state.npcs);
-    
+
     // Find using resolved ID
-    const char = charStore.characters.find(c => c.uuid === resolvedId);
-    
-    return char?.description ? char.description.slice(0, 500) + (char.description.length > 500 ? '...' : '') : "暂无详细设定";
+    const char = charStore.characters.find((c) => c.uuid === resolvedId);
+
+    return char?.description
+      ? char.description.slice(0, 500) + (char.description.length > 500 ? '...' : '')
+      : '暂无详细设定';
   };
 
   // Logic for Player Persona (from GameStore)
-  let playerPersonaText = "暂无详细设定";
-  let playerGlobalSetting = "无特殊设定";
-  
+  let playerPersonaText = '暂无详细设定';
+  let playerGlobalSetting = '无特殊设定';
+
   const playerState = gameStore.state.player;
   if (playerState) {
-      const rawPersona = playerState.persona || "";
-      
-      // Try parsing JSON
-      try {
-          const jsonObj = JSON.parse(rawPersona);
-          
-          // 1. Text Persona (user_persona)
-          if (jsonObj["详细人设"]) {
-              playerPersonaText = jsonObj["详细人设"];
-          } else if (jsonObj["补充设定"]) {
-              playerPersonaText = jsonObj["补充设定"];
-          } else {
-              // If purely JSON settings, maybe use raw string or default
-               playerPersonaText = "无特殊描述";
-          }
-          
-          // 2. Global Setting (global_user_setting)
-          // Clone to avoid modifying original
-          const settingObj = { ...jsonObj };
-          if ('详细人设' in settingObj) delete settingObj['详细人设'];
-          if ('补充设定' in settingObj) delete settingObj['补充设定'];
-          
-          playerGlobalSetting = JSON.stringify(settingObj, null, 2);
-          
-      } catch (e) {
-          // Plain text
-          playerPersonaText = rawPersona;
-      }
-  }
-  
-  const enemyPersonas = enemies.map((e, idx) => 
-    `### [${idx}] ${e.name}\n${getPersona(e.name, e.id)}`
-  ).join('\n\n');
+    const rawPersona = playerState.persona || '';
 
-  const allyPersonas = allies.length > 0 ? allies.map((a, idx) => 
-    `### [${idx}] ${a.name}\n${getPersona(a.name, a.id)}`
-  ).join('\n\n') : "无友军";
+    // Try parsing JSON
+    try {
+      const jsonObj = JSON.parse(rawPersona);
+
+      // 1. Text Persona (user_persona)
+      if (jsonObj['详细人设']) {
+        playerPersonaText = jsonObj['详细人设'];
+      } else if (jsonObj['补充设定']) {
+        playerPersonaText = jsonObj['补充设定'];
+      } else {
+        // If purely JSON settings, maybe use raw string or default
+        playerPersonaText = '无特殊描述';
+      }
+
+      // 2. Global Setting (global_user_setting)
+      // Clone to avoid modifying original
+      const settingObj = { ...jsonObj };
+      if ('详细人设' in settingObj) delete settingObj['详细人设'];
+      if ('补充设定' in settingObj) delete settingObj['补充设定'];
+
+      playerGlobalSetting = JSON.stringify(settingObj, null, 2);
+    } catch (e) {
+      // Plain text
+      playerPersonaText = rawPersona;
+    }
+  }
+
+  const enemyPersonas = enemies
+    .map((e, idx) => `### [${idx}] ${e.name}\n${getPersona(e.name, e.id)}`)
+    .join('\n\n');
+
+  const allyPersonas =
+    allies.length > 0
+      ? allies.map((a, idx) => `### [${idx}] ${a.name}\n${getPersona(a.name, a.id)}`).join('\n\n')
+      : '无友军';
 
   // 2. Build Prompt
-  const enemyDescriptions = enemies.map((e, idx) => 
-    `[${idx}] ${e.name} (HP: ${e.hp}/${e.maxHp}, Power: ${e.power})`
-  ).join('\n');
+  const enemyDescriptions = enemies
+    .map((e, idx) => `[${idx}] ${e.name} (HP: ${e.hp}/${e.maxHp}, Power: ${e.power})`)
+    .join('\n');
 
-  const allyDescriptions = allies.length > 0 ? allies.map((a, idx) => 
-    `[${idx}] ${a.name} (HP: ${a.hp}/${a.maxHp}, Power: ${a.power})`
-  ).join('\n') : "无";
+  const allyDescriptions =
+    allies.length > 0
+      ? allies
+          .map((a, idx) => `[${idx}] ${a.name} (HP: ${a.hp}/${a.maxHp}, Power: ${a.power})`)
+          .join('\n')
+      : '无';
 
   const systemPrompt = `角色: 战斗裁判 (东方Project宇宙)
 任务: 基于东方Project的设定和逻辑，评估玩家在战斗中“交谈/嘴炮”行动的效果。
@@ -548,7 +576,7 @@ ${allyDescriptions}
     });
 
     console.log('[CombatLogic] Raw response from LLM4:', response);
-    
+
     // Clean response: remove Markdown code blocks and conversational text
     let cleaned = response.trim();
     if (cleaned.includes('```')) {
@@ -557,7 +585,7 @@ ${allyDescriptions}
         cleaned = match[1].trim();
       }
     }
-    
+
     // Find first '{' and last '}' to isolate JSON object
     const firstBrace = cleaned.indexOf('{');
     const lastBrace = cleaned.lastIndexOf('}');

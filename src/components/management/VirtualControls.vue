@@ -38,7 +38,7 @@ function handleTouchStart(e: TouchEvent) {
 function handleTouchMove(e: TouchEvent) {
   if (touchId.value === null) return;
 
-  const touch = Array.from(e.changedTouches).find(t => t.identifier === touchId.value);
+  const touch = Array.from(e.changedTouches).find((t) => t.identifier === touchId.value);
   if (!touch) return;
 
   updatePosition(touch);
@@ -46,7 +46,7 @@ function handleTouchMove(e: TouchEvent) {
 }
 
 function handleTouchEnd(e: TouchEvent) {
-  const touch = Array.from(e.changedTouches).find(t => t.identifier === touchId.value);
+  const touch = Array.from(e.changedTouches).find((t) => t.identifier === touchId.value);
   if (!touch) return;
 
   touchId.value = null;
@@ -130,10 +130,7 @@ function preventScroll(e: TouchEvent) {
     </div>
 
     <!-- Action Button -->
-    <button
-      class="action-button"
-      @touchstart.prevent="emit('action')"
-    >
+    <button class="action-button" @touchstart.prevent="emit('action')">
       <span class="action-icon">✋</span>
       <span class="action-label">互动</span>
     </button>
@@ -209,16 +206,32 @@ function preventScroll(e: TouchEvent) {
   color: rgba(255, 255, 255, 0.4);
 }
 
-.arrow.up { top: 0; left: 50%; transform: translateX(-50%); }
-.arrow.right { right: 0; top: 50%; transform: translateY(-50%); }
-.arrow.down { bottom: 0; left: 50%; transform: translateX(-50%); }
-.arrow.left { left: 0; top: 50%; transform: translateY(-50%); }
+.arrow.up {
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.arrow.right {
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.arrow.down {
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.arrow.left {
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
 
 .action-button {
   pointer-events: auto;
   width: 80px;
   height: 80px;
-  background: linear-gradient(135deg, #4CAF50, #43A047);
+  background: linear-gradient(135deg, #4caf50, #43a047);
   border-radius: 50%;
   border: 3px solid rgba(255, 255, 255, 0.5);
   display: flex;

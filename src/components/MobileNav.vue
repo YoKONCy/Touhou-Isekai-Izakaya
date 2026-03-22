@@ -22,10 +22,10 @@ const navItems = [
   { id: 'status', icon: User, label: '状态' },
   { id: 'map', icon: Map, label: '地图' },
   { id: 'characters', icon: Users, label: '角色' },
-  { id: 'quests', icon: ListTodo, label: '任务' },
+  { id: 'quests', icon: ListTodo, label: '任务' }
 ] as const;
 
-function handleNavClick(panel: typeof navItems[number]['id']) {
+function handleNavClick(panel: (typeof navItems)[number]['id']) {
   audioManager.playSoftClick();
   emit('switch-panel', panel);
 }
@@ -33,7 +33,9 @@ function handleNavClick(panel: typeof navItems[number]['id']) {
 
 <template>
   <!-- Bottom Navigation Bar - Mobile Only -->
-  <nav class="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-izakaya-paper/95 backdrop-blur-md border-t-2 border-izakaya-wood/20 safe-area-bottom">
+  <nav
+    class="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-izakaya-paper/95 backdrop-blur-md border-t-2 border-izakaya-wood/20 safe-area-bottom"
+  >
     <div class="flex items-center justify-around h-16 px-2">
       <button
         v-for="item in navItems"

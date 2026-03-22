@@ -36,7 +36,7 @@ function createPetal(width: number, height: number, randomY = false): Petal {
     rotation: Math.random() * 360,
     rotationSpeed: (Math.random() - 0.5) * 2,
     size: Math.random() * 8 + 6,
-    opacity: Math.random() * 0.4 + 0.3,
+    opacity: Math.random() * 0.4 + 0.3
   };
 }
 
@@ -45,22 +45,22 @@ function drawPetal(ctx: CanvasRenderingContext2D, p: Petal) {
   ctx.translate(p.x, p.y);
   ctx.rotate((p.rotation * Math.PI) / 180);
   ctx.globalAlpha = p.opacity;
-  
+
   // 绘制樱花瓣形状
   ctx.beginPath();
   ctx.moveTo(0, 0);
   // 使用贝塞尔曲线绘制花瓣
   ctx.bezierCurveTo(p.size / 2, -p.size / 2, p.size, 0, 0, p.size);
   ctx.bezierCurveTo(-p.size, 0, -p.size / 2, -p.size / 2, 0, 0);
-  
+
   // 樱花粉色渐变
   const gradient = ctx.createLinearGradient(-p.size, -p.size, 0, p.size);
   gradient.addColorStop(0, '#FFCDD2'); // touhou-red-light
   gradient.addColorStop(1, '#E1BEE7'); // 淡紫色
-  
+
   ctx.fillStyle = gradient;
   ctx.fill();
-  
+
   ctx.restore();
 }
 
@@ -68,18 +68,18 @@ function animate() {
   if (!canvas.value) return;
   const ctx = canvas.value.getContext('2d');
   if (!ctx) return;
-  
+
   const width = canvas.value.width;
   const height = canvas.value.height;
-  
+
   ctx.clearRect(0, 0, width, height);
-  
+
   // Update and draw petals
   petals.forEach((p, index) => {
     p.x += p.vx * p.z;
     p.y += p.vy * p.z;
     p.rotation += p.rotationSpeed;
-    
+
     // 简单的风力扰动
     p.vx += (Math.random() - 0.5) * 0.05;
     // 限制最大水平速度
@@ -87,13 +87,13 @@ function animate() {
     if (p.vx < -2) p.vx = -2;
 
     drawPetal(ctx, p);
-    
+
     // Reset if out of bounds
     if (p.y > height + 20 || p.x > width + 20 || p.x < -20) {
       petals[index] = createPetal(width, height);
     }
   });
-  
+
   animationId = requestAnimationFrame(animate);
 }
 
@@ -110,8 +110,8 @@ function handleMouseMove(e: MouseEvent) {
   const mouseX = e.clientX;
   const centerX = window.innerWidth / 2;
   // 简单的风力影响
-  const wind = (mouseX - centerX) / centerX * 0.05;
-  petals.forEach(p => {
+  const wind = ((mouseX - centerX) / centerX) * 0.05;
+  petals.forEach((p) => {
     p.vx += wind * 0.01;
   });
 }
@@ -122,7 +122,7 @@ onMounted(() => {
     canvas.value.height = window.innerHeight;
     initPetals(window.innerWidth, window.innerHeight);
     animate();
-    
+
     window.addEventListener('resize', handleResize);
     window.addEventListener('mousemove', handleMouseMove);
   }
@@ -136,9 +136,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <canvas 
-    ref="canvas" 
+  <canvas
+    ref="canvas"
     class="fixed inset-0 pointer-events-none z-0 opacity-60"
-    style="mix-blend-mode: multiply;"
+    style="mix-blend-mode: multiply"
   ></canvas>
 </template>

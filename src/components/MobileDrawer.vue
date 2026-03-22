@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import {
-  X, Settings, Save, Book, Database, Blocks, HelpCircle,
+  X,
+  Settings,
+  Save,
+  Book,
+  Database,
+  Blocks,
+  HelpCircle,
   ChevronRight
 } from 'lucide-vue-next';
 import { audioManager } from '@/services/audio';
@@ -22,15 +28,51 @@ const emit = defineEmits<{
 }>();
 
 const menuItems = [
-  { id: 'save', icon: Save, label: '存档管理', description: '切换/管理游戏存档', event: 'open-save-manager' },
-  { id: 'char', icon: Book, label: '条目编辑器', description: 'Lorebook 角色设定', event: 'open-char-editor' },
-  { id: 'memory', icon: Database, label: '记忆库', description: '管理游戏记忆', event: 'open-memory-panel' },
-  { id: 'prompt', icon: Blocks, label: '提示词拼接', description: '调整提示词结构', event: 'open-prompt-builder' },
-  { id: 'help', icon: HelpCircle, label: '帮助与引导', description: '游戏操作指南', event: 'open-help' },
-  { id: 'settings', icon: Settings, label: '设置', description: 'API 与系统设置', event: 'open-settings' },
+  {
+    id: 'save',
+    icon: Save,
+    label: '存档管理',
+    description: '切换/管理游戏存档',
+    event: 'open-save-manager'
+  },
+  {
+    id: 'char',
+    icon: Book,
+    label: '条目编辑器',
+    description: 'Lorebook 角色设定',
+    event: 'open-char-editor'
+  },
+  {
+    id: 'memory',
+    icon: Database,
+    label: '记忆库',
+    description: '管理游戏记忆',
+    event: 'open-memory-panel'
+  },
+  {
+    id: 'prompt',
+    icon: Blocks,
+    label: '提示词拼接',
+    description: '调整提示词结构',
+    event: 'open-prompt-builder'
+  },
+  {
+    id: 'help',
+    icon: HelpCircle,
+    label: '帮助与引导',
+    description: '游戏操作指南',
+    event: 'open-help'
+  },
+  {
+    id: 'settings',
+    icon: Settings,
+    label: '设置',
+    description: 'API 与系统设置',
+    event: 'open-settings'
+  }
 ] as const;
 
-function handleMenuClick(event: typeof menuItems[number]['event']) {
+function handleMenuClick(event: (typeof menuItems)[number]['event']) {
   audioManager.playPageFlip();
   emit(event as any);
   emit('close');
@@ -95,7 +137,9 @@ function handleTouchEnd() {
         <div class="absolute inset-0 pointer-events-none opacity-20 bg-texture-rice-paper"></div>
 
         <!-- Header -->
-        <div class="relative z-10 flex items-center justify-between p-4 border-b border-izakaya-wood/10 bg-touhou-red/5">
+        <div
+          class="relative z-10 flex items-center justify-between p-4 border-b border-izakaya-wood/10 bg-touhou-red/5"
+        >
           <div class="flex items-center gap-2">
             <span class="text-xl">⛩️</span>
             <span class="font-display font-bold text-izakaya-wood">菜单</span>
@@ -116,18 +160,27 @@ function handleTouchEnd() {
             @click="handleMenuClick(item.event)"
             class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/50 active:bg-white/80 transition-colors group"
           >
-            <div class="w-10 h-10 rounded-lg bg-white/60 border border-izakaya-wood/10 flex items-center justify-center group-hover:border-touhou-red/30 group-hover:bg-white transition-colors">
-              <component :is="item.icon" class="w-5 h-5 text-izakaya-wood/70 group-hover:text-touhou-red transition-colors" />
+            <div
+              class="w-10 h-10 rounded-lg bg-white/60 border border-izakaya-wood/10 flex items-center justify-center group-hover:border-touhou-red/30 group-hover:bg-white transition-colors"
+            >
+              <component
+                :is="item.icon"
+                class="w-5 h-5 text-izakaya-wood/70 group-hover:text-touhou-red transition-colors"
+              />
             </div>
             <div class="flex-1 min-w-0">
-              <div class="font-display font-bold text-sm text-izakaya-wood group-hover:text-touhou-red transition-colors">
+              <div
+                class="font-display font-bold text-sm text-izakaya-wood group-hover:text-touhou-red transition-colors"
+              >
                 {{ item.label }}
               </div>
               <div class="text-xs text-izakaya-wood/50 truncate">
                 {{ item.description }}
               </div>
             </div>
-            <ChevronRight class="w-4 h-4 text-izakaya-wood/30 group-hover:text-touhou-red/50 group-hover:translate-x-0.5 transition-all" />
+            <ChevronRight
+              class="w-4 h-4 text-izakaya-wood/30 group-hover:text-touhou-red/50 group-hover:translate-x-0.5 transition-all"
+            />
           </button>
         </div>
 
@@ -136,9 +189,7 @@ function handleTouchEnd() {
           <div class="text-xs text-center text-izakaya-wood/40 font-display">
             东方异界食堂 <span class="text-touhou-red">Beta</span>
           </div>
-          <div class="text-[10px] text-center text-izakaya-wood/30 mt-1">
-            向右滑动关闭菜单
-          </div>
+          <div class="text-[10px] text-center text-izakaya-wood/30 mt-1">向右滑动关闭菜单</div>
         </div>
       </div>
     </Transition>

@@ -34,7 +34,7 @@ class AudioManager {
     if (this.ctx && this.ctx.state === 'suspended') {
       await this.ctx.resume();
     }
-    
+
     // If BGM was supposed to be playing but was blocked, try again
     if (this.currentBgm && this.currentBgm.paused && this.bgmUrl) {
       try {
@@ -49,15 +49,15 @@ class AudioManager {
     if (!this.ctx) {
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
       this.ctx = new AudioContext();
-      
+
       // Master Gain
       this.masterGain = this.ctx!.createGain();
       this.masterGain.connect(this.ctx!.destination);
-      
+
       // SFX Gain (Connects to Master)
       this.sfxGain = this.ctx!.createGain();
       this.sfxGain.connect(this.masterGain);
-      
+
       this.setVolume(this.volume);
       this.setSfxVolume(this.sfxVolume);
     }
@@ -82,7 +82,7 @@ class AudioManager {
   public setSfxVolume(val: number) {
     this.sfxVolume = Math.max(0, Math.min(1, val));
     if (this.sfxGain) {
-       this.sfxGain.gain.value = this.sfxVolume;
+      this.sfxGain.gain.value = this.sfxVolume;
     }
   }
 
@@ -90,7 +90,7 @@ class AudioManager {
     if (this.currentBgm) {
       // BGM volume is Master * BGM Sub-volume
       // Note: HTMLAudioElement volume is 0-1.
-      this.currentBgm.volume = this.isMuted ? 0 : (this.volume * this.bgmVolume);
+      this.currentBgm.volume = this.isMuted ? 0 : this.volume * this.bgmVolume;
     }
   }
 
@@ -128,8 +128,8 @@ class AudioManager {
     this.currentBgm.loop = true;
     this.updateBgmVolume(); // Set initial volume
     this.currentBgm.muted = false; // Mute handled by volume=0 in updateBgmVolume
-    
-    this.currentBgm.play().catch(e => {
+
+    this.currentBgm.play().catch((e) => {
       console.warn('BGM play failed (user interaction needed?):', e);
     });
   }
@@ -202,11 +202,11 @@ class AudioManager {
         clearTimeout(this.writingTimer);
         this.writingTimer = null;
       }
-      
+
       // Modulate amplitude (pressure)
       this.writingGain.gain.cancelScheduledValues(now);
       this.writingGain.gain.linearRampToValueAtTime(0.06 + Math.random() * 0.04, now + 0.05);
-      
+
       // Modulate frequency (texture/speed)
       this.writingFilter.frequency.cancelScheduledValues(now);
       this.writingFilter.frequency.linearRampToValueAtTime(3000 + Math.random() * 2000, now + 0.05);
@@ -215,7 +215,7 @@ class AudioManager {
       this.writingTimer = setTimeout(() => {
         this.stopWritingSound();
       }, 150); // Stop after 150ms of silence
-      
+
       return;
     }
 
@@ -223,14 +223,14 @@ class AudioManager {
     const bufferSize = this.ctx.sampleRate * 2.0; // 2s loop
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const data = buffer.getChannelData(0);
-    
+
     // Pinkish noise approximation
     let lastOut = 0;
     for (let i = 0; i < bufferSize; i++) {
-        const white = Math.random() * 2 - 1;
-        const val = (lastOut + (0.02 * white)) / 1.02;
-        lastOut = val;
-        data[i] = val * 3.5; // Compensate for gain loss
+      const white = Math.random() * 2 - 1;
+      const val = (lastOut + 0.02 * white) / 1.02;
+      lastOut = val;
+      data[i] = val * 3.5; // Compensate for gain loss
     }
 
     this.writingSource = this.ctx.createBufferSource();
@@ -246,7 +246,7 @@ class AudioManager {
     this.writingFilter.type = 'bandpass';
     this.writingFilter.frequency.value = 4000;
     this.writingFilter.Q.value = 0.6;
-    
+
     this.writingGain = this.ctx.createGain();
     this.writingGain.gain.value = 0;
 
@@ -256,7 +256,7 @@ class AudioManager {
     this.writingGain.connect(this.sfxGain);
 
     this.writingSource.start();
-    
+
     // Fade in
     this.writingGain.gain.linearRampToValueAtTime(0.06, now + 0.05);
 
@@ -271,11 +271,13 @@ class AudioManager {
       const now = this.ctx.currentTime;
       this.writingGain.gain.cancelScheduledValues(now);
       this.writingGain.gain.setTargetAtTime(0, now, 0.05); // Smooth fade out
-      
+
       const source = this.writingSource;
       setTimeout(() => {
         if (source) {
-            try { source.stop(); } catch(e) {}
+          try {
+            source.stop();
+          } catch (e) {}
         }
       }, 200);
     }
@@ -292,19 +294,19 @@ class AudioManager {
 
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
-    
+
     osc.connect(gain);
     gain.connect(this.sfxGain);
-    
+
     osc.type = 'sine';
     // Cute upward slide (Bubble sound)
     osc.frequency.setValueAtTime(440, this.ctx.currentTime);
     osc.frequency.linearRampToValueAtTime(880, this.ctx.currentTime + 0.15);
-    
+
     gain.gain.setValueAtTime(0, this.ctx.currentTime);
     gain.gain.linearRampToValueAtTime(0.1, this.ctx.currentTime + 0.05);
     gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.25);
-    
+
     osc.start();
     osc.stop(this.ctx.currentTime + 0.25);
   }
@@ -324,12 +326,12 @@ class AudioManager {
 
     const noise = this.ctx.createBufferSource();
     noise.buffer = buffer;
-    
+
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'lowpass';
     filter.frequency.setValueAtTime(1500, this.ctx.currentTime);
     filter.frequency.linearRampToValueAtTime(500, this.ctx.currentTime + duration);
-    
+
     const gain = this.ctx.createGain();
     noise.connect(filter);
     filter.connect(gain);
@@ -390,7 +392,7 @@ class AudioManager {
 
     osc.type = 'sine';
     osc.frequency.setValueAtTime(2000, this.ctx.currentTime);
-    
+
     gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.05);
 
@@ -419,26 +421,26 @@ class AudioManager {
     osc.start();
     osc.stop(this.ctx.currentTime + 1.5);
   }
-  
+
   // Sound: Hover effect (very subtle wind/breath)
   public playHoverWind() {
-      this.init();
-      if (!this.ctx || !this.sfxGain) return;
-      
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      
-      osc.connect(gain);
-      gain.connect(this.sfxGain);
-      
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(400, this.ctx.currentTime);
-      
-      gain.gain.setValueAtTime(0.02, this.ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.1);
-      
-      osc.start();
-      osc.stop(this.ctx.currentTime + 0.1);
+    this.init();
+    if (!this.ctx || !this.sfxGain) return;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+
+    gain.gain.setValueAtTime(0.02, this.ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.1);
+
+    osc.start();
+    osc.stop(this.ctx.currentTime + 0.1);
   }
 
   // Sound: Heavy Hit (Combat)
@@ -451,7 +453,7 @@ class AudioManager {
     // Low boom (Kick-like)
     const osc = this.ctx.createOscillator();
     const oscGain = this.ctx.createGain();
-    
+
     osc.connect(oscGain);
     oscGain.connect(this.sfxGain);
 
@@ -494,7 +496,7 @@ class AudioManager {
     if (!this.ctx || !this.sfxGain) return;
 
     const t = this.ctx.currentTime;
-    
+
     // White noise swoosh
     const bufferSize = this.ctx.sampleRate * 0.3;
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
@@ -536,29 +538,29 @@ class AudioManager {
 
     // Fast, high-pitched shimmer
     [660, 880].forEach((freq) => {
-        const osc = this.ctx!.createOscillator();
-        const gain = this.ctx!.createGain();
-        
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, t);
-        osc.frequency.linearRampToValueAtTime(freq * 1.5, t + 0.3); // Quick pitch up
-        
-        const lfo = this.ctx!.createOscillator();
-        lfo.frequency.value = 20; // Fast vibrato
-        const lfoGain = this.ctx!.createGain();
-        lfoGain.gain.value = 30;
-        lfo.connect(lfoGain);
-        lfoGain.connect(osc.frequency);
-        lfo.start(t);
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
 
-        gain.gain.setValueAtTime(0, t);
-        gain.gain.linearRampToValueAtTime(0.1, t + 0.05);
-        gain.gain.linearRampToValueAtTime(0, t + 0.5);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+      osc.frequency.linearRampToValueAtTime(freq * 1.5, t + 0.3); // Quick pitch up
 
-        osc.connect(gain);
-        gain.connect(this.sfxGain!);
-        osc.start(t);
-        osc.stop(t + 0.5);
+      const lfo = this.ctx!.createOscillator();
+      lfo.frequency.value = 20; // Fast vibrato
+      const lfoGain = this.ctx!.createGain();
+      lfoGain.gain.value = 30;
+      lfo.connect(lfoGain);
+      lfoGain.connect(osc.frequency);
+      lfo.start(t);
+
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.1, t + 0.05);
+      gain.gain.linearRampToValueAtTime(0, t + 0.5);
+
+      osc.connect(gain);
+      gain.connect(this.sfxGain!);
+      osc.start(t);
+      osc.stop(t + 0.5);
     });
   }
 
@@ -575,7 +577,7 @@ class AudioManager {
     drone.type = 'sawtooth';
     drone.frequency.setValueAtTime(110, t); // Low A
     drone.frequency.linearRampToValueAtTime(220, t + 1.5); // Slow rise
-    
+
     // Lowpass filter opening up
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'lowpass';
@@ -594,75 +596,75 @@ class AudioManager {
 
     // 2. Swirling Highs
     [440, 554, 659, 880].forEach((freq, i) => {
-        const osc = this.ctx!.createOscillator();
-        const gain = this.ctx!.createGain();
-        
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, t);
-        
-        // Slow LFO for "swirl"
-        const lfo = this.ctx!.createOscillator();
-        lfo.frequency.value = 4 + i; 
-        const lfoGain = this.ctx!.createGain();
-        lfoGain.gain.value = 20;
-        lfo.connect(lfoGain);
-        lfoGain.connect(osc.frequency);
-        lfo.start(t);
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
 
-        gain.gain.setValueAtTime(0, t);
-        gain.gain.linearRampToValueAtTime(0.05, t + 0.2 + (i * 0.1));
-        gain.gain.linearRampToValueAtTime(0, t + 1.5);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
 
-        osc.connect(gain);
-        gain.connect(this.sfxGain!);
-        osc.start(t);
-        osc.stop(t + 1.5);
+      // Slow LFO for "swirl"
+      const lfo = this.ctx!.createOscillator();
+      lfo.frequency.value = 4 + i;
+      const lfoGain = this.ctx!.createGain();
+      lfoGain.gain.value = 20;
+      lfo.connect(lfoGain);
+      lfoGain.connect(osc.frequency);
+      lfo.start(t);
+
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.05, t + 0.2 + i * 0.1);
+      gain.gain.linearRampToValueAtTime(0, t + 1.5);
+
+      osc.connect(gain);
+      gain.connect(this.sfxGain!);
+      osc.start(t);
+      osc.stop(t + 1.5);
     });
   }
 
   // Sound: AOE Explosion (Massive Boom)
   public playAoEExplosion() {
-      this.init();
-      if (!this.ctx || !this.sfxGain) return;
-      const t = this.ctx.currentTime;
+    this.init();
+    if (!this.ctx || !this.sfxGain) return;
+    const t = this.ctx.currentTime;
 
-      // 1. Sub-bass Boom
-      const osc = this.ctx.createOscillator();
-      const oscGain = this.ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(80, t);
-      osc.frequency.exponentialRampToValueAtTime(10, t + 1.0); // Deep drop
-      
-      oscGain.gain.setValueAtTime(1.0, t);
-      oscGain.gain.exponentialRampToValueAtTime(0.01, t + 1.0);
-      
-      osc.connect(oscGain);
-      oscGain.connect(this.sfxGain);
-      osc.start(t);
-      osc.stop(t + 1.0);
+    // 1. Sub-bass Boom
+    const osc = this.ctx.createOscillator();
+    const oscGain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(80, t);
+    osc.frequency.exponentialRampToValueAtTime(10, t + 1.0); // Deep drop
 
-      // 2. Wide Noise Wash
-      const bufferSize = this.ctx.sampleRate * 1.5;
-      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-      
-      const noise = this.ctx.createBufferSource();
-      noise.buffer = buffer;
-      
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(800, t);
-      filter.frequency.linearRampToValueAtTime(100, t + 1.5); // Muffle down
-      
-      const noiseGain = this.ctx.createGain();
-      noiseGain.gain.setValueAtTime(0.8, t);
-      noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 1.5);
-      
-      noise.connect(filter);
-      filter.connect(noiseGain);
-      noiseGain.connect(this.sfxGain);
-      noise.start(t);
+    oscGain.gain.setValueAtTime(1.0, t);
+    oscGain.gain.exponentialRampToValueAtTime(0.01, t + 1.0);
+
+    osc.connect(oscGain);
+    oscGain.connect(this.sfxGain);
+    osc.start(t);
+    osc.stop(t + 1.0);
+
+    // 2. Wide Noise Wash
+    const bufferSize = this.ctx.sampleRate * 1.5;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(800, t);
+    filter.frequency.linearRampToValueAtTime(100, t + 1.5); // Muffle down
+
+    const noiseGain = this.ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.8, t);
+    noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 1.5);
+
+    noise.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(this.sfxGain);
+    noise.start(t);
   }
 
   // Sound: Skill Cut-in (Moonlight/Ethereal theme)
@@ -674,32 +676,32 @@ class AudioManager {
 
     // 1. "Moonlight" Chimes (Crystal/Glassy)
     // A Major 7 chord: A (880), E (1318), G# (1661), C# (2217)
-    const freqs = [880, 1318.5, 1661.2, 2217.5]; 
-    
+    const freqs = [880, 1318.5, 1661.2, 2217.5];
+
     freqs.forEach((f, i) => {
-        const osc = this.ctx!.createOscillator();
-        const gain = this.ctx!.createGain();
-        
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(f, t);
-        
-        // Subtle downward drift (Falling feel)
-        osc.frequency.exponentialRampToValueAtTime(f * 0.98, t + 0.6);
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
 
-        osc.connect(gain);
-        gain.connect(this.sfxGain!);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, t);
 
-        // Staggered entry (arpeggio effect) - very fast descending feel? 
-        // Actually slightly staggered start creates a "shimmer"
-        const start = t + (i * 0.04); 
-        const duration = 0.6 - (i * 0.05);
+      // Subtle downward drift (Falling feel)
+      osc.frequency.exponentialRampToValueAtTime(f * 0.98, t + 0.6);
 
-        gain.gain.setValueAtTime(0, start);
-        gain.gain.linearRampToValueAtTime(0.08, start + 0.05); // Soft attack
-        gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+      osc.connect(gain);
+      gain.connect(this.sfxGain!);
 
-        osc.start(start);
-        osc.stop(start + duration);
+      // Staggered entry (arpeggio effect) - very fast descending feel?
+      // Actually slightly staggered start creates a "shimmer"
+      const start = t + i * 0.04;
+      const duration = 0.6 - i * 0.05;
+
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.08, start + 0.05); // Soft attack
+      gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+
+      osc.start(start);
+      osc.stop(start + duration);
     });
 
     // 2. "Shimmer" (High frequency sparkle)
@@ -715,7 +717,7 @@ class AudioManager {
     carrier.frequency.setValueAtTime(3000, t); // High pitch
 
     const carrierGain = this.ctx.createGain();
-    
+
     lfo.connect(lfoGain);
     lfoGain.connect(carrier.frequency); // FM Synthesis for sparkle
 
@@ -736,7 +738,7 @@ class AudioManager {
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
+      data[i] = Math.random() * 2 - 1;
     }
     const noise = this.ctx.createBufferSource();
     noise.buffer = buffer;
@@ -768,14 +770,14 @@ class AudioManager {
     // 1. The "Thump" (Sub-bass Impact)
     const osc = this.ctx.createOscillator();
     const oscGain = this.ctx.createGain();
-    
-    osc.type = 'triangle'; 
-    osc.frequency.setValueAtTime(100, t); 
-    osc.frequency.exponentialRampToValueAtTime(30, t + 0.25); 
-    
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(100, t);
+    osc.frequency.exponentialRampToValueAtTime(30, t + 0.25);
+
     oscGain.gain.setValueAtTime(0.5, t); // Good base weight
     oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
-    
+
     osc.connect(oscGain);
     oscGain.connect(this.sfxGain);
     osc.start(t);
@@ -798,8 +800,8 @@ class AudioManager {
     const crackFilter = this.ctx.createBiquadFilter();
     crackFilter.type = 'bandpass';
     crackFilter.frequency.setValueAtTime(1800, t); // Sweet spot for "crunch"
-    crackFilter.Q.value = 0.8; 
-    
+    crackFilter.Q.value = 0.8;
+
     const crackGain = this.ctx.createGain();
     crackGain.gain.setValueAtTime(0.6, t); // Loud impact
     crackGain.gain.exponentialRampToValueAtTime(0.01, t + 0.15); // Fast decay
@@ -813,16 +815,16 @@ class AudioManager {
     // A Lowpass filter sweeping down simulates pieces settling
     const crumbleSrc = this.ctx.createBufferSource();
     crumbleSrc.buffer = buffer;
-    
+
     const crumbleFilter = this.ctx.createBiquadFilter();
     crumbleFilter.type = 'lowpass';
     crumbleFilter.frequency.setValueAtTime(1000, t); // Start with some texture
     crumbleFilter.frequency.linearRampToValueAtTime(200, t + 0.5); // Muffle out
-    
+
     const crumbleGain = this.ctx.createGain();
     crumbleGain.gain.setValueAtTime(0.3, t);
     crumbleGain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
-    
+
     crumbleSrc.connect(crumbleFilter);
     crumbleFilter.connect(crumbleGain);
     crumbleGain.connect(this.sfxGain);
@@ -838,29 +840,29 @@ class AudioManager {
 
     // Soft ascending sine waves (Angelic chord)
     [330, 440, 554, 659].forEach((freq, i) => {
-        const osc = this.ctx!.createOscillator();
-        const gain = this.ctx!.createGain();
-        
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, t);
-        
-        // Gentle vibrato
-        const lfo = this.ctx!.createOscillator();
-        lfo.frequency.value = 5;
-        const lfoGain = this.ctx!.createGain();
-        lfoGain.gain.value = 5;
-        lfo.connect(lfoGain);
-        lfoGain.connect(osc.frequency);
-        lfo.start(t);
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
 
-        gain.gain.setValueAtTime(0, t);
-        gain.gain.linearRampToValueAtTime(0.08, t + 0.5 + (i * 0.1));
-        gain.gain.linearRampToValueAtTime(0, t + 2.0);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
 
-        osc.connect(gain);
-        gain.connect(this.sfxGain!);
-        osc.start(t);
-        osc.stop(t + 2.0);
+      // Gentle vibrato
+      const lfo = this.ctx!.createOscillator();
+      lfo.frequency.value = 5;
+      const lfoGain = this.ctx!.createGain();
+      lfoGain.gain.value = 5;
+      lfo.connect(lfoGain);
+      lfoGain.connect(osc.frequency);
+      lfo.start(t);
+
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.08, t + 0.5 + i * 0.1);
+      gain.gain.linearRampToValueAtTime(0, t + 2.0);
+
+      osc.connect(gain);
+      gain.connect(this.sfxGain!);
+      osc.start(t);
+      osc.stop(t + 2.0);
     });
 
     // Sparkle noise (High frequency bandpass)
@@ -868,7 +870,7 @@ class AudioManager {
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
+      data[i] = Math.random() * 2 - 1;
     }
     const noise = this.ctx.createBufferSource();
     noise.buffer = buffer;
@@ -899,21 +901,21 @@ class AudioManager {
 
     // Triumphant Major Chord Arpeggio
     // C Major: C4 (261.63), E4 (329.63), G4 (392.00), C5 (523.25)
-    [261.63, 329.63, 392.00, 523.25].forEach((freq, i) => {
-        const osc = this.ctx!.createOscillator();
-        const gain = this.ctx!.createGain();
-        
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, t + (i * 0.1));
-        
-        gain.gain.setValueAtTime(0, t + (i * 0.1));
-        gain.gain.linearRampToValueAtTime(0.2, t + (i * 0.1) + 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + (i * 0.1) + 1.0);
+    [261.63, 329.63, 392.0, 523.25].forEach((freq, i) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
 
-        osc.connect(gain);
-        gain.connect(this.sfxGain!);
-        osc.start(t + (i * 0.1));
-        osc.stop(t + (i * 0.1) + 1.0);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t + i * 0.1);
+
+      gain.gain.setValueAtTime(0, t + i * 0.1);
+      gain.gain.linearRampToValueAtTime(0.2, t + i * 0.1 + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.1 + 1.0);
+
+      osc.connect(gain);
+      gain.connect(this.sfxGain!);
+      osc.start(t + i * 0.1);
+      osc.stop(t + i * 0.1 + 1.0);
     });
   }
 
@@ -926,11 +928,11 @@ class AudioManager {
 
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
-    
+
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(150, t);
     osc.frequency.linearRampToValueAtTime(100, t + 0.2);
-    
+
     gain.gain.setValueAtTime(0, t);
     gain.gain.linearRampToValueAtTime(0.1, t + 0.05);
     gain.gain.linearRampToValueAtTime(0, t + 0.2);

@@ -4,8 +4,8 @@ import _ from 'lodash';
 export interface GameSnapshot {
   id: number;
   saveSlotId: number; // Foreign Key to SaveSlot
-  chatId: number; 
-  gameState: string; 
+  chatId: number;
+  gameState: string;
   createdAt: number;
 }
 
@@ -17,17 +17,17 @@ export interface ChatMessage {
   timestamp: number;
   snapshotId?: number;
   turnCount?: number; // The game turn this message belongs to
-  
+
   // Debug Info
   debugLog?: {
     logicInput?: string;
     logicOutput?: string;
     logicThinking?: string;
   };
-  
+
   // Chain of Thought Content (Stripped from content)
   thought_content?: string;
-  
+
   // Illustration
   illustrationUrl?: string;
   illustrationPrompt?: string;
@@ -51,11 +51,11 @@ export interface MemoryEntry {
   tags: string[];
   importance: number;
   createdAt: number;
-  
+
   // New Metadata Fields
-  gameDate?: string;    // e.g. "纪元123年1月1日"
-  gameTime?: string;    // e.g. "12:00"
-  location?: string;    // e.g. "博丽神社"
+  gameDate?: string; // e.g. "纪元123年1月1日"
+  gameTime?: string; // e.g. "12:00"
+  location?: string; // e.g. "博丽神社"
   characters?: string[]; // List of NPC names present in the scene
 }
 
@@ -71,13 +71,13 @@ export interface GameSettings {
   useDefaultTilemap?: boolean; // Debug: Use hardcoded map instead of LLM generated one
   theme: 'light' | 'dark' | 'eye-protection';
   currentSaveSlotId?: number; // Active slot
-  
+
   // Audio Settings
   audioVolume?: number;
   enableAudio?: boolean;
   bgmVolume?: number;
   sfxVolume?: number;
-  
+
   // Drawing Settings
   drawingConfig?: {
     enabled: boolean;
@@ -102,9 +102,9 @@ export interface CharacterCard {
   tags: string[];
   category?: string; // Folder name, e.g., '博丽神社'
   gender?: 'female' | 'male' | 'other'; // New field for gender segregation
-  
+
   // New Type Discrimination
-  type?: 'character' | 'spell_card' | 'other'; 
+  type?: 'character' | 'spell_card' | 'other';
 
   // Character Specific Fields
   initialPower?: string; // e.g. "S"
@@ -115,9 +115,9 @@ export interface CharacterCard {
   cost?: string; // e.g. "50 MP"
   damage?: string; // e.g. "500" or "1d100+50"
   damageType?: string; // e.g. "物理", "魔法", "精神"
-  
+
   // Buff Details for Spell Cards of type 'buff'
-  buffDetails?: any; 
+  buffDetails?: any;
 
   creatorNotes?: string;
 }
@@ -132,36 +132,39 @@ const db = new Dexie('TouhouIsekaiIzakayaDB') as Dexie & {
 };
 
 // Schema definition
-db.version(6).stores({
-  snapshots: '++id, saveSlotId, chatId, createdAt, [saveSlotId+chatId]',
-  chats: '++id, saveSlotId, role, timestamp, turnCount',
-  settings: '++id',
-  characters: '++id, uuid, name, category, *tags',
-  saveSlots: '++id, lastPlayed',
-  memories: '++id, saveSlotId, turnCount, type, *tags, *related_entities, [saveSlotId+turnCount], [saveSlotId+type+turnCount], [saveSlotId+type]'
-}).upgrade(async tx => {
-  // Migration for version 6: Add turnCount to existing chat messages
-  // This is a best-effort fallback based on sequential order within each save slot
-  const chats = await tx.table('chats').toArray();
-  const saveGroups = _.groupBy(chats, 'saveSlotId');
-  
-  for (const saveSlotId in saveGroups) {
-    const saveChats = _.sortBy(saveGroups[saveSlotId], 'timestamp');
-    let turnCounter = 0;
-    
-    for (let i = 0; i < saveChats.length; i++) {
-      const msg = saveChats[i];
-      // We assume each user message starts or is part of a turn increment
-      // In the game loop, turn is incremented before user message.
-      // So every time we see a user message, we increment our counter.
-      if (msg.role === 'user') {
-        turnCounter++;
+db.version(6)
+  .stores({
+    snapshots: '++id, saveSlotId, chatId, createdAt, [saveSlotId+chatId]',
+    chats: '++id, saveSlotId, role, timestamp, turnCount',
+    settings: '++id',
+    characters: '++id, uuid, name, category, *tags',
+    saveSlots: '++id, lastPlayed',
+    memories:
+      '++id, saveSlotId, turnCount, type, *tags, *related_entities, [saveSlotId+turnCount], [saveSlotId+type+turnCount], [saveSlotId+type]'
+  })
+  .upgrade(async (tx) => {
+    // Migration for version 6: Add turnCount to existing chat messages
+    // This is a best-effort fallback based on sequential order within each save slot
+    const chats = await tx.table('chats').toArray();
+    const saveGroups = _.groupBy(chats, 'saveSlotId');
+
+    for (const saveSlotId in saveGroups) {
+      const saveChats = _.sortBy(saveGroups[saveSlotId], 'timestamp');
+      let turnCounter = 0;
+
+      for (let i = 0; i < saveChats.length; i++) {
+        const msg = saveChats[i];
+        // We assume each user message starts or is part of a turn increment
+        // In the game loop, turn is incremented before user message.
+        // So every time we see a user message, we increment our counter.
+        if (msg.role === 'user') {
+          turnCounter++;
+        }
+        // If turnCounter is 0 (e.g. system message at start), we'll keep it at 0
+        await tx.table('chats').update(msg.id, { turnCount: turnCounter });
       }
-      // If turnCounter is 0 (e.g. system message at start), we'll keep it at 0
-      await tx.table('chats').update(msg.id, { turnCount: turnCounter });
     }
-  }
-});
+  });
 // .upgrade(tx => {
 //   // Migration logic
 // });

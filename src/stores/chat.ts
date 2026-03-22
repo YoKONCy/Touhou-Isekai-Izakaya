@@ -34,7 +34,7 @@ export const useChatStore = defineStore('chat', () => {
         `SELECT * FROM chats WHERE saveSlotId = ? ORDER BY timestamp DESC LIMIT ?`,
         [saveStore.currentSaveId, limit]
       );
-      
+
       const rowsAsc = rows.reverse(); // Now they are ASC
 
       if (rowsAsc.length > pageSize) {
@@ -54,18 +54,18 @@ export const useChatStore = defineStore('chat', () => {
         // Dexie: timestamp < firstMsg.timestamp, reverse(), limit(pageSize)
         // SQL: SELECT * FROM chats WHERE saveSlotId=? AND timestamp < ? ORDER BY timestamp DESC LIMIT ?
         const olderMsgs = await dbService.exec(
-            'SELECT * FROM chats WHERE saveSlotId = ? AND timestamp < ? ORDER BY timestamp DESC LIMIT ?',
-            [saveStore.currentSaveId, firstMsg.timestamp, pageSize]
+          'SELECT * FROM chats WHERE saveSlotId = ? AND timestamp < ? ORDER BY timestamp DESC LIMIT ?',
+          [saveStore.currentSaveId, firstMsg.timestamp, pageSize]
         );
-        
+
         if (olderMsgs.length > 0) {
           messages.value = [...olderMsgs.reverse(), ...messages.value];
-          
+
           const earliestTimestamp = messages.value[0]?.timestamp;
           if (earliestTimestamp !== undefined) {
             const countRes = await dbService.exec(
-                'SELECT COUNT(*) as count FROM chats WHERE saveSlotId = ? AND timestamp < ?',
-                [saveStore.currentSaveId, earliestTimestamp]
+              'SELECT COUNT(*) as count FROM chats WHERE saveSlotId = ? AND timestamp < ?',
+              [saveStore.currentSaveId, earliestTimestamp]
             );
             hasMore.value = countRes[0].count > 0;
           }
@@ -80,18 +80,18 @@ export const useChatStore = defineStore('chat', () => {
         // Dexie: timestamp > lastMsg.timestamp, limit(pageSize)
         // SQL: SELECT * FROM chats WHERE saveSlotId=? AND timestamp > ? ORDER BY timestamp ASC LIMIT ?
         const newerMsgs = await dbService.exec(
-            'SELECT * FROM chats WHERE saveSlotId = ? AND timestamp > ? ORDER BY timestamp ASC LIMIT ?',
-            [saveStore.currentSaveId, lastMsg.timestamp, pageSize]
+          'SELECT * FROM chats WHERE saveSlotId = ? AND timestamp > ? ORDER BY timestamp ASC LIMIT ?',
+          [saveStore.currentSaveId, lastMsg.timestamp, pageSize]
         );
-        
+
         if (newerMsgs.length > 0) {
           messages.value = [...messages.value, ...newerMsgs];
-          
+
           const latestTimestamp = messages.value[messages.value.length - 1]?.timestamp;
           if (latestTimestamp !== undefined) {
             const countRes = await dbService.exec(
-                'SELECT COUNT(*) as count FROM chats WHERE saveSlotId = ? AND timestamp > ?',
-                [saveStore.currentSaveId, latestTimestamp]
+              'SELECT COUNT(*) as count FROM chats WHERE saveSlotId = ? AND timestamp > ?',
+              [saveStore.currentSaveId, latestTimestamp]
             );
             hasMoreFuture.value = countRes[0].count > 0;
           }
@@ -101,18 +101,25 @@ export const useChatStore = defineStore('chat', () => {
       }
       return;
     }
-    
+
     // Load the latest state if exists (only on initial load)
     // We need the very last message to check for snapshot
     const lastMsgRes = await dbService.exec(
-        'SELECT * FROM chats WHERE saveSlotId = ? ORDER BY timestamp DESC LIMIT 1',
-        [saveStore.currentSaveId]
+      'SELECT * FROM chats WHERE saveSlotId = ? ORDER BY timestamp DESC LIMIT 1',
+      [saveStore.currentSaveId]
     );
-    
+
     if (lastMsgRes.length > 0) {
       const lastMsg = lastMsgRes[0];
-      console.log('[ChatStore] Loading history. Count:', messages.value.length, 'Last Msg ID:', lastMsg?.id, 'SnapshotId:', lastMsg?.snapshotId);
-      
+      console.log(
+        '[ChatStore] Loading history. Count:',
+        messages.value.length,
+        'Last Msg ID:',
+        lastMsg?.id,
+        'SnapshotId:',
+        lastMsg?.snapshotId
+      );
+
       if (lastMsg && lastMsg.snapshotId) {
         const snapshot = await dbService.getSnapshot(lastMsg.snapshotId);
         if (snapshot) {
@@ -120,22 +127,22 @@ export const useChatStore = defineStore('chat', () => {
           gameStore.setState(JSON.parse(snapshot.gameState));
           console.log('[ChatStore] State restored. Turn Count:', gameStore.state.system.turn_count);
         } else {
-            console.warn('[ChatStore] Snapshot not found for ID:', lastMsg.snapshotId);
+          console.warn('[ChatStore] Snapshot not found for ID:', lastMsg.snapshotId);
         }
       } else {
-         // If last message has no snapshot, find last available snapshot
-         console.log('[ChatStore] Last message has no snapshot. Searching backwards...');
-         const lastSnapshot = await dbService.getLatestSnapshot(saveStore.currentSaveId);
-         
-         if (lastSnapshot) {
-             console.log('[ChatStore] Found fallback snapshot:', lastSnapshot.id);
-             gameStore.setState(JSON.parse(lastSnapshot.gameState));
-         }
+        // If last message has no snapshot, find last available snapshot
+        console.log('[ChatStore] Last message has no snapshot. Searching backwards...');
+        const lastSnapshot = await dbService.getLatestSnapshot(saveStore.currentSaveId);
+
+        if (lastSnapshot) {
+          console.log('[ChatStore] Found fallback snapshot:', lastSnapshot.id);
+          gameStore.setState(JSON.parse(lastSnapshot.gameState));
+        }
       }
     } else {
       // New save or empty history
       const lastSnapshot = await dbService.getLatestSnapshot(saveStore.currentSaveId);
-      
+
       if (lastSnapshot) {
         gameStore.setState(JSON.parse(lastSnapshot.gameState));
       } else {
@@ -149,7 +156,7 @@ export const useChatStore = defineStore('chat', () => {
   async function createInitialSnapshot() {
     const saveStore = useSaveStore();
     if (!saveStore.currentSaveId) return;
-    
+
     await dbService.createSnapshot(saveStore.currentSaveId, 0, gameStore.state);
 
     // Sync Save Metadata
@@ -160,18 +167,18 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function addMessage(
-    role: 'user' | 'assistant' | 'system', 
-    content: string, 
+    role: 'user' | 'assistant' | 'system',
+    content: string,
     forcedSnapshotId?: number,
     debugLog?: any
   ) {
     const saveStore = useSaveStore();
     if (!saveStore.currentSaveId) {
-      throw new Error("No active save slot selected");
+      throw new Error('No active save slot selected');
     }
 
     const timestamp = Date.now();
-    
+
     let snapshotId: number | undefined = forcedSnapshotId;
 
     if (!snapshotId && role === 'assistant') {
@@ -185,12 +192,12 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     const messageId = await dbService.addChatMessage(saveStore.currentSaveId, {
-        role,
-        content,
-        timestamp,
-        turnCount: gameStore.state.system.turn_count,
-        snapshotId,
-        debugLog
+      role,
+      content,
+      timestamp,
+      turnCount: gameStore.state.system.turn_count,
+      snapshotId,
+      debugLog
     });
 
     // Update snapshot with correct chatId
@@ -213,9 +220,9 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function deleteTurn(messageId: number) {
-    const targetIndex = messages.value.findIndex(m => m.id === messageId);
+    const targetIndex = messages.value.findIndex((m) => m.id === messageId);
     if (targetIndex === -1) return;
-    
+
     let startIndex = targetIndex;
     const targetMsg = messages.value[targetIndex];
 
@@ -226,24 +233,29 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     const messagesToDelete = messages.value.slice(startIndex);
-    const idsToDelete = messagesToDelete.map(m => m.id);
+    const idsToDelete = messagesToDelete.map((m) => m.id);
 
     if (idsToDelete.length === 0) return;
 
-    console.log('[ChatStore] Deleting messages from index:', startIndex, 'Count:', idsToDelete.length);
+    console.log(
+      '[ChatStore] Deleting messages from index:',
+      startIndex,
+      'Count:',
+      idsToDelete.length
+    );
 
     // Delete from DB
     const placeholders = idsToDelete.map(() => '?').join(',');
     await dbService.exec(`DELETE FROM chats WHERE id IN (${placeholders})`, idsToDelete);
-    
+
     // Delete associated snapshots
     const snapshotIds = messagesToDelete
-      .map(m => m.snapshotId)
+      .map((m) => m.snapshotId)
       .filter((id): id is number => !!id);
-      
+
     if (snapshotIds.length > 0) {
-       const snapPlaceholders = snapshotIds.map(() => '?').join(',');
-       await dbService.exec(`DELETE FROM snapshots WHERE id IN (${snapPlaceholders})`, snapshotIds);
+      const snapPlaceholders = snapshotIds.map(() => '?').join(',');
+      await dbService.exec(`DELETE FROM snapshots WHERE id IN (${snapPlaceholders})`, snapshotIds);
     }
 
     // Delete snapshots linked via chatId
@@ -251,64 +263,66 @@ export const useChatStore = defineStore('chat', () => {
 
     // Update local state
     messages.value = messages.value.slice(0, startIndex);
-    
+
     // Restore state
     if (messages.value.length > 0) {
-       let restored = false;
-       for (let i = messages.value.length - 1; i >= 0; i--) {
-         const msg = messages.value[i];
-         if (msg && msg.snapshotId) {
-           const snapshot = await dbService.getSnapshot(msg.snapshotId);
-           if (snapshot) {
-             console.log('[ChatStore] Restoring state from snapshot:', snapshot.id);
-             gameStore.setState(JSON.parse(snapshot.gameState));
-             restored = true;
-             break;
-           }
-         }
-       }
-       
-       if (!restored) {
-          const saveStore = useSaveStore();
-          if (saveStore.currentSaveId) {
-             const initialSnapshotRes = await dbService.exec(
-                 'SELECT * FROM snapshots WHERE saveSlotId = ? AND chatId = 0 LIMIT 1',
-                 [saveStore.currentSaveId]
-             );
-             if (initialSnapshotRes.length > 0) {
-                console.log('[聊天商店] 正在从初始快照恢复');
-                gameStore.setState(JSON.parse(initialSnapshotRes[0].gameState));
-                restored = true;
-             }
+      let restored = false;
+      for (let i = messages.value.length - 1; i >= 0; i--) {
+        const msg = messages.value[i];
+        if (msg && msg.snapshotId) {
+          const snapshot = await dbService.getSnapshot(msg.snapshotId);
+          if (snapshot) {
+            console.log('[ChatStore] Restoring state from snapshot:', snapshot.id);
+            gameStore.setState(JSON.parse(snapshot.gameState));
+            restored = true;
+            break;
           }
-       }
-       
-       if (!restored) {
-          console.warn('[ChatStore] No snapshot found to restore. Keeping current state (might be desynced).');
-       }
-    } else {
-       console.log('[ChatStore] History empty. Resetting/Initializing state.');
-       const saveStore = useSaveStore();
-       if (saveStore.currentSaveId) {
+        }
+      }
+
+      if (!restored) {
+        const saveStore = useSaveStore();
+        if (saveStore.currentSaveId) {
           const initialSnapshotRes = await dbService.exec(
-             'SELECT * FROM snapshots WHERE saveSlotId = ? AND chatId = 0 LIMIT 1',
-             [saveStore.currentSaveId]
+            'SELECT * FROM snapshots WHERE saveSlotId = ? AND chatId = 0 LIMIT 1',
+            [saveStore.currentSaveId]
           );
           if (initialSnapshotRes.length > 0) {
-             gameStore.setState(JSON.parse(initialSnapshotRes[0].gameState));
-          } else {
-             gameStore.resetState();
+            console.log('[聊天商店] 正在从初始快照恢复');
+            gameStore.setState(JSON.parse(initialSnapshotRes[0].gameState));
+            restored = true;
           }
-       } else {
+        }
+      }
+
+      if (!restored) {
+        console.warn(
+          '[ChatStore] No snapshot found to restore. Keeping current state (might be desynced).'
+        );
+      }
+    } else {
+      console.log('[ChatStore] History empty. Resetting/Initializing state.');
+      const saveStore = useSaveStore();
+      if (saveStore.currentSaveId) {
+        const initialSnapshotRes = await dbService.exec(
+          'SELECT * FROM snapshots WHERE saveSlotId = ? AND chatId = 0 LIMIT 1',
+          [saveStore.currentSaveId]
+        );
+        if (initialSnapshotRes.length > 0) {
+          gameStore.setState(JSON.parse(initialSnapshotRes[0].gameState));
+        } else {
           gameStore.resetState();
-       }
+        }
+      } else {
+        gameStore.resetState();
+      }
     }
 
     // Sync Memory Rollback
     const saveStore = useSaveStore();
     if (saveStore.currentSaveId) {
-       const currentTurn = gameStore.state.system.turn_count || 0;
-       await memoryService.rollback(saveStore.currentSaveId, currentTurn);
+      const currentTurn = gameStore.state.system.turn_count || 0;
+      await memoryService.rollback(saveStore.currentSaveId, currentTurn);
     }
   }
 
@@ -318,28 +332,28 @@ export const useChatStore = defineStore('chat', () => {
 
     await dbService.exec('DELETE FROM chats WHERE saveSlotId = ?', [saveStore.currentSaveId]);
     await dbService.exec('DELETE FROM snapshots WHERE saveSlotId = ?', [saveStore.currentSaveId]);
-    
+
     messages.value = [];
     gameStore.resetState();
   }
 
   async function rollbackTo(messageId: number) {
-    const targetIndex = messages.value.findIndex(m => m.id === messageId);
+    const targetIndex = messages.value.findIndex((m) => m.id === messageId);
     if (targetIndex === -1) return;
 
     const targetMsg = messages.value[targetIndex];
     if (!targetMsg) return;
 
     let snapshotId = targetMsg.snapshotId;
-    
+
     if (!snapshotId) {
-       for (let i = targetIndex; i >= 0; i--) {
-         const msg = messages.value[i];
-         if (msg && msg.snapshotId) {
-           snapshotId = msg.snapshotId;
-           break;
-         }
-       }
+      for (let i = targetIndex; i >= 0; i--) {
+        const msg = messages.value[i];
+        if (msg && msg.snapshotId) {
+          snapshotId = msg.snapshotId;
+          break;
+        }
+      }
     }
 
     if (snapshotId) {
@@ -353,16 +367,16 @@ export const useChatStore = defineStore('chat', () => {
 
     const saveStore = useSaveStore();
     if (saveStore.currentSaveId) {
-       const currentTurn = gameStore.state.system.turn_count || 0;
-       await memoryService.rollback(saveStore.currentSaveId, currentTurn);
+      const currentTurn = gameStore.state.system.turn_count || 0;
+      await memoryService.rollback(saveStore.currentSaveId, currentTurn);
     }
 
     const futureMessages = messages.value.slice(targetIndex + 1);
-    const futureIds = futureMessages.map(m => m.id);
+    const futureIds = futureMessages.map((m) => m.id);
     if (futureIds.length > 0) {
-        const placeholders = futureIds.map(() => '?').join(',');
-        await dbService.exec(`DELETE FROM chats WHERE id IN (${placeholders})`, futureIds);
-        await dbService.exec(`DELETE FROM snapshots WHERE chatId IN (${placeholders})`, futureIds);
+      const placeholders = futureIds.map(() => '?').join(',');
+      await dbService.exec(`DELETE FROM chats WHERE id IN (${placeholders})`, futureIds);
+      await dbService.exec(`DELETE FROM snapshots WHERE chatId IN (${placeholders})`, futureIds);
     }
 
     messages.value = messages.value.slice(0, targetIndex + 1);
@@ -372,14 +386,16 @@ export const useChatStore = defineStore('chat', () => {
     // updates keys might not map 1:1 to DB columns if they are extra props, but ChatMessage is mostly flat
     // We should filter keys that exist in DB or just try.
     // For now assume updates match DB columns.
-    const fields = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+    const fields = Object.keys(updates)
+      .map((k) => `${k} = ?`)
+      .join(', ');
     const values = Object.values(updates);
-    
+
     if (fields.length > 0) {
-        await dbService.exec(`UPDATE chats SET ${fields} WHERE id = ?`, [...values, id]);
+      await dbService.exec(`UPDATE chats SET ${fields} WHERE id = ?`, [...values, id]);
     }
 
-    const msgIndex = messages.value.findIndex(m => m.id === id);
+    const msgIndex = messages.value.findIndex((m) => m.id === id);
     if (msgIndex !== -1) {
       messages.value[msgIndex] = { ...messages.value[msgIndex], ...updates } as ChatMessage;
       messages.value = [...messages.value];
@@ -394,12 +410,11 @@ export const useChatStore = defineStore('chat', () => {
 
     console.log('[ChatStore] Jumping to turn:', turnCount);
 
-    const snapshots = await dbService.exec(
-        'SELECT * FROM snapshots WHERE saveSlotId = ?',
-        [saveStore.currentSaveId]
-    );
-    
-    const targetSnapshot = snapshots.find(s => {
+    const snapshots = await dbService.exec('SELECT * FROM snapshots WHERE saveSlotId = ?', [
+      saveStore.currentSaveId
+    ]);
+
+    const targetSnapshot = snapshots.find((s) => {
       try {
         const state = JSON.parse(s.gameState);
         return state.system?.turn_count === turnCount;
@@ -415,26 +430,26 @@ export const useChatStore = defineStore('chat', () => {
 
     const targetChatId = targetSnapshot.chatId;
     console.log('[ChatStore] Found target chatId:', targetChatId);
-    
-    const isLoaded = messages.value.some(m => m.id === targetChatId);
+
+    const isLoaded = messages.value.some((m) => m.id === targetChatId);
 
     if (!isLoaded) {
       console.log('[ChatStore] Loading history window for jump...');
-      
+
       const windowSize = 40;
       // SQL: SELECT * FROM chats WHERE saveSlotId=? AND id >= ? ORDER BY timestamp ASC LIMIT ?
       const msgs = await dbService.exec(
         'SELECT * FROM chats WHERE saveSlotId = ? AND id >= ? ORDER BY timestamp ASC LIMIT ?',
         [saveStore.currentSaveId, targetChatId, windowSize]
       );
-    
+
       messages.value = msgs;
-      
+
       const earliestTimestamp = messages.value[0]?.timestamp;
       if (earliestTimestamp !== undefined) {
         const countRes = await dbService.exec(
-            'SELECT COUNT(*) as count FROM chats WHERE saveSlotId = ? AND timestamp < ?',
-            [saveStore.currentSaveId, earliestTimestamp]
+          'SELECT COUNT(*) as count FROM chats WHERE saveSlotId = ? AND timestamp < ?',
+          [saveStore.currentSaveId, earliestTimestamp]
         );
         hasMore.value = countRes[0].count > 0;
       }
@@ -442,15 +457,15 @@ export const useChatStore = defineStore('chat', () => {
       const latestTimestamp = messages.value[messages.value.length - 1]?.timestamp;
       if (latestTimestamp !== undefined) {
         const countRes = await dbService.exec(
-            'SELECT COUNT(*) as count FROM chats WHERE saveSlotId = ? AND timestamp > ?',
-            [saveStore.currentSaveId, latestTimestamp]
+          'SELECT COUNT(*) as count FROM chats WHERE saveSlotId = ? AND timestamp > ?',
+          [saveStore.currentSaveId, latestTimestamp]
         );
         hasMoreFuture.value = countRes[0].count > 0;
       }
     }
 
     jumpTargetId.value = targetChatId;
-    
+
     setTimeout(() => {
       jumpTargetId.value = null;
     }, 1000);

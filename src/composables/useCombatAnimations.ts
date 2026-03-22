@@ -12,10 +12,11 @@ import type { Combatant } from '@/types/combat';
 
 export const defaultSprite = defaultSpriteUrl;
 
-const characterSprites = import.meta.glob(
-  '/src/assets/images/battle_sprites/*.png',
-  { query: '?url', import: 'default', eager: true }
-) as Record<string, string>;
+const characterSprites = import.meta.glob('/src/assets/images/battle_sprites/*.png', {
+  query: '?url',
+  import: 'default',
+  eager: true
+}) as Record<string, string>;
 
 export function getSpriteUrl(name?: string): string {
   if (!name) return defaultSprite;
@@ -24,7 +25,7 @@ export function getSpriteUrl(name?: string): string {
 
 export function useCombatAnimations() {
   const gameStore = useGameStore();
-  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
   // --- Screen Shake ---
   const isScreenShaking = ref(false);
@@ -39,7 +40,16 @@ export function useCombatAnimations() {
   }
 
   // --- Active Effect ---
-  type EffectType = 'slash' | 'spell' | 'spell_aoe' | 'spell_single' | 'enemy' | 'hit' | 'hit_aoe' | 'talk' | 'ultimate_impact';
+  type EffectType =
+    | 'slash'
+    | 'spell'
+    | 'spell_aoe'
+    | 'spell_single'
+    | 'enemy'
+    | 'hit'
+    | 'hit_aoe'
+    | 'talk'
+    | 'ultimate_impact';
 
   const activeEffect = ref<{
     type: EffectType;
@@ -49,7 +59,13 @@ export function useCombatAnimations() {
     extra?: string;
   }>({ type: 'slash', x: 0, y: 0, show: false });
 
-  async function triggerEffect(type: EffectType, x: number, y: number, extra?: string, isRemote = false) {
+  async function triggerEffect(
+    type: EffectType,
+    x: number,
+    y: number,
+    extra?: string,
+    isRemote = false
+  ) {
     if (!isRemote && gameStore.multiplayer.isHost && gameStore.multiplayer.isMultiplayer) {
       const rect = document.body.getBoundingClientRect();
       multiplayerService.sendCombatEffect({
@@ -57,14 +73,20 @@ export function useCombatAnimations() {
         effectType: type,
         xRatio: x / rect.width,
         yRatio: y / rect.height,
-        extra,
+        extra
       });
     }
     activeEffect.value = { type, x, y, show: true, extra };
 
     const durations: Record<string, number> = {
-      slash: 800, spell: 2200, spell_aoe: 2200, spell_single: 2200,
-      ultimate_impact: 2500, talk: 2000, hit_aoe: 1000, hit: 500,
+      slash: 800,
+      spell: 2200,
+      spell_aoe: 2200,
+      spell_single: 2200,
+      ultimate_impact: 2500,
+      talk: 2000,
+      hit_aoe: 1000,
+      hit: 500
     };
     await sleep(durations[type] ?? 1000);
     activeEffect.value.show = false;
@@ -92,17 +114,21 @@ export function useCombatAnimations() {
     isPlayer: true,
     charName: '',
     spellName: '',
-    spriteUrl: '',
+    spriteUrl: ''
   });
 
-  async function playUltimateAnimation(combatant: Combatant | any, spellName: string, isRemote = false) {
+  async function playUltimateAnimation(
+    combatant: Combatant | any,
+    spellName: string,
+    isRemote = false
+  ) {
     if (!isRemote && gameStore.multiplayer.isHost && gameStore.multiplayer.isMultiplayer) {
       multiplayerService.sendCombatEffect({
         type: 'ultimate_anim',
         charName: combatant.name,
         spellName,
         isPlayer: combatant.isPlayer || combatant.team === 'player',
-        actorId: combatant.id,
+        actorId: combatant.id
       });
     }
     const isPlayerTeam = combatant.isPlayer || combatant.team === 'player';
@@ -110,7 +136,7 @@ export function useCombatAnimations() {
       isPlayer: isPlayerTeam,
       charName: combatant.name,
       spellName,
-      spriteUrl: getSpriteUrl(combatant.id === 'player' ? '主角' : combatant.name),
+      spriteUrl: getSpriteUrl(combatant.id === 'player' ? '主角' : combatant.name)
     };
     audioManager.playSpellCast();
     showUltimateCutin.value = true;
@@ -125,10 +151,15 @@ export function useCombatAnimations() {
     isSpecial: false,
     charName: '',
     spellName: '',
-    spriteUrl: '',
+    spriteUrl: ''
   });
 
-  async function playSkillAnimation(combatant: Combatant | any, spellName: string, isSpecial = false, isRemote = false) {
+  async function playSkillAnimation(
+    combatant: Combatant | any,
+    spellName: string,
+    isSpecial = false,
+    isRemote = false
+  ) {
     if (!isRemote && gameStore.multiplayer.isHost && gameStore.multiplayer.isMultiplayer) {
       multiplayerService.sendCombatEffect({
         type: 'skill_anim',
@@ -136,7 +167,7 @@ export function useCombatAnimations() {
         spellName,
         isSpecial,
         isPlayer: combatant.isPlayer || combatant.team === 'player',
-        actorId: combatant.id,
+        actorId: combatant.id
       });
     }
     const isPlayerTeam = combatant.isPlayer || combatant.team === 'player';
@@ -145,7 +176,7 @@ export function useCombatAnimations() {
       isSpecial,
       charName: combatant.name,
       spellName,
-      spriteUrl: getSpriteUrl(combatant.id === 'player' ? '主角' : combatant.name),
+      spriteUrl: getSpriteUrl(combatant.id === 'player' ? '主角' : combatant.name)
     };
     audioManager.playSkillCutin();
     showSkillCutin.value = true;
@@ -198,6 +229,6 @@ export function useCombatAnimations() {
     combatFlowPhase,
     playCombatFlowAnimation,
     // Utility
-    sleep,
+    sleep
   };
 }

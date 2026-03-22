@@ -16,7 +16,7 @@ const STORAGE_KEY = 'izakaya-music-player-state';
 
 export const useMusicPlayerStore = defineStore('musicPlayer', () => {
   const settings = useSettingsStore();
-  
+
   // State
   const isPlaying = ref(false);
   const playlist = ref<Track[]>([]);
@@ -25,19 +25,23 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
   const currentTime = ref(0);
   const duration = ref(0);
   const showPlayer = ref(true);
-  
+
   // Internal Audio Element
   const audio = new Audio();
-  
+
   // Computed effective volume
   const effectiveVolume = computed(() => {
     return settings.audioVolume * settings.bgmVolume;
   });
 
   // Watch for volume changes
-  watch(effectiveVolume, (newVolume) => {
-    audio.volume = newVolume;
-  }, { immediate: true });
+  watch(
+    effectiveVolume,
+    (newVolume) => {
+      audio.volume = newVolume;
+    },
+    { immediate: true }
+  );
 
   // Getters
   const currentTrack = computed(() => playlist.value[currentIndex.value]);
@@ -47,7 +51,7 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
     const state = {
       playlist: playlist.value,
       currentIndex: currentIndex.value,
-      mode: mode.value,
+      mode: mode.value
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
@@ -67,18 +71,22 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
   }
 
   // Watchers for persistence
-  watch([playlist, currentIndex, mode], () => {
-    saveState();
-  }, { deep: true });
+  watch(
+    [playlist, currentIndex, mode],
+    () => {
+      saveState();
+    },
+    { deep: true }
+  );
 
   // Actions
   function init() {
     // Load saved state first
     loadState();
-    
+
     // Load local music (will merge with saved)
     loadLocalMusic();
-    
+
     // Setup Audio Events
     audio.addEventListener('ended', handleTrackEnd);
     audio.addEventListener('timeupdate', () => {
@@ -97,15 +105,19 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
 
   function loadLocalMusic() {
     // Glob import all audio files in src/assets/music
-    const modules = import.meta.glob('@/assets/music/**/*.{mp3,ogg,wav}', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
-    
+    const modules = import.meta.glob('@/assets/music/**/*.{mp3,ogg,wav}', {
+      eager: true,
+      query: '?url',
+      import: 'default'
+    }) as Record<string, string>;
+
     const tracks: Track[] = [];
     for (const path in modules) {
       const parts = path.split('/');
       const filename = parts[parts.length - 1] || 'unknown';
       const title = filename.replace(/\.(mp3|ogg|wav)$/i, '');
-      const folder = parts[parts.length - 2] || 'Unknown'; 
-      
+      const folder = parts[parts.length - 2] || 'Unknown';
+
       tracks.push({
         id: path,
         title: title,
@@ -114,14 +126,14 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
         type: 'local'
       });
     }
-    
+
     // Add to playlist if empty
     if (playlist.value.length === 0) {
       playlist.value = tracks;
     } else {
       // Merge: Add local tracks that are not already in the playlist
-      const existingIds = new Set(playlist.value.map(t => t.id));
-      const newTracks = tracks.filter(t => !existingIds.has(t.id));
+      const existingIds = new Set(playlist.value.map((t) => t.id));
+      const newTracks = tracks.filter((t) => !existingIds.has(t.id));
       if (newTracks.length > 0) {
         playlist.value.push(...newTracks);
       }
@@ -132,21 +144,27 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
     if (typeof index === 'number') {
       currentIndex.value = index;
     }
-    
+
     const track = currentTrack.value;
     if (!track) return;
 
     if (track.type === 'local') {
-      if (audio.src !== track.url && audio.src !== new URL(track.url, window.location.origin).href) {
+      if (
+        audio.src !== track.url &&
+        audio.src !== new URL(track.url, window.location.origin).href
+      ) {
         audio.src = track.url;
         audio.load();
       }
-      
-      audio.play().then(() => {
-        isPlaying.value = true;
-      }).catch(e => {
-        console.error("Play failed", e);
-      });
+
+      audio
+        .play()
+        .then(() => {
+          isPlaying.value = true;
+        })
+        .catch((e) => {
+          console.error('Play failed', e);
+        });
     } else {
       // Handle iframe/external types (just mark as playing for UI)
       isPlaying.value = true;
@@ -198,7 +216,7 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
       next();
     }
   }
-  
+
   function setVolume(_val: number) {
     // This is now handled by settings store
   }
@@ -219,7 +237,7 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
         currentIndex.value = 0;
       } else {
         // play next (which is now at the same index)
-        if (isPlaying.value) play(); 
+        if (isPlaying.value) play();
       }
     }
   }

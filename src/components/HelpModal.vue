@@ -18,29 +18,34 @@ const emit = defineEmits<{
 const activeSectionId = ref(GUIDE_CONTENT[0]?.id || '');
 const searchQuery = ref('');
 
-const activeSection = computed(() => 
-  GUIDE_CONTENT.find(s => s.id === activeSectionId.value) || GUIDE_CONTENT[0]
+const activeSection = computed(
+  () => GUIDE_CONTENT.find((s) => s.id === activeSectionId.value) || GUIDE_CONTENT[0]
 );
 
 const filteredSections = computed(() => {
   if (!searchQuery.value) return GUIDE_CONTENT;
-  return GUIDE_CONTENT.filter(s => 
-    s.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-    s.content.toLowerCase().includes(searchQuery.value.toLowerCase())
+  return GUIDE_CONTENT.filter(
+    (s) =>
+      s.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      s.content.toLowerCase().includes(searchQuery.value.toLowerCase())
   );
 });
 
 // Sync activeSectionId with prop when modal opens
-watch(() => props.isOpen, (val) => {
-  if (val) {
-    audioManager.playWindowOpen();
-    if (props.initialSectionId) {
-      activeSectionId.value = props.initialSectionId;
+watch(
+  () => props.isOpen,
+  (val) => {
+    if (val) {
+      audioManager.playWindowOpen();
+      if (props.initialSectionId) {
+        activeSectionId.value = props.initialSectionId;
+      }
+    } else if (val === false) {
+      // Only play close sound if it was actually open
+      audioManager.playWindowClose();
     }
-  } else if (val === false) { // Only play close sound if it was actually open
-    audioManager.playWindowClose();
   }
-});
+);
 
 function handleSectionClick(id: string) {
   activeSectionId.value = id;
@@ -57,12 +62,12 @@ function handleContentClick(event: MouseEvent) {
       event.preventDefault();
       const action = href.replace('action:', '');
       console.log('[HelpModal] Triggering action:', action);
-      
+
       if (action === 'stay') {
         // Do nothing for self-reference
         return;
       }
-      
+
       audioManager.playClick();
       emit('action', action);
       // Close help modal for most actions to allow user to see the result
@@ -82,7 +87,6 @@ const parsedContent = computed(() => {
   // But standard markdown parser output with simple <a> tags is enough if styled correctly
   return html;
 });
-
 </script>
 
 <template>
@@ -94,20 +98,34 @@ const parsedContent = computed(() => {
     leave-from-class="opacity-100 scale-100"
     leave-to-class="opacity-0 scale-95"
   >
-    <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6" @click.self="emit('close')">
+    <div
+      v-if="isOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+      @click.self="emit('close')"
+    >
       <!-- Backdrop -->
-      <div class="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" @click="emit('close')"></div>
+      <div
+        class="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+        @click="emit('close')"
+      ></div>
 
       <!-- Modal Card -->
-      <div class="relative bg-izakaya-paper w-full max-w-5xl h-[80vh] rounded-xl shadow-2xl flex flex-col overflow-hidden border-2 border-izakaya-wood/20">
-        
+      <div
+        class="relative bg-izakaya-paper w-full max-w-5xl h-[80vh] rounded-xl shadow-2xl flex flex-col overflow-hidden border-2 border-izakaya-wood/20"
+      >
         <!-- Texture Overlay -->
-        <div class="absolute inset-0 pointer-events-none opacity-20 bg-texture-rice-paper mix-blend-multiply z-0"></div>
+        <div
+          class="absolute inset-0 pointer-events-none opacity-20 bg-texture-rice-paper mix-blend-multiply z-0"
+        ></div>
 
         <!-- Header -->
-        <div class="relative z-10 flex items-center justify-between px-6 py-4 bg-izakaya-wood/5 border-b border-izakaya-wood/10">
+        <div
+          class="relative z-10 flex items-center justify-between px-6 py-4 bg-izakaya-wood/5 border-b border-izakaya-wood/10"
+        >
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-touhou-red text-white flex items-center justify-center shadow-sm">
+            <div
+              class="w-10 h-10 rounded-full bg-touhou-red text-white flex items-center justify-center shadow-sm"
+            >
               <HelpCircle class="w-6 h-6" />
             </div>
             <div>
@@ -115,8 +133,8 @@ const parsedContent = computed(() => {
               <p class="text-xs text-izakaya-wood/60">幻想乡异闻录 - 新手指南</p>
             </div>
           </div>
-          
-          <button 
+
+          <button
             @click="emit('close')"
             class="p-2 hover:bg-izakaya-wood/10 rounded-full transition-colors text-izakaya-wood/60 hover:text-izakaya-wood"
           >
@@ -126,11 +144,15 @@ const parsedContent = computed(() => {
 
         <!-- Body -->
         <div class="relative z-10 flex flex-col md:flex-row flex-1 min-h-0">
-
           <!-- Sidebar (TOC) - Desktop: left sidebar, Mobile: top tabs -->
-          <div class="md:w-64 bg-white/50 border-b md:border-b-0 md:border-r border-izakaya-wood/10 flex flex-col flex-shrink-0">
+          <div
+            class="md:w-64 bg-white/50 border-b md:border-b-0 md:border-r border-izakaya-wood/10 flex flex-col flex-shrink-0"
+          >
             <!-- Mobile: Horizontal scrollable tabs -->
-            <div class="md:hidden overflow-x-auto p-2 flex gap-2" style="-webkit-overflow-scrolling: touch;">
+            <div
+              class="md:hidden overflow-x-auto p-2 flex gap-2"
+              style="-webkit-overflow-scrolling: touch"
+            >
               <button
                 v-for="section in filteredSections"
                 :key="section.id"
@@ -166,21 +188,26 @@ const parsedContent = computed(() => {
           </div>
 
           <!-- Content Area -->
-          <div class="flex-1 overflow-y-auto bg-white/80 p-4 md:p-8 custom-scrollbar relative" style="-webkit-overflow-scrolling: touch;">
-             <div class="max-w-3xl mx-auto prose prose-stone prose-headings:font-display prose-headings:text-izakaya-wood prose-a:text-touhou-red prose-a:no-underline prose-a:font-bold prose-a:border-b-2 prose-a:border-touhou-red/20 hover:prose-a:border-touhou-red hover:prose-a:bg-touhou-red/5 prose-a:transition-all prose-a:px-1 prose-a:rounded-sm prose-img:rounded-xl prose-strong:text-touhou-red/80">
-                <!-- Render Content -->
-                <div v-html="parsedContent" @click="handleContentClick"></div>
-             </div>
+          <div
+            class="flex-1 overflow-y-auto bg-white/80 p-4 md:p-8 custom-scrollbar relative"
+            style="-webkit-overflow-scrolling: touch"
+          >
+            <div
+              class="max-w-3xl mx-auto prose prose-stone prose-headings:font-display prose-headings:text-izakaya-wood prose-a:text-touhou-red prose-a:no-underline prose-a:font-bold prose-a:border-b-2 prose-a:border-touhou-red/20 hover:prose-a:border-touhou-red hover:prose-a:bg-touhou-red/5 prose-a:transition-all prose-a:px-1 prose-a:rounded-sm prose-img:rounded-xl prose-strong:text-touhou-red/80"
+            >
+              <!-- Render Content -->
+              <div v-html="parsedContent" @click="handleContentClick"></div>
+            </div>
 
-             <!-- Interaction Hint -->
-             <div class="mt-12 pt-6 border-t border-izakaya-wood/10 text-center text-xs text-izakaya-wood/40 flex items-center justify-center gap-2">
-                <MousePointer2 class="w-3 h-3" />
-                <span>点击文档中的高亮链接可快速跳转功能</span>
-             </div>
+            <!-- Interaction Hint -->
+            <div
+              class="mt-12 pt-6 border-t border-izakaya-wood/10 text-center text-xs text-izakaya-wood/40 flex items-center justify-center gap-2"
+            >
+              <MousePointer2 class="w-3 h-3" />
+              <span>点击文档中的高亮链接可快速跳转功能</span>
+            </div>
           </div>
-
         </div>
-
       </div>
     </div>
   </Transition>

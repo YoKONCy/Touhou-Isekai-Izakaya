@@ -17,10 +17,10 @@ export interface GraphEdge {
 
 // Configuration for PEDSA Algorithm
 export const PEDSA_CONFIG = {
-  decayRate: 0.6,          // How much energy is lost per step (0.0 - 1.0)
+  decayRate: 0.6, // How much energy is lost per step (0.0 - 1.0)
   activationThreshold: 0.05, // Minimum energy to keep propagating
-  maxSteps: 3,             // Maximum propagation depth
-  maxFanOut: 10            // Max edges to traverse per node (to prevent explosion)
+  maxSteps: 3, // Maximum propagation depth
+  maxFanOut: 10 // Max edges to traverse per node (to prevent explosion)
 };
 
 /**
@@ -36,8 +36,8 @@ export class MemoryGraphService {
 
   async ensureInitialized(saveSlotId: number) {
     if (!this.isInitialized || this.currentSaveSlotId !== saveSlotId) {
-        await this.loadGraph(saveSlotId);
-        this.currentSaveSlotId = saveSlotId;
+      await this.loadGraph(saveSlotId);
+      this.currentSaveSlotId = saveSlotId;
     }
   }
 
@@ -48,34 +48,34 @@ export class MemoryGraphService {
   async loadGraph(saveSlotId: number) {
     console.time('GraphLoad');
     this.adjacencyList.clear();
-    
+
     try {
       const relations = await dbService.getAllMemoryRelations(saveSlotId);
-      
+
       relations.forEach((rel: any) => {
         if (!this.adjacencyList.has(rel.source_id)) {
           this.adjacencyList.set(rel.source_id, []);
         }
-        
+
         // Add edge
         this.adjacencyList.get(rel.source_id)?.push({
           targetId: rel.target_id,
           weight: rel.strength,
           type: rel.rel_type
         });
-        
+
         // Since it's an undirected graph concept for association (mostly),
-        // we might want bidirectional links for some types, but let's stick to 
+        // we might want bidirectional links for some types, but let's stick to
         // explicit edges from DB. If DB has only one-way, we respect it.
         // PeroCore usually treats 'associative' as bidirectional.
-        
+
         // For 'sequence' (prev/next), it's directed.
         // For 'entity' (memory -> entity), if we treat entity as a node...
-        // Wait, our nodes are ALL memories. 
-        // Entities are implicit anchors. 
+        // Wait, our nodes are ALL memories.
+        // Entities are implicit anchors.
         // If Memory A and Memory B both relate to "Reimu", they should be connected?
         // OR, we have "Virtual Nodes" for entities?
-        
+
         // Simplified approach V1: Nodes are ONLY Memories.
         // Edges are direct links between memories.
       });
@@ -119,7 +119,7 @@ export class MemoryGraphService {
         if (energy < PEDSA_CONFIG.activationThreshold) continue;
 
         const edges = this.adjacencyList.get(sourceId) || [];
-        
+
         // Sort by weight to prioritize strong connections (Fan-out limit)
         // Optimization: In a real large graph, pre-sort edges.
         const activeEdges = edges
@@ -136,13 +136,13 @@ export class MemoryGraphService {
             const currentEnergy = nextActivations.get(edge.targetId) || 0;
             const existingFinalEnergy = finalActivations.get(edge.targetId) || 0;
 
-            // Softmax-like accumulation or Max? 
+            // Softmax-like accumulation or Max?
             // PeroCore uses accumulation but capped at 1.0 usually.
             // Let's use max for simplicity to avoid explosion, or simple add with dampening.
             const newEnergy = currentEnergy + propagatedEnergy;
-            
+
             nextActivations.set(edge.targetId, newEnergy);
-            
+
             // Update final result map (keeping the highest energy seen or accumulating?)
             // We accumulate into final map to capture multi-path reinforcement.
             finalActivations.set(edge.targetId, existingFinalEnergy + propagatedEnergy);
@@ -152,7 +152,7 @@ export class MemoryGraphService {
 
       // Prepare for next step
       currentActivations = nextActivations;
-      
+
       // If no nodes active, stop early
       if (currentActivations.size === 0) break;
     }

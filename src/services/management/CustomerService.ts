@@ -42,28 +42,33 @@ Return ONLY the dialogue string (no quotes needed around the whole text).
 `;
 
 export async function evaluateDish(
-  customer: Customer, 
-  dish: CookingSession, 
-  context: string = ""
-): Promise<{ score: number; comment: string; payment: number; reputation: number; isDelicious: boolean }> {
+  customer: Customer,
+  dish: CookingSession,
+  context: string = ''
+): Promise<{
+  score: number;
+  comment: string;
+  payment: number;
+  reputation: number;
+  isDelicious: boolean;
+}> {
   try {
-    const ingredientsDesc = dish.ingredients.map(i => 
-      `${i.ingredient.name} (Cooked ${i.cookedDuration}s, Order ${i.sequence})`
-    ).join(', ');
+    const ingredientsDesc = dish.ingredients
+      .map((i) => `${i.ingredient.name} (Cooked ${i.cookedDuration}s, Order ${i.sequence})`)
+      .join(', ');
 
-    const prompt = JUDGING_PROMPT
-      .replace('{customerName}', customer.name)
-      .replace('{customerContext}', customer.dialogue || context || "Regular customer")
+    const prompt = JUDGING_PROMPT.replace('{customerName}', customer.name)
+      .replace('{customerContext}', customer.dialogue || context || 'Regular customer')
       .replace('{dishName}', dish.dishName)
       .replace('{ingredients}', ingredientsDesc)
       .replace('{totalTime}', dish.totalDuration.toString())
       .replace('{heat}', dish.accumulatedHeat.toString())
       .replace('{phase}', dish.finalPhase)
-      .replace('{requirement}', customer.order?.dishName || "Something tasty");
+      .replace('{requirement}', customer.order?.dishName || 'Something tasty');
 
     const response = await generateCompletion({
       modelType: 'logic',
-      systemPrompt: "You are a culinary judge and roleplay engine.",
+      systemPrompt: 'You are a culinary judge and roleplay engine.',
       messages: [{ role: 'user', content: prompt }],
       jsonMode: true,
       temperature: 0.7
@@ -71,10 +76,10 @@ export async function evaluateDish(
 
     return JSON.parse(response);
   } catch (error) {
-    console.error("菜品评价失败", error);
+    console.error('菜品评价失败', error);
     return {
       score: 50,
-      comment: "还可以吧。",
+      comment: '还可以吧。',
       payment: 100,
       reputation: 0,
       isDelicious: false
@@ -84,20 +89,18 @@ export async function evaluateDish(
 
 export async function generateCustomerDialogue(name: string, context: string): Promise<string> {
   try {
-    const prompt = DIALOGUE_PROMPT
-      .replace('{name}', name)
-      .replace('{context}', context);
+    const prompt = DIALOGUE_PROMPT.replace('{name}', name).replace('{context}', context);
 
     const response = await generateCompletion({
       modelType: 'chat',
-      systemPrompt: "You are a Touhou Project character roleplay engine.",
+      systemPrompt: 'You are a Touhou Project character roleplay engine.',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.8
     });
 
     return response.trim();
   } catch (error) {
-    console.error("对话生成失败", error);
-    return "...";
+    console.error('对话生成失败', error);
+    return '...';
   }
 }

@@ -2,10 +2,10 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { dbService } from '@/services/DatabaseService';
 import _ from 'lodash';
-import { 
-    DEFAULT_DRAWING_PROMPT_SYSTEM, 
-    DEFAULT_NOVELAI_V3_PROMPT_SYSTEM, 
-    DEFAULT_NOVELAI_V4_PROMPT_SYSTEM 
+import {
+  DEFAULT_DRAWING_PROMPT_SYSTEM,
+  DEFAULT_NOVELAI_V3_PROMPT_SYSTEM,
+  DEFAULT_NOVELAI_V4_PROMPT_SYSTEM
 } from '@/services/drawing';
 
 export interface LLMConfig {
@@ -19,7 +19,7 @@ export interface LLMConfig {
   };
   model: string;
   maxContextTokens?: number; // Optional context window limit
-  
+
   // Advanced Settings
   stream?: boolean; // Default true
   timeout?: number; // Default 300000ms (5min)
@@ -128,7 +128,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const enableMemoryRefinement = ref(false); // Default to disabled
   const enableManagementSystem = ref(false); // Toggle for Izakaya Management System
   const useDefaultTilemap = ref(false); // Debug: Use hardcoded map instead of LLM generated one
-  
+
   const theme = ref<'light' | 'dark' | 'eye-protection'>('light');
   const currentSaveSlotId = ref<number | undefined>(undefined);
 
@@ -151,11 +151,12 @@ export const useSettingsStore = defineStore('settings', () => {
     steps: 28,
     scale: 5.0,
     sampler: 'k_euler_ancestral',
-    negativePrompt: 'lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry',
-    
+    negativePrompt:
+      'lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry',
+
     // Legacy field, kept for migration or fallback
     systemPrompt: DEFAULT_DRAWING_PROMPT_SYSTEM,
-    
+
     // Separated System Prompts
     systemPromptOpenAI: DEFAULT_DRAWING_PROMPT_SYSTEM,
     systemPromptNovelAIV3: DEFAULT_NOVELAI_V3_PROMPT_SYSTEM,
@@ -172,28 +173,32 @@ export const useSettingsStore = defineStore('settings', () => {
     if (settings) {
       if (settings.globalProvider) globalProvider.value = settings.globalProvider;
       if (settings.llmConfigs) {
-         // Merge saved configs with default to ensure new fields (like maxContextTokens) exist
-         const savedConfigs = settings.llmConfigs;
-         for (const key in DEFAULT_LLM_CONFIGS) {
-           if (savedConfigs[key]) {
-             // Ensure maxContextTokens exists if not present in saved data
-             const defaultConfig = DEFAULT_LLM_CONFIGS[key];
-             if (defaultConfig && savedConfigs[key].maxContextTokens === undefined && defaultConfig.maxContextTokens !== undefined) {
-               savedConfigs[key].maxContextTokens = defaultConfig.maxContextTokens;
-             }
-           } else {
-             // If a new config key was added (e.g. misc), add it from defaults
-             savedConfigs[key] = _.cloneDeep(DEFAULT_LLM_CONFIGS[key]);
-           }
-         }
-         llmConfigs.value = savedConfigs;
+        // Merge saved configs with default to ensure new fields (like maxContextTokens) exist
+        const savedConfigs = settings.llmConfigs;
+        for (const key in DEFAULT_LLM_CONFIGS) {
+          if (savedConfigs[key]) {
+            // Ensure maxContextTokens exists if not present in saved data
+            const defaultConfig = DEFAULT_LLM_CONFIGS[key];
+            if (
+              defaultConfig &&
+              savedConfigs[key].maxContextTokens === undefined &&
+              defaultConfig.maxContextTokens !== undefined
+            ) {
+              savedConfigs[key].maxContextTokens = defaultConfig.maxContextTokens;
+            }
+          } else {
+            // If a new config key was added (e.g. misc), add it from defaults
+            savedConfigs[key] = _.cloneDeep(DEFAULT_LLM_CONFIGS[key]);
+          }
+        }
+        llmConfigs.value = savedConfigs;
       }
       if (settings.enableMemoryRefinement !== undefined) {
         enableMemoryRefinement.value = settings.enableMemoryRefinement;
       }
       // Force disabled: enableManagementSystem.value = settings.enableManagementSystem;
       enableManagementSystem.value = false;
-      
+
       if (settings.useDefaultTilemap !== undefined) {
         useDefaultTilemap.value = settings.useDefaultTilemap;
       }
@@ -203,7 +208,7 @@ export const useSettingsStore = defineStore('settings', () => {
       if (settings.sfxVolume !== undefined) sfxVolume.value = settings.sfxVolume;
       if (settings.drawingConfig) {
         const mergedConfig = { ...drawingConfig.value, ...settings.drawingConfig };
-        
+
         // Migration: Model ID cleanup
         const modelMap: Record<string, string> = {
           'NovelAI Diffusion V4.5 Full': 'nai-diffusion-4-5-full',
@@ -215,16 +220,17 @@ export const useSettingsStore = defineStore('settings', () => {
           'nai-diffusion-4.5-full': 'nai-diffusion-4-5-full',
           'nai-diffusion-4.5-curated': 'nai-diffusion-4-5-curated'
         };
-        
+
         const mappedModel = mergedConfig.model ? modelMap[mergedConfig.model] : undefined;
         if (mappedModel) {
           mergedConfig.model = mappedModel;
         }
 
         // Migration: If the user was using the old official URL, update it to the new CF proxy URL
-        const isOfficialUrl = mergedConfig.apiBaseUrl === 'https://api.novelai.net/ai/generate-image' || 
-                             mergedConfig.apiBaseUrl === 'https://image.novelai.net/ai/generate-image';
-                             
+        const isOfficialUrl =
+          mergedConfig.apiBaseUrl === 'https://api.novelai.net/ai/generate-image' ||
+          mergedConfig.apiBaseUrl === 'https://image.novelai.net/ai/generate-image';
+
         if (mergedConfig.providerType === 'novelai' && isOfficialUrl) {
           mergedConfig.apiBaseUrl = 'https://nai-proxy.2752026184.workers.dev/ai/generate-image';
         }
@@ -253,7 +259,7 @@ export const useSettingsStore = defineStore('settings', () => {
       sfxVolume: sfxVolume.value,
       drawingConfig: JSON.parse(JSON.stringify(drawingConfig.value))
     };
-    
+
     await dbService.saveSettings(settingsToSave);
   }
 
@@ -263,7 +269,7 @@ export const useSettingsStore = defineStore('settings', () => {
   async function exportGlobalConfig() {
     // 1. Prepare global settings data
     const dbData = await dbService.exportGlobalData();
-    
+
     const config: any = {
       version: 2, // Upgraded version to include game data
       timestamp: Date.now(),
@@ -273,7 +279,7 @@ export const useSettingsStore = defineStore('settings', () => {
         audioVolume: audioVolume.value,
         enableAudio: enableAudio.value,
         bgmVolume: bgmVolume.value,
-        sfxVolume: sfxVolume.value,
+        sfxVolume: sfxVolume.value
       },
       customOrigins: [] as any[],
       gameData: dbData
@@ -301,10 +307,10 @@ export const useSettingsStore = defineStore('settings', () => {
   async function importGlobalConfig(jsonStr: string) {
     try {
       const config = JSON.parse(jsonStr);
-      
+
       // Validation: Ensure it's a valid backup file before doing anything
       if (!config.version || (!config.globalProvider && !config.gameData)) {
-        throw new Error("无效的备份文件：缺少版本号或必要数据");
+        throw new Error('无效的备份文件：缺少版本号或必要数据');
       }
 
       // 1. Import Global Settings
@@ -318,7 +324,7 @@ export const useSettingsStore = defineStore('settings', () => {
         }
         llmConfigs.value = mergedConfigs;
       }
-      
+
       if (config.audio) {
         if (config.audio.audioVolume !== undefined) audioVolume.value = config.audio.audioVolume;
         if (config.audio.enableAudio !== undefined) enableAudio.value = config.audio.enableAudio;
@@ -348,10 +354,10 @@ export const useSettingsStore = defineStore('settings', () => {
   function getEffectiveConfig(type: 'chat' | 'logic' | 'memory' | 'misc' | 'drawing') {
     const config = llmConfigs.value[type];
     const defaultConfig = DEFAULT_LLM_CONFIGS[type];
-    
+
     // Merge with defaults to ensure all fields exist
     const mergedConfig = { ...defaultConfig, ...config };
-    
+
     if (mergedConfig.useGlobal) {
       return {
         baseUrl: globalProvider.value.baseUrl,
@@ -366,7 +372,7 @@ export const useSettingsStore = defineStore('settings', () => {
         frequency_penalty: mergedConfig.frequency_penalty,
         presence_penalty: mergedConfig.presence_penalty,
         // Chat-specific
-        ...(type === 'chat' && { 
+        ...(type === 'chat' && {
           historyTurns: mergedConfig.historyTurns,
           minWordCount: mergedConfig.minWordCount,
           maxWordCount: mergedConfig.maxWordCount
@@ -386,7 +392,7 @@ export const useSettingsStore = defineStore('settings', () => {
       frequency_penalty: mergedConfig.frequency_penalty,
       presence_penalty: mergedConfig.presence_penalty,
       // Chat-specific
-      ...(type === 'chat' && { 
+      ...(type === 'chat' && {
         historyTurns: mergedConfig.historyTurns,
         minWordCount: mergedConfig.minWordCount,
         maxWordCount: mergedConfig.maxWordCount
@@ -394,13 +400,16 @@ export const useSettingsStore = defineStore('settings', () => {
     };
   }
 
-  function updateLLMConfig(type: 'chat' | 'logic' | 'memory' | 'misc' | 'drawing', newConfig: Partial<LLMConfig>) {
+  function updateLLMConfig(
+    type: 'chat' | 'logic' | 'memory' | 'misc' | 'drawing',
+    newConfig: Partial<LLMConfig>
+  ) {
     const currentConfig = llmConfigs.value[type] || DEFAULT_LLM_CONFIGS[type];
     if (!currentConfig) return; // Should not happen given defaults
 
     // Explicitly cast to LLMConfig to ensure type safety, preserving ID and other required fields
-    llmConfigs.value[type] = { 
-      ...currentConfig, 
+    llmConfigs.value[type] = {
+      ...currentConfig,
       ...newConfig,
       id: currentConfig.id // Ensure ID is never undefined
     } as LLMConfig;
@@ -408,23 +417,23 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   return {
-      globalProvider,
-      llmConfigs,
-      enableMemoryRefinement,
-      enableManagementSystem,
-      useDefaultTilemap,
-      theme,
-      currentSaveSlotId,
-      audioVolume,
-      enableAudio,
-      bgmVolume,
-      sfxVolume,
-      drawingConfig,
-      loadSettings,
-      saveSettings,
-      exportGlobalConfig,
-      importGlobalConfig,
-      getEffectiveConfig,
-      updateLLMConfig
-    };
+    globalProvider,
+    llmConfigs,
+    enableMemoryRefinement,
+    enableManagementSystem,
+    useDefaultTilemap,
+    theme,
+    currentSaveSlotId,
+    audioVolume,
+    enableAudio,
+    bgmVolume,
+    sfxVolume,
+    drawingConfig,
+    loadSettings,
+    saveSettings,
+    exportGlobalConfig,
+    importGlobalConfig,
+    getEffectiveConfig,
+    updateLLMConfig
+  };
 });

@@ -1,4 +1,3 @@
-
 // Wrapper for Web Crypto API for AES-GCM encryption
 export class CryptoService {
   private static instance: CryptoService;
@@ -13,39 +12,42 @@ export class CryptoService {
   }
 
   // Derive a key from a password using PBKDF2
-  public async deriveKey(password: string, salt: string = 'touhou-isekai-salt'): Promise<CryptoKey> {
+  public async deriveKey(
+    password: string,
+    salt: string = 'touhou-isekai-salt'
+  ): Promise<CryptoKey> {
     const enc = new TextEncoder();
     const keyMaterial = await window.crypto.subtle.importKey(
-      "raw",
+      'raw',
       enc.encode(password),
-      { name: "PBKDF2" },
+      { name: 'PBKDF2' },
       false,
-      ["deriveBits", "deriveKey"]
+      ['deriveBits', 'deriveKey']
     );
 
     return window.crypto.subtle.deriveKey(
       {
-        name: "PBKDF2",
+        name: 'PBKDF2',
         salt: enc.encode(salt),
         iterations: 100000,
-        hash: "SHA-256"
+        hash: 'SHA-256'
       },
       keyMaterial,
-      { name: "AES-GCM", length: 256 },
+      { name: 'AES-GCM', length: 256 },
       true, // Extractable (not strictly needed but useful for debugging if needed, though secure practice prefers false)
-      ["encrypt", "decrypt"]
+      ['encrypt', 'decrypt']
     );
   }
 
   // Encrypt data (JSON object)
-  public async encrypt(data: any, key: CryptoKey): Promise<{ ciphertext: string, iv: string }> {
+  public async encrypt(data: any, key: CryptoKey): Promise<{ ciphertext: string; iv: string }> {
     const enc = new TextEncoder();
     const encodedData = enc.encode(JSON.stringify(data));
     const iv = window.crypto.getRandomValues(new Uint8Array(12));
 
     const encryptedContent = await window.crypto.subtle.encrypt(
       {
-        name: "AES-GCM",
+        name: 'AES-GCM',
         iv: iv
       },
       key,
@@ -67,7 +69,7 @@ export class CryptoService {
     try {
       const decryptedContent = await window.crypto.subtle.decrypt(
         {
-          name: "AES-GCM",
+          name: 'AES-GCM',
           iv: ivData
         },
         key,

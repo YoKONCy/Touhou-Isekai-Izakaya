@@ -77,6 +77,7 @@
 | 🌐 | **Multiplayer** - 全能联机中心 | [Jump](#-multiplayer-hub) |
 | ⚔️ | **Combat System** - 策略弹幕战斗 | [Jump](#-combat-system) |
 | 🚀 | **Quick Start** - 快速开始指南 | [Jump](#-quick-start) |
+| 📦 | **Build & Packaging** - 打包构建与代码规范 | [Jump](#-build--packaging) |
 | 🖼️ | **AI Drawing** - AI 绘图与隐私说明 | [Jump](#-ai-drawing-privacy) |
 | 📅 | **Roadmap** - 开发计划与待办 | [Jump](#-roadmap) |
 | ⚠️ | **Disclaimer** - 版权与声明 | [Jump](#-disclaimer) |
@@ -401,6 +402,94 @@ graph TD
 <img src="https://user-images.githubusercontent.com/73097560/115834477-dbab4500-a447-11eb-908a-139a6edaec5c.gif" width="100%">
 
 <br/>
+
+## 📦 Build & Packaging
+
+### 🌐 Web 生产构建 (Production Build)
+
+```bash
+# 类型检查 + 构建
+pnpm run build
+# 或跳过类型检查，仅构建
+pnpm run static-build
+# 预览构建产物
+pnpm run preview
+```
+
+构建产物输出到 `dist/` 目录，可直接部署到任何静态文件托管服务（GitHub Pages, Vercel, Cloudflare Pages 等）。
+
+> **⚠️ 重要**: 为了在 Web 端启用 OPFS 持久化存储，你的服务器必须设置以下 HTTP 响应头（或使用项目内置的 `coi-serviceworker.js` 自动注入）:
+> ```
+> Cross-Origin-Opener-Policy: same-origin
+> Cross-Origin-Embedder-Policy: require-corp
+> ```
+
+### 📱 Android 打包 (Android Build)
+
+本项目使用 [Capacitor](https://capacitorjs.com/) 将 Web 应用打包为 Android 原生应用。
+
+#### 前置要求
+- **Android Studio** (最新版)
+- **JDK 21+**
+- **Android SDK** (API Level 36，见 `android/variables.gradle`)
+
+#### 打包步骤
+
+```bash
+# 1. 构建 Web 产物
+pnpm run build
+
+# 2. 同步 Web 产物到 Android 工程
+npx cap copy android
+
+# 3. 同步原生插件 (如有新增依赖)
+npx cap sync android
+
+# 4. 在 Android Studio 中打开工程
+npx cap open android
+```
+
+在 Android Studio 中，选择 **Build → Generate Signed Bundle / APK** 即可生成发布包。
+
+#### 🔧 Android 存储兼容性说明
+
+Android WebView **不支持** `crossOriginIsolated`（这是 Chromium 的已知限制），因此标准的 OPFS VFS 无法工作。本项目采用了**三级梯度回退策略**自动处理：
+
+| 优先级 | 存储方案 | 适用环境 | 需要 SharedArrayBuffer? |
+|:---:|:---|:---|:---:|
+| 1 | **OPFS** (标准) | 桌面浏览器 (Chrome, Firefox, Safari) | ✅ 是 |
+| 2 | **opfs-sahpool** | Android WebView, 移动端浏览器 | ❌ 否 |
+| 3 | **内存数据库** (兜底) | 极端环境 (数据不持久化) | ❌ 否 |
+
+> `opfs-sahpool` 使用 OPFS 的 `FileSystemSyncAccessHandle` API，不依赖 `SharedArrayBuffer`，兼容所有 2023 年 3 月后发布的主流浏览器内核（Chrome 108+, Safari 16.4+, Firefox 111+）。
+
+### 🧹 代码规范 (Code Quality)
+
+项目已配置 **Prettier** + **ESLint** 进行代码规范化：
+
+```bash
+# 格式化所有源代码
+npx prettier --write src/
+
+# 自动修复 ESLint 问题
+npx eslint --fix src/
+
+# 类型检查 (不输出文件)
+npx vue-tsc --noEmit
+```
+
+配置文件：
+- `.prettierrc` — Prettier 规则（单引号、2 空格缩进、行宽 100）
+- `eslint.config.js` — ESLint 规则（含 Vue + TypeScript 插件）
+- `.prettierignore` — 排除 `dist/`, `node_modules/`, `android/` 等目录
+
+<br/>
+
+<!-- 动态分隔线 -->
+<img src="https://user-images.githubusercontent.com/73097560/115834477-dbab4500-a447-11eb-908a-139a6edaec5c.gif" width="100%">
+
+<br/>
+
 
 ## 🖼️ AI Drawing Privacy
 

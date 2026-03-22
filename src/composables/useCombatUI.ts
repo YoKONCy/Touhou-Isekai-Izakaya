@@ -55,7 +55,7 @@ export function useCombatUI() {
     const list = getPopups(target.id);
     list.push({ id, text: value, type });
     setTimeout(() => {
-      const idx = list.findIndex(p => p.id === id);
+      const idx = list.findIndex((p) => p.id === id);
       if (idx > -1) list.splice(idx, 1);
     }, 1000);
   }
@@ -73,7 +73,7 @@ export function useCombatUI() {
     combatLogs.value.unshift({
       id: Date.now() + Math.random(),
       turn: turnValue,
-      content,
+      content
     });
     // Sync to store
     if (combatState) {
@@ -84,7 +84,7 @@ export function useCombatUI() {
         actorName: '系统',
         actionType: 'wait',
         targetNames: [],
-        description: content,
+        description: content
       });
     }
   }
@@ -93,20 +93,31 @@ export function useCombatUI() {
   function getEffectName(effect: BuffEffect): string {
     if (effect.type === 'stat_mod') {
       const statMap: Record<string, string> = {
-        attack: '攻击', defense: '防御', dodge: '闪避', damage_taken: '受伤修正',
+        attack: '攻击',
+        defense: '防御',
+        dodge: '闪避',
+        damage_taken: '受伤修正'
       };
       return statMap[effect.targetStat || ''] || '属性';
     }
     const typeMap: Record<string, string> = {
-      damage_reduction: '减伤', dodge_mod: '闪避修正', shield: '护盾',
-      heal: '每回合回复', damage_over_time: '持续受伤', heal_mp: 'MP回复',
+      damage_reduction: '减伤',
+      dodge_mod: '闪避修正',
+      shield: '护盾',
+      heal: '每回合回复',
+      damage_over_time: '持续受伤',
+      heal_mp: 'MP回复'
     };
     return typeMap[effect.type] || '效果';
   }
 
   function getSpellTypeName(type: string): string {
     const map: Record<string, string> = {
-      attack: '攻击', buff: '增益', debuff: '减益', shield: '护盾', heal: '治疗',
+      attack: '攻击',
+      buff: '增益',
+      debuff: '减益',
+      shield: '护盾',
+      heal: '治疗'
     };
     return map[type] || '特殊';
   }
@@ -138,10 +149,10 @@ export function useCombatUI() {
     const color = `rgb(${r}, ${g}, ${b})`;
     const percent = ratio * 100;
     return {
-      borderColor: color
-      , color,
+      borderColor: color,
+      color,
       boxShadow: `0 0 10px rgba(${r}, ${g}, ${b}, 0.4)`,
-      background: `linear-gradient(to left, rgba(${r}, ${g}, ${b}, 0.3) ${percent}%, rgba(0,0,0,0.8) ${percent}%)`,
+      background: `linear-gradient(to left, rgba(${r}, ${g}, ${b}, 0.3) ${percent}%, rgba(0,0,0,0.8) ${percent}%)`
     };
   }
 
@@ -150,9 +161,21 @@ export function useCombatUI() {
     const map: Record<string, any> = {
       blue: { border: 'border-cyan-500', hoverBg: 'hover:bg-cyan-900/50', textP: 'text-cyan-300' },
       red: { border: 'border-red-500', hoverBg: 'hover:bg-red-900/50', textP: 'text-red-300' },
-      orange: { border: 'border-orange-500', hoverBg: 'hover:bg-orange-900/50', textP: 'text-orange-300' },
-      purple: { border: 'border-purple-500', hoverBg: 'hover:bg-purple-900/50', textP: 'text-purple-300' },
-      yellow: { border: 'border-yellow-500', hoverBg: 'hover:bg-yellow-900/50', textP: 'text-yellow-300' },
+      orange: {
+        border: 'border-orange-500',
+        hoverBg: 'hover:bg-orange-900/50',
+        textP: 'text-orange-300'
+      },
+      purple: {
+        border: 'border-purple-500',
+        hoverBg: 'hover:bg-purple-900/50',
+        textP: 'text-purple-300'
+      },
+      yellow: {
+        border: 'border-yellow-500',
+        hoverBg: 'hover:bg-yellow-900/50',
+        textP: 'text-yellow-300'
+      }
     };
     return map[theme] || map.yellow;
   }
@@ -190,6 +213,6 @@ export function useCombatUI() {
     getEnemyHpStyle,
     getSkillThemeClasses,
     // Dodge
-    getEnemyEffectiveDodge,
+    getEnemyEffectiveDodge
   };
 }

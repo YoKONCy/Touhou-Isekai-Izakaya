@@ -16,11 +16,11 @@ class MultiplayerService {
   private static instance: MultiplayerService;
   private ws: WebSocket | null = null;
   private cryptoKey: CryptoKey | null = null;
-  
+
   // Host Side: Command Queue for sequential processing
   private commandQueue: any[] = [];
   private isProcessingQueue: boolean = false;
-  
+
   // Host Side: Store Guest Inputs
   private pendingGuestInputs: Record<string, string> = {};
 
@@ -59,7 +59,9 @@ class MultiplayerService {
   public async fetchPublicRooms(): Promise<any[]> {
     try {
       // WebSocket URL is wss://.../ws, we need https://.../rooms
-      const baseUrl = this.OFFICIAL_SERVER_URL.replace('wss://', 'https://').replace('ws://', 'http://').replace('/ws', '');
+      const baseUrl = this.OFFICIAL_SERVER_URL.replace('wss://', 'https://')
+        .replace('ws://', 'http://')
+        .replace('/ws', '');
       const response = await fetch(`${baseUrl}/rooms`);
       if (!response.ok) throw new Error('Failed to fetch rooms');
       return await response.json();
@@ -89,7 +91,14 @@ class MultiplayerService {
   /**
    * Create a room as Host
    */
-  public async createRoom(hostName: string, identity: string = '房主', persona: string = '', power: string = 'A', password?: string, roomName?: string): Promise<string> {
+  public async createRoom(
+    hostName: string,
+    identity: string = '房主',
+    persona: string = '',
+    power: string = 'A',
+    password?: string,
+    roomName?: string
+  ): Promise<string> {
     const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     // Construct WebSocket URL
     let url = `${this.OFFICIAL_SERVER_URL}?action=create&room=${roomId}&host=true&id=${this.identityKey}&name=${encodeURIComponent(hostName)}`;
@@ -99,7 +108,7 @@ class MultiplayerService {
     if (roomName) {
       url += `&roomName=${encodeURIComponent(roomName)}`;
     }
-    
+
     // Generate Key if password provided
     if (password) {
       try {
@@ -111,26 +120,29 @@ class MultiplayerService {
     } else {
       this.cryptoKey = null;
     }
-    
+
     console.log(`[联机] 正在创建房间 ${roomId}，地址：${url}`);
-    
+
     return new Promise((resolve, reject) => {
-      this.connect(url, 
+      this.connect(
+        url,
         () => {
           console.log(`[联机] 房间已创建: ${roomId}`);
-          
+
           // Initial Player List (Myself)
           const gameStore = useGameStore();
-          (gameStore as any).updatePlayers([{
-            id: this.identityKey,
-            name: hostName,
-            identity: identity,
-            persona: persona,
-            power: power,
-            isHost: true,
-            isMe: true
-          }]);
-          
+          (gameStore as any).updatePlayers([
+            {
+              id: this.identityKey,
+              name: hostName,
+              identity: identity,
+              persona: persona,
+              power: power,
+              isHost: true,
+              isMe: true
+            }
+          ]);
+
           resolve(roomId);
         },
         (err) => {
@@ -145,11 +157,11 @@ class MultiplayerService {
    * Join a room as Guest
    */
   public async joinRoom(
-    roomId: string, 
-    playerName: string, 
-    identity: string = '异界访客', 
-    persona: string = '', 
-    power: string = 'E', 
+    roomId: string,
+    playerName: string,
+    identity: string = '异界访客',
+    persona: string = '',
+    power: string = 'E',
     password?: string,
     initialStats?: { hp: number; mp: number; money: number }
   ): Promise<boolean> {
@@ -157,7 +169,7 @@ class MultiplayerService {
     if (password) {
       url += `&pass=${encodeURIComponent(password)}`;
     }
-    
+
     // Generate Key if password provided
     if (password) {
       try {
@@ -169,37 +181,40 @@ class MultiplayerService {
     } else {
       this.cryptoKey = null;
     }
-    
+
     console.log(`[联机] 正在加入房间 ${roomId}，地址：${url}`);
-    
+
     return new Promise((resolve, reject) => {
-      this.connect(url, 
+      this.connect(
+        url,
         () => {
           console.log(`[联机] 已加入房间: ${roomId}`);
-          
+
           // Send Player Info immediately
           this.send('PLAYER_INFO', {
-             name: playerName,
-             identity: identity || '异界访客',
-             persona: persona,
-             power: power,
-             avatarUrl: '', // TODO: Add avatar support
-             initialStats: initialStats // 发送自定义初始数值
+            name: playerName,
+            identity: identity || '异界访客',
+            persona: persona,
+            power: power,
+            avatarUrl: '', // TODO: Add avatar support
+            initialStats: initialStats // 发送自定义初始数值
           });
 
           // Initial Player List (Myself + others will come via events, but we don't know existing ones yet)
           const gameStore = useGameStore();
-          (gameStore as any).updatePlayers([{
-            id: this.identityKey,
-            name: playerName,
-            identity: identity || '访客',
-            persona: persona,
-            power: power,
-            isHost: false,
-            isMe: true,
-            ...initialStats // 本地预览也加上
-          }]);
-          
+          (gameStore as any).updatePlayers([
+            {
+              id: this.identityKey,
+              name: playerName,
+              identity: identity || '访客',
+              persona: persona,
+              power: power,
+              isHost: false,
+              isMe: true,
+              ...initialStats // 本地预览也加上
+            }
+          ]);
+
           resolve(true);
         },
         (err) => {
@@ -219,7 +234,7 @@ class MultiplayerService {
       this.ws.onmessage = null;
       this.ws.close();
     }
-    
+
     // 增加连接超时处理
     const connectionTimeout = setTimeout(() => {
       if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
@@ -237,23 +252,23 @@ class MultiplayerService {
       onError(e);
       return;
     }
-    
+
     this.ws.onopen = () => {
       clearTimeout(connectionTimeout);
       onOpen();
     };
-    
+
     this.ws.onclose = (event) => {
       clearTimeout(connectionTimeout);
       console.warn(`[联机] WebSocket 已关闭: 代码=${event.code}, 原因=${event.reason || '无'}`);
-      
+
       const gameStore = useGameStore();
       const toastStore = useToastStore();
-      
+
       if (gameStore.multiplayer.isMultiplayer) {
         const reason = event.reason || (event.code === 1008 ? '房间已满 (Max 6)' : '连接断开');
         toastStore.addToast(`联机中断: ${reason}`, 'error');
-        
+
         // Reset state
         gameStore.setMultiplayer(false);
         gameStore.setRoomInfo(null);
@@ -271,15 +286,15 @@ class MultiplayerService {
       toastStore.addToast('无法连接到联机服务器，请检查网络或稍后再试', 'error');
       onError(err);
     };
-    
+
     this.ws.onmessage = async (event) => {
       try {
         const data = event.data;
         if (typeof data !== 'string') return;
 
         // 处理可能存在的“粘包”情况（多个 JSON 消息由换行符分隔）
-        const messages = data.split('\n').filter(line => line.trim() !== '');
-        
+        const messages = data.split('\n').filter((line) => line.trim() !== '');
+
         for (const rawMsg of messages) {
           try {
             const msg = JSON.parse(rawMsg);
@@ -311,7 +326,7 @@ class MultiplayerService {
       console.warn('[联机] 发送失败: WebSocket 未连接');
       return;
     }
-    
+
     let finalPayload = payload;
     let isEncrypted = false;
 
@@ -326,14 +341,14 @@ class MultiplayerService {
         return;
       }
     }
-    
+
     const message = {
       type,
       senderId: this.identityKey,
       payload: finalPayload,
       isEncrypted
     };
-    
+
     this.ws.send(JSON.stringify(message));
   }
 
@@ -343,10 +358,10 @@ class MultiplayerService {
   public syncPlayerList() {
     const gameStore = useGameStore();
     if (!gameStore.multiplayer.isHost) return;
-    
-    const playersToSend = gameStore.multiplayer.players.map(p => {
+
+    const playersToSend = gameStore.multiplayer.players.map((p) => {
       const stats: any = {};
-      
+
       if (p.isHost) {
         // Host uses local player state
         stats.hp = gameStore.state.player.hp;
@@ -456,7 +471,7 @@ class MultiplayerService {
   public startVote(proposal: string, options: string[]) {
     const gameStore = useGameStore();
     if (!gameStore.multiplayer.isHost) return;
-    
+
     const voteId = Math.random().toString(36).substring(2, 8);
     this.activeVote = {
       id: voteId,
@@ -465,7 +480,7 @@ class MultiplayerService {
       votes: {},
       totalPlayers: gameStore.multiplayer.players.length
     };
-    
+
     const voteData = {
       id: voteId,
       proposal,
@@ -479,7 +494,7 @@ class MultiplayerService {
 
     // Update Local Store
     (gameStore as any).setVote(voteData);
-    
+
     // Broadcast Vote Start
     this.send('VOTE_PROPOSAL', voteData);
   }
@@ -521,7 +536,7 @@ class MultiplayerService {
   public updateEnergy(amount: number) {
     const gameStore = useGameStore();
     if (!gameStore.multiplayer.isHost) return;
-    
+
     const newTotal = (gameStore.multiplayer.totalEnergy || 0) + amount;
     (gameStore as any).setTotalEnergy(newTotal);
     this.send('SYNC_ENERGY', { totalEnergy: newTotal });
@@ -533,7 +548,7 @@ class MultiplayerService {
   public toggleEnergySharing(isSharing: boolean) {
     const gameStore = useGameStore();
     if (!gameStore.multiplayer.isHost) return;
-    
+
     (gameStore as any).setEnergySharing(isSharing);
     this.send('SYNC_ENERGY_SHARING', { isSharing });
   }
@@ -558,16 +573,16 @@ class MultiplayerService {
   public kickPlayer(playerId: string) {
     const gameStore = useGameStore();
     if (!gameStore.multiplayer.isHost) return;
-    
+
     // 1. Send kick notification to the target player
     this.send('PLAYER_KICKED', { targetId: playerId });
-    
+
     // 2. Locally remove the player (they will also be removed by others when host syncs player list)
-    gameStore.multiplayer.players = gameStore.multiplayer.players.filter(p => p.id !== playerId);
-    
+    gameStore.multiplayer.players = gameStore.multiplayer.players.filter((p) => p.id !== playerId);
+
     // 3. Broadcast updated player list
     this.syncPlayerList();
-    
+
     console.log(`[联机] 房主踢出了玩家: ${playerId}`);
   }
 
@@ -598,17 +613,17 @@ class MultiplayerService {
   public async syncFullStateToGuest(targetGuestId: string) {
     const gameStore = useGameStore();
     if (!gameStore.multiplayer.isHost) return;
-    
+
     console.log(`[联机] 开始向访客 ${targetGuestId} 同步全量状态...`);
-    
+
     // 1. Sync Game State (Variables, NPCs, etc.)
     this.send('SYNC_STATE', { state: gameStore.state });
-    
+
     // 2. Sync Chat History (Last 50 messages)
     const chatStore = useChatStore();
     const recentMessages = chatStore.messages.slice(-50);
     this.send('SYNC_CHAT_HISTORY', { messages: recentMessages });
-    
+
     // 3. Sync Memories (If any)
     try {
       const saveStore = useSaveStore();
@@ -625,16 +640,16 @@ class MultiplayerService {
     } catch (e) {
       console.error('[联机] 同步记忆失败:', e);
     }
-    
+
     // 4. Sync Total Energy & Sharing Status
     this.send('SYNC_ENERGY', { totalEnergy: gameStore.multiplayer.totalEnergy });
     this.send('SYNC_ENERGY_SHARING', { isSharing: gameStore.multiplayer.isSharingEnergy });
-    
+
     // 5. Sync Active Vote (if any)
     if (this.activeVote && !this.activeVote.isEnded) {
       this.send('VOTE_PROPOSAL', {
-         ...this.activeVote,
-         // We might need to scrub votes details if we want secret ballot, but usually open
+        ...this.activeVote
+        // We might need to scrub votes details if we want secret ballot, but usually open
       });
       this.send('SYNC_VOTES', { voteId: this.activeVote.id, votes: this.activeVote.votes });
     }
@@ -655,7 +670,7 @@ class MultiplayerService {
       try {
         const { ciphertext, iv } = msg.payload;
         if (!ciphertext || !iv) throw new Error('Invalid encrypted payload');
-        
+
         const decryptedPayload = await cryptoService.decrypt(ciphertext, iv, this.cryptoKey);
         msg.payload = decryptedPayload;
       } catch (e) {
@@ -689,9 +704,9 @@ class MultiplayerService {
    */
   private async processQueue() {
     if (this.isProcessingQueue || this.commandQueue.length === 0) return;
-    
+
     this.isProcessingQueue = true;
-    
+
     while (this.commandQueue.length > 0) {
       const msg = this.commandQueue.shift();
       try {
@@ -700,7 +715,7 @@ class MultiplayerService {
         console.error('[联机] 执行指令失败:', e, msg);
       }
     }
-    
+
     this.isProcessingQueue = false;
   }
 
@@ -714,26 +729,27 @@ class MultiplayerService {
     switch (msg.type) {
       case 'SYNC_CHAT_MESSAGE': {
         const senderId = msg.senderId;
-        const sender = gameStore.multiplayer.players.find(p => p.id === senderId);
+        const sender = gameStore.multiplayer.players.find((p) => p.id === senderId);
 
         if (!gameStore.multiplayer.isHost && sender?.isHost && msg.payload) {
           const chatStore = useChatStore();
           const { role, content, timestamp } = msg.payload;
-          
+
           // Check if this message already exists to avoid duplicates
-          const exists = chatStore.messages.some(m => 
-            m.role === role && 
-            m.content === content && 
-            Math.abs(m.timestamp - (timestamp || 0)) < 2000 // 2 second window
+          const exists = chatStore.messages.some(
+            (m) =>
+              m.role === role &&
+              m.content === content &&
+              Math.abs(m.timestamp - (timestamp || 0)) < 2000 // 2 second window
           );
-          
+
           if (!exists) {
             chatStore.addMessage(role, content, timestamp);
             console.log(`[联机] 同步收到新消息: ${role}`);
 
             // 如果收到助手消息，重置所有玩家的就绪状态和草稿
             if (role === 'assistant') {
-              gameStore.multiplayer.players.forEach(p => {
+              gameStore.multiplayer.players.forEach((p) => {
                 p.status = 'idle';
                 p.draftContent = '';
               });
@@ -757,27 +773,27 @@ class MultiplayerService {
 
       case 'SYNC_CHAT_HISTORY': {
         if (!gameStore.multiplayer.isHost && msg.payload?.messages) {
-           const chatStore = useChatStore();
-           // Merge or replace? For initial sync, replace is safer or append unique
-           // Assuming empty state on join, just set
-           // But better to check duplicates
-           const incoming = msg.payload.messages;
-           // We might want to clear existing if it's a fresh join?
-           // For now, let's just append ones we don't have
-           // actually, chatStore.setMessages(incoming) might be better if we trust host completely
-           // But user might have their own system messages.
-           // Let's use a merge strategy
-           incoming.forEach((m: any) => {
-             if (!chatStore.messages.find(existing => existing.id === m.id)) {
-               chatStore.addMessage(m.role, m.content, m.timestamp); // Need to ensure ID preservation?
-               // chatStore.addMessage generates new ID. 
-               // We should probably force set the messages array if possible or expose a bulk add
-               // For simplicity:
-             }
-           });
-           // Re-fetch store to update list (hacky)
-           chatStore.messages = incoming; // Direct overwrite for full sync context
-           console.log('[联机] 已同步聊天记录');
+          const chatStore = useChatStore();
+          // Merge or replace? For initial sync, replace is safer or append unique
+          // Assuming empty state on join, just set
+          // But better to check duplicates
+          const incoming = msg.payload.messages;
+          // We might want to clear existing if it's a fresh join?
+          // For now, let's just append ones we don't have
+          // actually, chatStore.setMessages(incoming) might be better if we trust host completely
+          // But user might have their own system messages.
+          // Let's use a merge strategy
+          incoming.forEach((m: any) => {
+            if (!chatStore.messages.find((existing) => existing.id === m.id)) {
+              chatStore.addMessage(m.role, m.content, m.timestamp); // Need to ensure ID preservation?
+              // chatStore.addMessage generates new ID.
+              // We should probably force set the messages array if possible or expose a bulk add
+              // For simplicity:
+            }
+          });
+          // Re-fetch store to update list (hacky)
+          chatStore.messages = incoming; // Direct overwrite for full sync context
+          console.log('[联机] 已同步聊天记录');
         }
         break;
       }
@@ -785,10 +801,10 @@ class MultiplayerService {
       case 'SYNC_MEMORIES': {
         if (!gameStore.multiplayer.isHost && msg.payload?.memories) {
           for (const mem of msg.payload.memories) {
-             // Check if exists?
-             // Simple add
-             await dbService.addMemory(mem);
-             await memoryService.updateGraph(mem);
+            // Check if exists?
+            // Simple add
+            await dbService.addMemory(mem);
+            await memoryService.updateGraph(mem);
           }
           console.log('[联机] 已同步记忆库');
         }
@@ -796,80 +812,80 @@ class MultiplayerService {
       }
 
       case 'PLAYER_DRAFT': {
-          const senderId = msg.senderId;
-          const content = msg.payload?.content;
-          const player = gameStore.multiplayer.players.find(p => p.id === senderId);
-          if (player) {
-            // 如果内容为空且当前状态不是 ready，则设为 idle
-            if (!content && player.status !== 'ready') {
-              player.status = 'idle';
-            } else if (player.status !== 'ready') {
-              player.status = 'drafting';
-            }
-            player.draftContent = content;
+        const senderId = msg.senderId;
+        const content = msg.payload?.content;
+        const player = gameStore.multiplayer.players.find((p) => p.id === senderId);
+        if (player) {
+          // 如果内容为空且当前状态不是 ready，则设为 idle
+          if (!content && player.status !== 'ready') {
+            player.status = 'idle';
+          } else if (player.status !== 'ready') {
+            player.status = 'drafting';
           }
-          break;
+          player.draftContent = content;
         }
+        break;
+      }
 
       case 'COMBAT_ACTION':
         // Host receives combat action from Guest
         if (gameStore.multiplayer.isHost) {
-           const senderId = msg.senderId;
-           const { type, payload, targetId } = msg.payload;
-           
-           const event = new CustomEvent('mp-combat-action', { 
-             detail: { senderId, type, payload, targetId } 
-           });
-           window.dispatchEvent(event);
+          const senderId = msg.senderId;
+          const { type, payload, targetId } = msg.payload;
+
+          const event = new CustomEvent('mp-combat-action', {
+            detail: { senderId, type, payload, targetId }
+          });
+          window.dispatchEvent(event);
         }
         break;
 
       case 'COMBAT_EFFECT': {
         if (!gameStore.multiplayer.isHost) {
-           const event = new CustomEvent('mp-combat-effect', { 
-             detail: msg.payload
-           });
-           window.dispatchEvent(event);
+          const event = new CustomEvent('mp-combat-effect', {
+            detail: msg.payload
+          });
+          window.dispatchEvent(event);
         }
         break;
       }
 
       case 'COMBAT_LOG': {
         if (!gameStore.multiplayer.isHost) {
-           const event = new CustomEvent('mp-combat-log', { 
-             detail: msg.payload
-           });
-           window.dispatchEvent(event);
+          const event = new CustomEvent('mp-combat-log', {
+            detail: msg.payload
+          });
+          window.dispatchEvent(event);
         }
         break;
       }
 
       case 'COMBAT_POPUP': {
         if (!gameStore.multiplayer.isHost) {
-           const event = new CustomEvent('mp-combat-popup', { 
-             detail: msg.payload
-           });
-           window.dispatchEvent(event);
+          const event = new CustomEvent('mp-combat-popup', {
+            detail: msg.payload
+          });
+          window.dispatchEvent(event);
         }
         break;
       }
 
       case 'STORY_GENERATING': {
         if (!gameStore.multiplayer.isHost) {
-           const event = new CustomEvent('mp-story-generating', { 
-             detail: msg.payload
-           });
-           window.dispatchEvent(event);
+          const event = new CustomEvent('mp-story-generating', {
+            detail: msg.payload
+          });
+          window.dispatchEvent(event);
         }
         break;
       }
 
       case 'LLM_TOKEN': {
         if (!gameStore.multiplayer.isHost) {
-           const event = new CustomEvent('mp-llm-token', { 
-             detail: msg.payload
-           });
-           window.dispatchEvent(event);
+          const event = new CustomEvent('mp-llm-token', {
+            detail: msg.payload
+          });
+          window.dispatchEvent(event);
         }
         break;
       }
@@ -906,7 +922,7 @@ class MultiplayerService {
 
       case 'PLAYER_ACTION': {
         const senderIdAction = msg.senderId;
-        const pAction = gameStore.multiplayer.players.find(p => p.id === senderIdAction);
+        const pAction = gameStore.multiplayer.players.find((p) => p.id === senderIdAction);
         if (pAction) {
           pAction.status = 'ready';
         }
@@ -920,76 +936,76 @@ class MultiplayerService {
         }
         break;
       }
-        
+
       case 'PLAYER_INFO': {
         if (gameStore.multiplayer.isHost) {
-           const { name, identity, avatarUrl, persona, power, initialStats } = msg.payload;
-           const senderIdInfo = msg.senderId || msg.payload.id;
-           
-           if (!senderIdInfo) break;
+          const { name, identity, avatarUrl, persona, power, initialStats } = msg.payload;
+          const senderIdInfo = msg.senderId || msg.payload.id;
 
-           const existing = gameStore.multiplayer.players.find(p => p.id === senderIdInfo);
-           if (existing) {
-              existing.name = name || existing.name;
-              existing.identity = identity || existing.identity;
-              existing.avatarUrl = avatarUrl || existing.avatarUrl;
-              existing.persona = persona || existing.persona;
-              existing.power = power || existing.power;
-              if (initialStats) {
-                existing.hp = initialStats.hp;
-                existing.max_hp = initialStats.hp;
-                existing.mp = initialStats.mp;
-                existing.max_mp = initialStats.mp;
-                existing.money = initialStats.money;
-              }
-           } else {
-              (gameStore as any).addPlayer({
-                 id: senderIdInfo,
-                 name: name || `Player ${senderIdInfo.substring(0,4)}`,
-                 identity: identity || '访客',
-                 persona: persona,
-                 power: power,
-                 isHost: false,
-                 isMe: false,
-                 hp: initialStats?.hp,
-                 mp: initialStats?.mp,
-                 money: initialStats?.money
-              });
-           }
+          if (!senderIdInfo) break;
+
+          const existing = gameStore.multiplayer.players.find((p) => p.id === senderIdInfo);
+          if (existing) {
+            existing.name = name || existing.name;
+            existing.identity = identity || existing.identity;
+            existing.avatarUrl = avatarUrl || existing.avatarUrl;
+            existing.persona = persona || existing.persona;
+            existing.power = power || existing.power;
+            if (initialStats) {
+              existing.hp = initialStats.hp;
+              existing.max_hp = initialStats.hp;
+              existing.mp = initialStats.mp;
+              existing.max_mp = initialStats.mp;
+              existing.money = initialStats.money;
+            }
+          } else {
+            (gameStore as any).addPlayer({
+              id: senderIdInfo,
+              name: name || `Player ${senderIdInfo.substring(0, 4)}`,
+              identity: identity || '访客',
+              persona: persona,
+              power: power,
+              isHost: false,
+              isMe: false,
+              hp: initialStats?.hp,
+              mp: initialStats?.mp,
+              money: initialStats?.money
+            });
+          }
 
           if (!gameStore.state.multiplayer_companions) {
             gameStore.state.multiplayer_companions = {};
           }
-          
+
           let companion = gameStore.state.multiplayer_companions[senderIdInfo];
-          
+
           if (!companion) {
-             // 只有新玩家才应用初始数值
-             companion = {
-                ...gameStore.state.player, 
-                id: senderIdInfo,
-                isMe: senderIdInfo === this.identityKey,
-                hp: initialStats?.hp ?? gameStore.state.player.hp,
-                max_hp: initialStats?.hp ?? gameStore.state.player.max_hp,
-                mp: initialStats?.mp ?? gameStore.state.player.mp,
-                max_mp: initialStats?.mp ?? gameStore.state.player.max_mp,
-                money: initialStats?.money ?? 0
-             };
+            // 只有新玩家才应用初始数值
+            companion = {
+              ...gameStore.state.player,
+              id: senderIdInfo,
+              isMe: senderIdInfo === this.identityKey,
+              hp: initialStats?.hp ?? gameStore.state.player.hp,
+              max_hp: initialStats?.hp ?? gameStore.state.player.max_hp,
+              mp: initialStats?.mp ?? gameStore.state.player.mp,
+              max_mp: initialStats?.mp ?? gameStore.state.player.max_mp,
+              money: initialStats?.money ?? 0
+            };
           }
-          
+
           // 无论是否是老玩家，都允许更新这些“人设”信息
           companion.name = name || companion.name;
           companion.identity = identity || companion.identity;
           companion.persona = persona || companion.persona;
           companion.power = power || companion.power;
           if (avatarUrl) companion.avatarUrl = avatarUrl;
-          
+
           // 如果是 Host，只有在 companion 还是“初始状态”或者这是个新 companion 时才应用 initialStats
           // 这里我们已经通过 if (!companion) 处理了。
           // 这样即使客机配置里写了 500 金钱，只要主机存档里他已经有 10000 了，就不会被覆写。
 
           gameStore.state.multiplayer_companions[senderIdInfo] = companion;
-          
+
           this.syncPlayerList();
         }
         break;
@@ -997,48 +1013,48 @@ class MultiplayerService {
 
       case 'SYNC_PLAYERS':
         if (!gameStore.multiplayer.isHost) {
-           gameStore.updatePlayers(msg.payload.players);
-           
-           const players = msg.payload.players as any[];
-           if (!gameStore.state.multiplayer_companions) {
-             gameStore.state.multiplayer_companions = {};
-           }
-           
-           players.forEach(p => {
-             if (p.id === this.identityKey) return; 
-             
-             if (!gameStore.state.multiplayer_companions![p.id]) {
-               gameStore.state.multiplayer_companions![p.id] = {
-                 ...gameStore.state.player,
-                 id: p.id,
-                 name: p.name,
-                 identity: p.identity,
-                 persona: p.persona,
-                 power: p.power,
-                 avatarUrl: p.avatarUrl,
-                 hp: p.hp ?? gameStore.state.player.hp,
-                 max_hp: p.max_hp ?? gameStore.state.player.max_hp,
-                 mp: p.mp ?? gameStore.state.player.mp,
-                 max_mp: p.max_mp ?? gameStore.state.player.max_mp,
-                 money: p.money ?? 0,
-                 isMe: false
-               };
-             } else {
-               const comp = gameStore.state.multiplayer_companions![p.id];
-               if (comp) {
-                 comp.name = p.name;
-                 comp.identity = p.identity;
-                 comp.persona = p.persona;
-                 comp.power = p.power;
-                 comp.avatarUrl = p.avatarUrl;
-                 if (p.hp !== undefined) comp.hp = p.hp;
-                 if (p.max_hp !== undefined) comp.max_hp = p.max_hp;
-                 if (p.mp !== undefined) comp.mp = p.mp;
-                 if (p.max_mp !== undefined) comp.max_mp = p.max_mp;
-                 if (p.money !== undefined) comp.money = p.money;
-               }
-             }
-           });
+          gameStore.updatePlayers(msg.payload.players);
+
+          const players = msg.payload.players as any[];
+          if (!gameStore.state.multiplayer_companions) {
+            gameStore.state.multiplayer_companions = {};
+          }
+
+          players.forEach((p) => {
+            if (p.id === this.identityKey) return;
+
+            if (!gameStore.state.multiplayer_companions![p.id]) {
+              gameStore.state.multiplayer_companions![p.id] = {
+                ...gameStore.state.player,
+                id: p.id,
+                name: p.name,
+                identity: p.identity,
+                persona: p.persona,
+                power: p.power,
+                avatarUrl: p.avatarUrl,
+                hp: p.hp ?? gameStore.state.player.hp,
+                max_hp: p.max_hp ?? gameStore.state.player.max_hp,
+                mp: p.mp ?? gameStore.state.player.mp,
+                max_mp: p.max_mp ?? gameStore.state.player.max_mp,
+                money: p.money ?? 0,
+                isMe: false
+              };
+            } else {
+              const comp = gameStore.state.multiplayer_companions![p.id];
+              if (comp) {
+                comp.name = p.name;
+                comp.identity = p.identity;
+                comp.persona = p.persona;
+                comp.power = p.power;
+                comp.avatarUrl = p.avatarUrl;
+                if (p.hp !== undefined) comp.hp = p.hp;
+                if (p.max_hp !== undefined) comp.max_hp = p.max_hp;
+                if (p.mp !== undefined) comp.mp = p.mp;
+                if (p.max_mp !== undefined) comp.max_mp = p.max_mp;
+                if (p.money !== undefined) comp.money = p.money;
+              }
+            }
+          });
         }
         break;
 
@@ -1053,9 +1069,9 @@ class MultiplayerService {
           }
         } else if (msg.payload?.event === 'PLAYER_JOINED') {
           const { id, name, isHost } = msg.payload;
-          const displayName = name || `玩家 ${id.substring(0,4)}`;
+          const displayName = name || `玩家 ${id.substring(0, 4)}`;
           toastStore.addToast(`${displayName} 加入了房间`, 'info');
-          
+
           (gameStore as any).addPlayer({
             id: id,
             name: displayName,
@@ -1063,25 +1079,24 @@ class MultiplayerService {
             isHost: isHost,
             isMe: id === this.identityKey
           });
-          
-          if (gameStore.multiplayer.isHost) {
-             this.syncPlayerList();
-             // Trigger full state sync for the new player
-             this.syncFullStateToGuest(id);
-          }
 
+          if (gameStore.multiplayer.isHost) {
+            this.syncPlayerList();
+            // Trigger full state sync for the new player
+            this.syncFullStateToGuest(id);
+          }
         } else if (msg.payload?.event === 'PLAYER_LEFT') {
           const { id } = msg.payload;
           // Try to find name from store before removing
-          const p = gameStore.multiplayer.players.find(p => p.id === id);
-          const displayName = p ? p.name : `玩家 ${id.substring(0,4)}`;
-          
+          const p = gameStore.multiplayer.players.find((p) => p.id === id);
+          const displayName = p ? p.name : `玩家 ${id.substring(0, 4)}`;
+
           toastStore.addToast(`${displayName} 离开了房间`, 'info');
-          
+
           (gameStore as any).removePlayer(id);
-          
+
           if (gameStore.multiplayer.isHost) {
-             this.syncPlayerList();
+            this.syncPlayerList();
           }
         }
         break;
@@ -1091,8 +1106,8 @@ class MultiplayerService {
         const senderIdChat = msg.senderId;
         const content = msg.payload?.content;
         if (senderIdChat && content) {
-          const event = new CustomEvent('mp-chat-message', { 
-            detail: { senderId: senderIdChat, content, timestamp: Date.now() } 
+          const event = new CustomEvent('mp-chat-message', {
+            detail: { senderId: senderIdChat, content, timestamp: Date.now() }
           });
           window.dispatchEvent(event);
         }
@@ -1100,129 +1115,143 @@ class MultiplayerService {
       }
 
       case 'VOTE_PROPOSAL': {
-          const senderId = msg.senderId;
-          const sender = gameStore.multiplayer.players.find(p => p.id === senderId);
+        const senderId = msg.senderId;
+        const sender = gameStore.multiplayer.players.find((p) => p.id === senderId);
 
-          if (!gameStore.multiplayer.isHost && sender?.isHost) {
-            (gameStore as any).setVote(msg.payload);
-          } else if (!gameStore.multiplayer.isHost) {
-            console.warn(`[联机] 拦截到非房主发起的投票: 来自 ${senderId}`);
-          }
-          break;
+        if (!gameStore.multiplayer.isHost && sender?.isHost) {
+          (gameStore as any).setVote(msg.payload);
+        } else if (!gameStore.multiplayer.isHost) {
+          console.warn(`[联机] 拦截到非房主发起的投票: 来自 ${senderId}`);
+        }
+        break;
       }
-      
+
       case 'VOTE_CAST': {
-          if (gameStore.multiplayer.isHost && this.activeVote && this.activeVote.id === msg.payload.voteId) {
-              const voterId = msg.senderId;
-              const optionIndex = msg.payload.optionIndex;
-              this.activeVote.votes[voterId] = optionIndex;
-              
-              // Update Host Store
-              (gameStore as any).updateVote({ ...this.activeVote.votes });
-              
-              // Broadcast partial results if needed, or just wait for finish
-              this.send('SYNC_VOTES', { voteId: this.activeVote.id, votes: this.activeVote.votes });
+        if (
+          gameStore.multiplayer.isHost &&
+          this.activeVote &&
+          this.activeVote.id === msg.payload.voteId
+        ) {
+          const voterId = msg.senderId;
+          const optionIndex = msg.payload.optionIndex;
+          this.activeVote.votes[voterId] = optionIndex;
 
-              const voteCount = Object.keys(this.activeVote.votes).length;
-              if (voteCount >= this.activeVote.totalPlayers) {
-                 const counts = new Array(this.activeVote.options.length).fill(0);
-                 Object.values(this.activeVote.votes).forEach(idx => counts[idx]++);
-                 
-                 let maxVotes = -1;
-                 let winningIndex = -1;
-                 counts.forEach((c, i) => {
-                     if (c > maxVotes) {
-                         maxVotes = c;
-                         winningIndex = i;
-                     }
-                 });
-                 
-                 this.send('VOTE_RESULT', { 
-                     voteId: this.activeVote.id, 
-                     resultIndex: winningIndex, 
-                     counts 
-                 });
-                 
-                 // Update Host Store Result
-                 if (gameStore.multiplayer.activeVote) {
-                   gameStore.multiplayer.activeVote.isEnded = true;
-                   gameStore.multiplayer.activeVote.resultIndex = winningIndex;
-                 }
+          // Update Host Store
+          (gameStore as any).updateVote({ ...this.activeVote.votes });
 
-                 this.activeVote = null; 
+          // Broadcast partial results if needed, or just wait for finish
+          this.send('SYNC_VOTES', { voteId: this.activeVote.id, votes: this.activeVote.votes });
+
+          const voteCount = Object.keys(this.activeVote.votes).length;
+          if (voteCount >= this.activeVote.totalPlayers) {
+            const counts = new Array(this.activeVote.options.length).fill(0);
+            Object.values(this.activeVote.votes).forEach((idx) => counts[idx]++);
+
+            let maxVotes = -1;
+            let winningIndex = -1;
+            counts.forEach((c, i) => {
+              if (c > maxVotes) {
+                maxVotes = c;
+                winningIndex = i;
               }
+            });
+
+            this.send('VOTE_RESULT', {
+              voteId: this.activeVote.id,
+              resultIndex: winningIndex,
+              counts
+            });
+
+            // Update Host Store Result
+            if (gameStore.multiplayer.activeVote) {
+              gameStore.multiplayer.activeVote.isEnded = true;
+              gameStore.multiplayer.activeVote.resultIndex = winningIndex;
+            }
+
+            this.activeVote = null;
           }
-          break;
+        }
+        break;
       }
 
       case 'SYNC_VOTES': {
-          if (!gameStore.multiplayer.isHost && gameStore.multiplayer.activeVote?.id === msg.payload.voteId) {
-            (gameStore as any).updateVote(msg.payload.votes);
-          }
-          break;
+        if (
+          !gameStore.multiplayer.isHost &&
+          gameStore.multiplayer.activeVote?.id === msg.payload.voteId
+        ) {
+          (gameStore as any).updateVote(msg.payload.votes);
+        }
+        break;
       }
-      
-      case 'VOTE_RESULT': {
-          const senderId = msg.senderId;
-          const sender = gameStore.multiplayer.players.find(p => p.id === senderId);
 
-          if (!gameStore.multiplayer.isHost && sender?.isHost && gameStore.multiplayer.activeVote?.id === msg.payload.voteId) {
-            const vote = gameStore.multiplayer.activeVote;
-            if (vote) {
-              vote.isEnded = true;
-              vote.resultIndex = msg.payload.resultIndex;
-            }
-          } else if (!gameStore.multiplayer.isHost && !sender?.isHost) {
-            console.warn(`[联机] 拦截到非房主发布的投票结果: 来自 ${senderId}`);
+      case 'VOTE_RESULT': {
+        const senderId = msg.senderId;
+        const sender = gameStore.multiplayer.players.find((p) => p.id === senderId);
+
+        if (
+          !gameStore.multiplayer.isHost &&
+          sender?.isHost &&
+          gameStore.multiplayer.activeVote?.id === msg.payload.voteId
+        ) {
+          const vote = gameStore.multiplayer.activeVote;
+          if (vote) {
+            vote.isEnded = true;
+            vote.resultIndex = msg.payload.resultIndex;
           }
-          break;
+        } else if (!gameStore.multiplayer.isHost && !sender?.isHost) {
+          console.warn(`[联机] 拦截到非房主发布的投票结果: 来自 ${senderId}`);
+        }
+        break;
       }
 
       case 'ENERGY_CONTRIBUTION': {
-          if (gameStore.multiplayer.isHost) {
-            const amount = msg.payload.amount || 0;
-            const senderId = msg.senderId;
-            const player = gameStore.multiplayer.players.find(p => p.id === senderId);
-            
-            // Update contributor's individual energy record
-            (gameStore as any).updatePlayerEnergy(senderId, (player?.energy || 0) + amount);
-            // Update total room energy
-            this.updateEnergy(amount);
-            
-            toastStore.addToast(`收到玩家 ${player?.name || senderId.substring(0,4)} 贡献的 ${amount} 点能源`, 'success');
-          }
-          break;
+        if (gameStore.multiplayer.isHost) {
+          const amount = msg.payload.amount || 0;
+          const senderId = msg.senderId;
+          const player = gameStore.multiplayer.players.find((p) => p.id === senderId);
+
+          // Update contributor's individual energy record
+          (gameStore as any).updatePlayerEnergy(senderId, (player?.energy || 0) + amount);
+          // Update total room energy
+          this.updateEnergy(amount);
+
+          toastStore.addToast(
+            `收到玩家 ${player?.name || senderId.substring(0, 4)} 贡献的 ${amount} 点能源`,
+            'success'
+          );
+        }
+        break;
       }
 
       case 'SYNC_ENERGY': {
-          const senderId = msg.senderId;
-          const sender = gameStore.multiplayer.players.find(p => p.id === senderId);
+        const senderId = msg.senderId;
+        const sender = gameStore.multiplayer.players.find((p) => p.id === senderId);
 
-          if (!gameStore.multiplayer.isHost && sender?.isHost) {
-            (gameStore as any).setTotalEnergy(msg.payload.totalEnergy);
-          } else if (!gameStore.multiplayer.isHost) {
-            console.warn(`[联机] 拦截到非房主发送的能源同步: 来自 ${senderId}`);
-          }
-          break;
+        if (!gameStore.multiplayer.isHost && sender?.isHost) {
+          (gameStore as any).setTotalEnergy(msg.payload.totalEnergy);
+        } else if (!gameStore.multiplayer.isHost) {
+          console.warn(`[联机] 拦截到非房主发送的能源同步: 来自 ${senderId}`);
+        }
+        break;
       }
 
       case 'SYNC_ENERGY_SHARING': {
-          const senderId = msg.senderId;
-          const sender = gameStore.multiplayer.players.find(p => p.id === senderId);
+        const senderId = msg.senderId;
+        const sender = gameStore.multiplayer.players.find((p) => p.id === senderId);
 
-          if (!gameStore.multiplayer.isHost && sender?.isHost) {
-            (gameStore as any).setEnergySharing(msg.payload.isSharing);
-          } else if (!gameStore.multiplayer.isHost) {
-            console.warn(`[联机] 拦截到非房主发送的能源共享同步: 来自 ${senderId}`);
-          }
-          break;
+        if (!gameStore.multiplayer.isHost && sender?.isHost) {
+          (gameStore as any).setEnergySharing(msg.payload.isSharing);
+        } else if (!gameStore.multiplayer.isHost) {
+          console.warn(`[联机] 拦截到非房主发送的能源共享同步: 来自 ${senderId}`);
+        }
+        break;
       }
 
       case 'PLAYER_KICKED': {
         const targetId = msg.payload?.targetId;
         const senderId = msg.senderId;
-        const sender = gameStore.multiplayer.players.find(p => p.id === senderId);
-        
+        const sender = gameStore.multiplayer.players.find((p) => p.id === senderId);
+
         // 安全检查：只有房主有权踢人
         if (!sender?.isHost) {
           console.warn(`[联机] 拦截到非房主发送的踢人指令: 来自 ${senderId}`);
@@ -1234,7 +1263,7 @@ class MultiplayerService {
           const toastStore = useToastStore();
           toastStore.addToast('你已被房主踢出房间', 'error');
           this.disconnect();
-          
+
           // Force back to main screen or show error
           setTimeout(() => {
             window.location.reload(); // Simple way to reset state
@@ -1246,9 +1275,9 @@ class MultiplayerService {
       case 'DICE_ROLL': {
         const { sides, result } = msg.payload;
         const senderId = msg.senderId;
-        
+
         // 更新玩家投骰子的回合
-        const player = gameStore.multiplayer.players.find(p => p.id === senderId);
+        const player = gameStore.multiplayer.players.find((p) => p.id === senderId);
         if (player) {
           player.lastDiceRollTurn = gameStore.state.system.turn_count;
         }
@@ -1295,7 +1324,7 @@ class MultiplayerService {
   public clearPendingGuestInputs() {
     this.pendingGuestInputs = {};
   }
-  
+
   public startGuestPolling() {}
   public stopGuestPolling() {}
 }
