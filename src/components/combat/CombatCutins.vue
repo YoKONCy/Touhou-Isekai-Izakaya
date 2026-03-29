@@ -40,7 +40,7 @@
           class="text-6xl md:text-8xl font-black italic text-white drop-shadow-[0_0_20px_rgba(255,0,0,1)] tracking-tighter animate-slam font-display transform -rotate-6 border-y-8 border-yellow-400 py-4 bg-black/50 backdrop-blur-md px-20"
         >
           <span class="block text-3xl text-yellow-400 mb-2 tracking-[1em] text-center uppercase"
-            >符卡发动</span
+            >Spell Card</span
           >
           {{ ultimateData.spellName }}
         </div>
@@ -145,13 +145,13 @@
         <h1
           class="text-8xl md:text-9xl font-black italic text-transparent bg-clip-text bg-gradient-to-t from-white to-purple-300 font-display animate-glitch-slam tracking-tighter drop-shadow-[0_0_20px_rgba(255,255,255,0.8)]"
         >
-          战斗心流
+          COMBAT FLOW
         </h1>
         <div class="h-1 w-0 bg-white animate-expand-width shadow-[0_0_10px_white]"></div>
         <p
           class="text-2xl md:text-3xl text-purple-200 font-mono tracking-[1em] animate-fade-in-up uppercase"
         >
-          领域展开
+          Zone Activated
         </p>
       </div>
 

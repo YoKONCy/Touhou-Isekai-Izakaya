@@ -20,7 +20,7 @@
       >
         <div class="flex justify-between items-center mb-1">
           <span class="font-bold font-display text-white truncate text-sm">{{ en.name }}</span>
-          <span class="text-xs font-mono text-purple-300">待场中</span>
+          <span class="text-xs font-mono text-purple-300">WAITING</span>
         </div>
         <div class="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
           <div

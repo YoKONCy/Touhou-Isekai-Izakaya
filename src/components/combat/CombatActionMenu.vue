@@ -25,7 +25,7 @@
         <span
           class="transform transition-transform drop-shadow-md"
           :class="isMenuOpen ? '-rotate-[360deg]' : ''"
-          >攻击</span
+          >ATTACK</span
         >
       </button>
 
@@ -44,7 +44,7 @@
       >
         <span
           class="transform -rotate-[36deg] group-hover:scale-110 transition-transform text-xl block"
-          >符卡</span
+          >SPELL</span
         >
       </button>
 
@@ -63,7 +63,7 @@
       >
         <span
           class="transform -rotate-[108deg] group-hover:scale-110 transition-transform text-xl block"
-          >道具</span
+          >ITEM</span
         >
       </button>
 
@@ -82,7 +82,7 @@
       >
         <span
           class="transform -rotate-[180deg] group-hover:scale-110 transition-transform text-xl block"
-          >特技</span
+          >SPECIAL</span
         >
       </button>
 
@@ -96,7 +96,7 @@
           opacity: isMenuOpen ? 0.5 : 0
         }"
       >
-        <span class="transform -rotate-[252deg] text-xl block">撤退</span>
+        <span class="transform -rotate-[252deg] text-xl block">ESCAPE</span>
       </button>
 
       <!-- 5. 嘴遁 (左上, 324deg) -->
@@ -114,7 +114,7 @@
       >
         <span
           class="transform -rotate-[324deg] group-hover:scale-110 transition-transform text-xl block"
-          >嘴遁</span
+          >TALK</span
         >
       </button>
     </div>
@@ -125,7 +125,7 @@
       class="relative w-80 min-h-[300px] flex flex-col gap-2 items-end animate-slide-in-right"
     >
       <div class="text-3xl font-black italic text-purple-400 mb-4 drop-shadow-glow font-display">
-        待选符卡
+        SPELL CARDS
       </div>
 
       <!-- Hover Info Panel -->
@@ -190,7 +190,7 @@
         @mouseenter="$emit('hover-sound')"
         class="mt-4 text-gray-400 hover:text-white font-bold italic transition-colors"
       >
-        返回
+        BACK
       </button>
     </div>
 
@@ -200,7 +200,7 @@
       class="relative w-80 min-h-[300px] flex flex-col gap-2 items-end animate-slide-in-right"
     >
       <div class="text-3xl font-black italic text-blue-400 mb-4 drop-shadow-glow font-display">
-        持有道具
+        ITEMS
       </div>
 
       <button
@@ -223,7 +223,7 @@
         @mouseenter="$emit('hover-sound')"
         class="mt-4 text-gray-400 hover:text-white font-bold italic transition-colors"
       >
-        返回
+        BACK
       </button>
     </div>
 
@@ -236,7 +236,7 @@
         class="text-3xl font-black italic text-green-400 mb-4 drop-shadow-glow font-display flex items-center gap-2"
       >
         <MessageSquare class="w-8 h-8" />
-        言语说服
+        PERSUASION
       </div>
 
       <div class="w-full bg-black/80 border-2 border-green-500 p-4 relative">
@@ -269,7 +269,7 @@
           class="flex items-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold transition-colors clip-rect-left"
         >
           <Send class="w-4 h-4" />
-          发送 <span class="text-xs ml-1 opacity-90 font-mono">(15P)</span>
+          SEND <span class="text-xs ml-1 opacity-90 font-mono">(15P)</span>
         </button>
       </div>
 
@@ -278,7 +278,7 @@
         @mouseenter="$emit('hover-sound')"
         class="mt-4 text-gray-400 hover:text-white font-bold italic transition-colors"
       >
-        返回
+        BACK
       </button>
     </div>
 
@@ -288,7 +288,7 @@
       class="relative w-80 min-h-[300px] flex flex-col gap-2 items-end animate-slide-in-right"
     >
       <div class="text-3xl font-black italic text-yellow-400 mb-4 drop-shadow-glow font-display">
-        主角特技
+        SPECIAL
       </div>
       <div class="w-full h-[300px] overflow-y-auto pr-2 custom-scrollbar flex flex-col gap-2">
         <button

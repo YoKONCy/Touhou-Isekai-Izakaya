@@ -25,7 +25,7 @@
           <div
             class="absolute bottom-1/3 left-10 text-8xl font-black italic text-black tracking-tighter drop-shadow-white rotate-[-5deg]"
           >
-            <span class="block text-4xl text-red-600 mb-2">玩家</span>
+            <span class="block text-4xl text-red-600 mb-2">PLAYER</span>
             {{ playerName }}
           </div>
         </div>
@@ -47,7 +47,7 @@
           <div
             class="absolute top-1/3 right-10 text-8xl font-black italic text-white tracking-tighter drop-shadow-red rotate-[-5deg] text-right"
           >
-            <span class="block text-4xl text-black mb-2">对手</span>
+            <span class="block text-4xl text-black mb-2">ENEMY</span>
             {{ enemyName }}
           </div>
         </div>
