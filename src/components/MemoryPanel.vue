@@ -20,6 +20,7 @@ import {
   ExternalLink
 } from 'lucide-vue-next';
 import _ from 'lodash';
+import { useConfirm } from '@/utils/confirm';
 
 interface MemoryEntry {
   id: number;
@@ -45,6 +46,7 @@ const emit = defineEmits(['close']);
 
 const saveStore = useSaveStore();
 const chatStore = useChatStore();
+const { confirm } = useConfirm();
 const memories = ref<MemoryEntry[]>([]);
 const searchQuery = ref('');
 const filterType = ref<string>('all');
@@ -155,9 +157,10 @@ watch([searchQuery, filterType], () => {
 });
 
 async function deleteMemory(id: number) {
-  if (!window.confirm('确定要删除这条记忆吗？')) return;
-  await dbService.deleteMemory(id);
-  await loadMemories();
+  if (await confirm('确定要删除这条记忆吗？', { destructive: true })) {
+    await dbService.deleteMemory(id);
+    await loadMemories();
+  }
 }
 
 function formatContent(content: any) {

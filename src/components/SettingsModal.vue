@@ -29,6 +29,7 @@ import {
   DEFAULT_NOVELAI_V4_PROMPT_SYSTEM
 } from '@/services/drawing';
 import { generateMap, DEFAULT_MAP_DATA } from '@/services/management/MapGenerator';
+import { useConfirm } from '@/utils/confirm';
 
 const props = defineProps<{
   isOpen: boolean;
@@ -51,6 +52,7 @@ const emit = defineEmits<{
 const settingsStore = useSettingsStore();
 const gameStore = useGameStore();
 const toastStore = useToastStore();
+const { confirm } = useConfirm();
 const activeTab = ref<
   'global' | 'chat' | 'logic' | 'memory' | 'misc' | 'audio' | 'interface' | 'drawing' | 'debug'
 >('global');
@@ -74,9 +76,12 @@ const handleExport = async () => {
   }
 };
 
-const triggerImport = () => {
+const triggerImport = async () => {
   if (
-    confirm('导入备份将覆盖当前所有的配置和存档数据！建议操作前先导出当前数据作为备份。是否继续？')
+    await confirm(
+      '导入备份将覆盖当前所有的配置和存档数据！建议操作前先导出当前数据作为备份。是否继续？',
+      { destructive: true }
+    )
   ) {
     importFileInput.value?.click();
   }
@@ -95,9 +100,11 @@ const handleImport = async (event: Event) => {
       if (success) {
         toastStore.addToast({ message: '数据恢复成功，配置与存档已还原', type: 'success' });
         // (可选) 重新加载页面，确保所有 Pinia Store 与 IndexedDB 的最新状态保持物理同步
-        if (confirm('数据已还原。建议刷新页面以确保所有状态同步，是否立即刷新？')) {
-          window.location.reload();
-        }
+        confirm('数据已还原。建议刷新页面以确保所有状态同步，是否立即刷新？').then((ok) => {
+          if (ok) {
+            window.location.reload();
+          }
+        });
       } else {
         toastStore.addToast({ message: '导入失败：文件格式无效或损坏', type: 'error' });
       }

@@ -40,7 +40,7 @@
 </a>
 &nbsp;
 <a href="./LICENSE">
-  <img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg?style=for-the-badge&logo=gnu&logoColor=white" alt="License">
+  <img src="https://img.shields.io/badge/License-AGPL--3.0-blue.svg?style=for-the-badge&logo=gnu&logoColor=white" alt="License">
 </a>
 &nbsp;
 <a href="./TECHNICAL_DESIGN.md">

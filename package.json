@@ -2,7 +2,7 @@
   "name": "touhouisekai",
   "private": true,
   "version": "0.7.9",
-  "license": "GPL-3.0",
+  "license": "AGPL-3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

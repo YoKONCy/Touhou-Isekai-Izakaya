@@ -198,6 +198,18 @@ const gameStore = useGameStore();
 
 // 监听战斗激活状态以同步（仅限主机段）
 watch(
+  () => gameStore.state.system.combat,
+  (newCombat) => {
+    if (newCombat && newCombat.isPending && (newCombat as any).tutorialMode) {
+      console.log('[CombatOverlay] 教学模式检测中: 正在自动开启战斗演示喵...');
+      startCombat();
+    }
+  },
+  { immediate: true, deep: true }
+);
+
+// 监听战斗激活状态以同步（仅限主机段）
+watch(
   () => gameStore.state.system.combat?.isActive,
   () => {
     if (gameStore.multiplayer.isHost && gameStore.multiplayer.isMultiplayer) {
@@ -737,6 +749,7 @@ interface Popup {
 
 interface UICombatant extends Combatant {
   popups: Popup[];
+  items?: Item[];
 }
 
 // --- 前端主进程持有的瞬时视效与动效缓存状态分量 喵 ---
@@ -880,6 +893,10 @@ const turn = computed(() => combatState.value?.turn || 1);
 // 战斗数据访问层 (Getters)
 const spells = computed(() => player.value?.spellCards || []);
 const items = computed(() => {
+  // 教学模式优先使用战斗员自带的虚拟道具喵
+  if (combatState.value?.tutorialMode && player.value?.items) {
+    return player.value.items;
+  }
   const allItems = gameStore.state.player.items || [];
   return allItems.filter((item) => {
     // 显式排除特殊物品、关键道具、装备等不可直接消耗的项目
@@ -2780,8 +2797,21 @@ function checkWinLoss() {
 
 function closeCombat() {
   const finalCombatants = combatState.value?.combatants || [];
+  const isTutorial = combatState.value?.tutorialMode;
 
   audioManager.stopBgm();
+
+  if (isTutorial) {
+    console.log('[CombatOverlay] 教学模式结束，跳过数据持久化与回写喵。');
+    gameStore.updateState({
+      system: {
+        ...gameStore.state.system,
+        combat: null
+      }
+    });
+    emit('close');
+    return;
+  }
 
   // 1. 玩家侧核心数值回写与战后成长核算 (Player Stats Sync & Growth)喵
   if (player.value) {

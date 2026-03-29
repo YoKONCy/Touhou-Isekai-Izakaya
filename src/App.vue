@@ -695,6 +695,13 @@ function handleHelpAction(action: string) {
       // Flash the refresh button?
       // For now, no-op or just sound
       break;
+    case 'startCombatTutorial':
+      // 开启战斗教学沙箱喵
+      gameStore.startCombatTutorial();
+      isHelpOpen.value = false;
+      userOpenCombat.value = true;
+      audioManager.playPageFlip();
+      break;
   }
 }
 

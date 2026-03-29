@@ -35,12 +35,14 @@ import {
 import { audioManager } from '@/services/audio';
 import { TALENTS } from '@/data/talents';
 import { useToastStore } from '@/stores/toast';
+import { useConfirm } from '@/utils/confirm';
 
 import PlayerConfigModal from './PlayerConfigModal.vue';
 import FacilityPanel from './FacilityPanel.vue';
 
 const gameStore = useGameStore();
 const toastStore = useToastStore();
+const { confirm: customConfirm } = useConfirm();
 
 const emit = defineEmits<{
   (e: 'open-help', sectionId?: string): void;
@@ -384,9 +386,9 @@ function handleBackToItems() {
   audioManager.playPageFlip();
 }
 
-function handleDiscardItem(item: any) {
+async function handleDiscardItem(item: any) {
   if (!item) return;
-  if (confirm(`确定要丢弃 [${item.name || item.id}] 吗？\n这是不可逆转的操作，请三思喵！`)) {
+  if (await customConfirm(`确定要丢弃 [${item.name || item.id}] 吗？\n这是不可逆转的操作，请三思喵！`, { destructive: true })) {
     gameStore.applyAction({
       type: 'INVENTORY',
       target: 'items',

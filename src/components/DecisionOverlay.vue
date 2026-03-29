@@ -22,6 +22,7 @@ import {
   UserMinus
 } from 'lucide-vue-next';
 import _ from 'lodash';
+import { useConfirm } from '@/utils/confirm';
 
 const props = defineProps<{
   isOpen: boolean;
@@ -33,6 +34,7 @@ const emit = defineEmits<{
 }>();
 
 const gameStore = useGameStore();
+const { confirm } = useConfirm();
 const activeTab = ref<'action' | 'interaction' | 'logs'>('action');
 
 // --- 行动决策逻辑喵 (Action Logic) ---
@@ -232,9 +234,9 @@ function submitVoteCreation() {
   closeVoteCreation();
 }
 
-function handleKickPlayer(playerId: string, playerName: string) {
+async function handleKickPlayer(playerId: string, playerName: string) {
   if (!gameStore.multiplayer.isHost) return;
-  if (confirm(`确定要踢出玩家 "${playerName}" 吗？`)) {
+  if (await confirm(`确定要踢出玩家 "${playerName}" 吗？`, { destructive: true })) {
     multiplayerService.kickPlayer(playerId);
     audioManager.playClick();
   }

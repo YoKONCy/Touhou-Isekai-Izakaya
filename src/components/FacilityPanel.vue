@@ -4,6 +4,7 @@ import { dbService } from '@/services/DatabaseService';
 import { useSaveStore } from '@/stores/save';
 import { X, MapPin, Users, Activity, Home, Trash2 } from 'lucide-vue-next';
 import { audioManager } from '@/services/audio';
+import { useConfirm } from '@/utils/confirm';
 
 const props = defineProps<{
   isOpen: boolean;
@@ -12,6 +13,7 @@ const props = defineProps<{
 const emit = defineEmits(['close']);
 
 const saveStore = useSaveStore();
+const { confirm } = useConfirm();
 const facilities = ref<any[]>([]);
 const isLoading = ref(false);
 
@@ -143,7 +145,7 @@ function close() {
 
 // 风险操作：从持久化层物理删除特定的设施注册记录 喵
 async function removeFacility(id: string) {
-  if (confirm('确定要清除这处设施的档案吗？(操作无法撤销)')) {
+  if (await confirm('确定要清除这处设施的档案吗？(操作无法撤销)', { destructive: true })) {
     await dbService.deleteFacility(id);
     audioManager.playSoftClick();
     loadFacilities();

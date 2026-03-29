@@ -254,6 +254,104 @@ export const useGameStore = defineStore('game', () => {
     state.value.system.combat = combatState;
   }
 
+  function startCombatTutorial() {
+    clearQuickReplies();
+
+    const playerCombatant: any = {
+      id: 'player',
+      name: state.value.player.name || '旅人',
+      team: 'player',
+      isPlayer: true,
+      hp: 1000,
+      maxHp: 1000,
+      mp: 500,
+      maxMp: 500,
+      power: 'D+',
+      spellCards: [
+        {
+          id: 'tutorial_spell_1',
+          name: '简单弹幕',
+          description: '基础的弹幕攻击，威力稳定喵。',
+          damage: 100,
+          scope: 'single',
+          cost: 30,
+          type: 'attack',
+          hitRate: 0.95,
+          level: 30
+        },
+        {
+          id: 'tutorial_spell_2',
+          name: '小小奇迹',
+          description: '集中精神，为自己恢复生命值喵。',
+          damage: 250,
+          scope: 'single',
+          cost: 60,
+          type: 'heal',
+          level: 1
+        }
+      ],
+      buffs: [],
+      shield: 0,
+      dodgeRate: 0.15,
+      pPoints: 0,
+      maxPPoints: 100,
+      actionPoints: 2,
+      maxActionPoints: 2,
+      combatLevel: 10,
+      items: [
+        {
+          id: 'tutorial_item_1',
+          name: '咸饭团',
+          description: '恢复 150 点生命值。',
+          type: 'consumable',
+          count: 3,
+          effects: { heal: 150 }
+        }
+      ]
+    };
+
+    const enemyCombatant: any = {
+      id: 'enemy_tutorial',
+      name: '练习妖精',
+      team: 'enemy',
+      isPlayer: false,
+      hp: 500,
+      maxHp: 500,
+      mp: 200,
+      maxMp: 200,
+      power: 'D',
+      spellCards: [],
+      buffs: [],
+      shield: 0,
+      dodgeRate: 0.1,
+      pPoints: 0,
+      maxPPoints: 100,
+      actionPoints: 1,
+      maxActionPoints: 1
+    };
+
+    const combatState: any = {
+      isActive: false,
+      isPending: true,
+      tutorialMode: true, // 标记为教学模式以自动开启
+      turn: 1,
+      combatants: [playerCombatant, enemyCombatant],
+      logs: [
+        {
+          turn: 1,
+          actorId: 'system',
+          actorName: '系统',
+          actionType: 'wait',
+          targetNames: [],
+          description: '进入了战斗教学沙箱！这里的数值与您的主剧情无关喵。'
+        }
+      ],
+      bgm_suggestion: '常规'
+    };
+
+    state.value.system.combat = combatState;
+  }
+
   function setPendingQuest(quest: Quest | null) {
     state.value.system.pending_quest_trigger = quest;
   }
@@ -1304,6 +1402,7 @@ export const useGameStore = defineStore('game', () => {
     setQuickReplies,
     clearQuickReplies,
     setCombatState,
+    startCombatTutorial,
     setPendingQuest,
     addQuest,
     updateQuestStatus,

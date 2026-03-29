@@ -82,6 +82,7 @@ export interface Combatant {
   unlockedTalents?: string[]; // IDs of unlocked talents
 
   hasUsedUltimate?: boolean; // Track if Ultimate has been used in this battle
+  items?: any[]; // 教学模式预设道具
 }
 
 export interface BuffEffect {
@@ -129,4 +130,5 @@ export interface CombatState {
   logs: CombatLogEntry[];
   result?: 'win' | 'loss' | 'escape';
   bgm_suggestion?: string;
+  tutorialMode?: boolean; // 新增：是否为教学模式
 }
