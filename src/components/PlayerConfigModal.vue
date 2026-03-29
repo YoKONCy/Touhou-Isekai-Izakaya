@@ -300,10 +300,12 @@ async function handleCropConfirm() {
   ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
 
   const avatarUrl = canvas.toDataURL('image/png');
-
+  
   // 同步至全局状态机并重置临时显存 (State Commit)
-  if (referenceUrl) {
-    gameStore.setPlayerAvatar(avatarUrl, referenceUrl);
+  if (rawImage.value) {
+    gameStore.setPlayerAvatar(avatarUrl, rawImage.value);
+  } else {
+    gameStore.setPlayerAvatar(avatarUrl);
   }
 
   showCropperModal.value = false;
