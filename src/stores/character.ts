@@ -3,7 +3,7 @@ import { ref } from 'vue';
 import { type CharacterCard } from '@/types/db';
 import { dbService } from '@/services/DatabaseService';
 
-// Simple UUID generator
+// RFC4122 兼容的简化版 UUID 生成算法
 export function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = (Math.random() * 16) | 0,
@@ -18,14 +18,14 @@ export const useCharacterStore = defineStore('character', () => {
   async function loadCharacters() {
     characters.value = await dbService.getAllCharacters();
 
-    // Always try to load defaults to ensure new JSON files are picked up
-    // The initializeDefaults function checks for duplicates
+    // 强制执行默认值初始化，确保新增的 JSON 静态资源能被即时捕获
+    // initializeDefaults 内部已集成幂等性检查，防范记录重复注入
     await initializeDefaults();
   }
 
   async function initializeDefaults() {
-    // 1. Load from multiple directories with subfolder support
-    // We use glob with recursive pattern to support nested categories
+    // 1. 从多个目录执行资源加载，并支持子文件夹递归扫描
+    // 利用 glob 递归模式来支持文件夹层级与分类自动映射
     const charModules = import.meta.glob('@/assets/lorebook/characters/**/*.json', { eager: true });
     const locModules = import.meta.glob('@/assets/lorebook/locations/**/*.json', { eager: true });
     const infoModules = import.meta.glob('@/assets/lorebook/info/**/*.json', { eager: true });
@@ -49,14 +49,13 @@ export const useCharacterStore = defineStore('character', () => {
       let inferredCategory = charData.category;
 
       const pathSegments = path.split('/');
-      // Path usually looks like: /src/assets/lorebook/characters/CategoryName/FileName.json
-      // Or: /src/assets/lorebook/locations/FileName.json
+      // 物理路径基准：/src/assets/lorebook/{Type}/{Category}/{File}.json (或无 Category)
 
       const lorebookIndex = pathSegments.indexOf('lorebook');
       if (lorebookIndex !== -1 && pathSegments.length > lorebookIndex + 1) {
         const typeSegment = pathSegments[lorebookIndex + 1];
 
-        // 1. Infer Type
+        // 1. 类型推导 (Type Inference)
         if (!inferredType || inferredType === 'character' || inferredType === 'other') {
           if (typeSegment === 'locations') inferredType = 'location';
           else if (typeSegment === 'info') inferredType = 'info';
@@ -65,8 +64,7 @@ export const useCharacterStore = defineStore('character', () => {
           else if (!inferredType) inferredType = 'character';
         }
 
-        // 2. Infer Category from subfolder if it exists
-        // If there's a segment between type and filename, use it as category
+        // 2. 分类推导 (Category Inference)：若存在中间目录，则将其映射为分类名
         // e.g., .../characters/Hakurei_Jinja/Reimu.json -> category = Hakurei_Jinja
         if (pathSegments.length > lorebookIndex + 3) {
           const subFolderCategory = pathSegments[lorebookIndex + 2];
@@ -79,27 +77,25 @@ export const useCharacterStore = defineStore('character', () => {
       if (!inferredType) inferredType = 'character';
       if (!inferredCategory) inferredCategory = inferredType === 'location' ? '地点' : '未分类';
 
-      // Ensure description is a string
+      // 健壮性校验：确保描述字段强制转换为字符串格式
       let desc = charData.description;
       if (typeof desc === 'object') {
         desc = JSON.stringify(desc, null, 2);
       }
 
-      // Try to match existing character
-      // Priority 1: UUID match
+      // 尝试匹配既有数据记录 (Deduplication Check)
+      // 优先级 1: 基于 UUID 唯一标识进行精确匹配
       let existing = charData.uuid
         ? characters.value.find((c) => c.uuid === charData.uuid)
         : undefined;
 
-      // Priority 2: Name match (if UUID match failed or no UUID in file)
+      // 优先级 2: 若 UUID 缺省或不匹配，则基于显示名称执行二级模糊/精确匹配
       if (!existing && charData.name) {
         existing = characters.value.find((c) => c.name === charData.name);
       }
 
       if (existing && existing.id) {
-        // Special migration for Shanghai split:
-        // If we find an existing "Shanghai" UUID that still has "蓬莱" in its name (old combined entry),
-        // we force update it to the new single "Shanghai" data.
+        // 上海/蓬莱 实体拆分专项迁移逻辑：针对旧版合并条目执行自动重构
         if (existing.uuid === 'Shanghai' && existing.name.includes('蓬莱')) {
           const updateData = {
             name: charData.name,
@@ -112,11 +108,10 @@ export const useCharacterStore = defineStore('character', () => {
           await dbService.updateCharacter(existing.id, updateData);
         }
 
-        // --- TYPE & CATEGORY MIGRATION ---
-        // If existing entry's type or category differs from inferred ones (from folder structure), update it!
-        // This ensures that moving files between folders automatically updates their attributes in DB.
+        // --- 类型与分类自动同步迁移 (Auto-Sync) ---
+        // 若磁盘物理分类与数据库记录不一致，则以磁盘为准执行自动更新 (Disk-First Sync)
 
-        // Also sync missing fields (gender, stats, etc.) from JSON to DB if they are empty in DB
+        // 同时将 JSON 中持有的生理/战斗属性补齐至数据库缺项中
         const missingFields: any = {};
         const fieldsToSync = [
           'gender',
@@ -154,7 +149,7 @@ export const useCharacterStore = defineStore('character', () => {
           });
         }
 
-        // Character already exists, skip overwriting to preserve player edits
+        // 角色已在库中命中，跳过核心数据覆盖以保护玩家的自定义编辑成果
         continue;
       } else {
         // CREATE new character
