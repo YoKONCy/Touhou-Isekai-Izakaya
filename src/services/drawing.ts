@@ -106,7 +106,7 @@ export const drawingService = {
       // 流程：将图像载入离屏 Image 对象以获取其物理尺寸，并准备绘制。
       return new Promise((resolve, reject) => {
         const img = new Image();
-        img.crossOrigin = 'Anonymous'; // Handle CORS if needed for local assets
+        img.crossOrigin = 'Anonymous'; // 处理跨域资源引用 (CORS) 喵
         img.onload = () => {
           const canvas = document.createElement('canvas');
           let width = img.width;
@@ -227,7 +227,7 @@ ${storyText}
         };
       } catch (e) {
         console.warn(
-          '[DrawingService] Failed to parse LLM response as JSON, falling back to raw content'
+          '[DrawingService] 无法将 LLM 响应解析为 JSON 格式，正降级回退至原始文本内容喵'
         );
         return {
           prompt: content,
@@ -284,7 +284,7 @@ ${storyText}
         scale: config.scale || 6.0,
         sampler: sampler,
         seed: Math.floor(Math.random() * 1000000000),
-        // n_samples is often not needed for V4
+        // 对于 V4/V4.5 架构，通常不再需要 n_samples 参数喵
         uc: negativePrompt,
         params_version: 1,
         cfg_rescale: 0,
@@ -331,7 +331,7 @@ ${storyText}
       parameters: parameters
     };
 
-    // Compatibility: NovelAI provider always uses official structure
+    // 兼容性修正：NovelAI 服务商始终采用其官方规定的请求参数结构
     const isOfficialStructure =
       config.providerType === 'novelai' ||
       baseUrl.includes('novelai.net') ||
@@ -437,7 +437,7 @@ ${storyText}
     const isV45 = model.includes('nai-diffusion-4-5');
 
     console.log(
-      `[DrawingService] Testing connection to: ${baseUrl} with model: ${model} (isV4: ${isV4})`
+      `[DrawingService] 正在测试连接至: ${baseUrl}，使用模型: ${model} (V4 系列: ${isV4})`
     );
 
     let parameters: any = {};
@@ -717,31 +717,15 @@ ${storyText}
         }
       }
 
-      // 容错降级：若非 SSE 协议或流析构异常，则尝试将全量响应体作为同步 JSON 进行强制解析。
-      if (!imageUrl) {
-        console.warn('[绘图服务] 未能在流中识别出图片链接，正在尝试全量响应解析回退...');
-        try {
-          // 执行分析：fullRawResponse 包含全量原始分片合集。
-          // 逻辑说明：若检测到 SSE 帧前缀则剥离分析；若纯 JSON 则直接读取。
-
-          if (!isSSE) {
-            const parsed = JSON.parse(fullRawResponse);
-            const ch = parsed?.choices?.[0];
-
-            // Check message content
-            const content = ch?.message?.content || '';
-            const mdMatch = content.match(/!\[.*?\]\((https?:\/\/[^\s\)]+)(?:[\s"'].*?)?\)/);
-
-            if (mdMatch && mdMatch[1]) {
-              imageUrl = mdMatch[1];
-            } else if (ch?.message?.image_url?.url) {
-              imageUrl = ch.message.image_url.url;
-            } else if (ch?.url) {
-              imageUrl = ch.url;
-            }
-          }
-        } catch (e) {
-          console.error('[DrawingService] Full response parse failed:', e);
+      if (!imageUrl && !isSSE) {
+        const parsed = JSON.parse(fullRawResponse);
+        const ch = parsed?.choices?.[0];
+ 
+        // 深入检查消息正文
+        const content = ch?.message?.content || '';
+        const mdMatch = content.match(/!\[.*?\]\((https?:\/\/[^\s\)]+)(?:[\s"'].*?)?\)/);
+        if (mdMatch && mdMatch[1]) {
+          imageUrl = mdMatch[1];
         }
       }
 
@@ -774,18 +758,18 @@ ${storyText}
     }
 
     try {
-      console.log('[DrawingService] Starting generation...');
+      console.log('[DrawingService] 正在开启绘图生成工作流...');
 
-      // 1. Generate Prompt from LLM
+      // 1. 调用 LLM 提示词导演生成精准描述词 (Phase 1)
       const { prompt: llmPrompt, negative_prompt: llmNegativePrompt } = await this.generatePrompt(
         storyText,
         location,
         characters
       );
       console.log('[DrawingService] LLM Generated Prompt:', llmPrompt);
-      console.log('[DrawingService] LLM Generated Negative Prompt:', llmNegativePrompt);
+      console.log('[DrawingService] LLM 生成的反向提示词:', llmNegativePrompt);
 
-      // 2. Combine with User Extra Prompts
+      // 2. 合并用户自定义的额外提示词 (针对 NovelAI 专属增强策略)
       const isNovelAI = config.providerType === 'novelai';
       let finalPrompt = llmPrompt;
       let finalNegativePrompt = llmNegativePrompt || (isNovelAI ? config.negativePrompt : '');

@@ -20,7 +20,7 @@ const initPromise = (sqlite3InitModule as any)({
   try {
     log('运行 SQLite3 版本', sqlite3.version.libVersion);
 
-    // OPFS 运行环境诊断日志 (Diagnostic logging)
+    // OPFS 运行环境诊断日志 (环境连通性诊断 - Diagnostic logging)
     log('诊断 - isSecureContext:', self.isSecureContext);
     log('诊断 - crossOriginIsolated:', (self as any).crossOriginIsolated);
     log('诊断 - SharedArrayBuffer:', !!(self as any).SharedArrayBuffer);
@@ -69,7 +69,7 @@ const initPromise = (sqlite3InitModule as any)({
       (self as any).dbType = 'memory';
     }
 
-    // 应用数据库结构定义 (Apply Schema)
+    // 应用数据库结构定义 (应用数据库架构 - Apply Schema)
     log('正在应用数据库 Schema...');
     db.transaction(() => {
       SCHEMA_SQL.forEach((sql: string, index: number) => {
@@ -84,7 +84,7 @@ const initPromise = (sqlite3InitModule as any)({
     });
     log('数据库 Schema 应用成功。');
 
-    // 为既有数据库执行版本迁移脚本 (Migrations)
+    // 为既有数据库执行版本迁移脚本 (数据库迁移 - Migrations)
     runMigrations(db);
 
     return true;
@@ -98,7 +98,7 @@ const initPromise = (sqlite3InitModule as any)({
 function runMigrations(db: any) {
   log('开始数据库迁移...');
   try {
-    // 工具函数：如果列缺失则执行 DDL 自动补全 (Column Guard)
+    // 工具函数：如果列缺失则执行 DDL 自动补全 (列存在性守卫 - Column Guard)
     const ensureColumn = (tableName: string, colName: string, typeDef: string) => {
       const tableInfo = db.exec({
         sql: `PRAGMA table_info(${tableName})`,
@@ -131,7 +131,7 @@ function runMigrations(db: any) {
   }
 }
 
-// --- 数据压缩与优化工具函数 (Optimization Shards) ---
+// --- 数据压缩与优化工具函数 (优化算法分片 - Optimization Shards) ---
 const hashCache = new Map<string, string>();
 
 /**
@@ -141,7 +141,7 @@ const hashCache = new Map<string, string>();
 function fastHash(str: string): string {
   if (hashCache.has(str)) return hashCache.get(str)!;
 
-  // FNV-1a 32位 + 辅助 djb2 算法以极大降低碰撞概率 (Anti-collision)
+  // FNV-1a 32位 + 辅助 djb2 算法以极大降低碰撞概率 (防碰撞处理 - Anti-collision)
   let h1 = 0x811c9dc5;
   let h2 = 5381;
   for (let i = 0; i < str.length; i++) {
@@ -211,13 +211,13 @@ async function optimizeGameState(state: any): Promise<any> {
       if (quest._ref) continue;
 
       if (quest.status === 'completed' || quest.status === 'failed') {
-        // 针对终态任务执行整包哈希压缩 (Immutable)
+        // 针对终态任务执行整包哈希压缩 (不可变数据处理 - Immutable)
         const content = JSON.stringify(quest);
         const hash = fastHash(content);
         storeStatic(hash, 'quest_full', content);
         state.system.quests[i] = { _ref: hash };
       } else {
-        // 针对运行态任务执行属性拆分优化 (Dynamic/Static Split)
+        // 针对运行态任务执行属性拆分优化 (动静分离策略 - Dynamic/Static Split)
         const {
           id,
           status,
@@ -248,12 +248,12 @@ async function optimizeGameState(state: any): Promise<any> {
   }
 
   // 优化阶段 D：处理 NPC 字典 — 将每个 NPC 视为独立对象进行整体哈希
-  // 考虑到多数 NPC 状态在回合间保持稳定，此举可大幅削减冗余快照量 (Entity Deduplication)
+  // 考虑到多数 NPC 状态在回合间保持稳定，此举可大幅削减冗余快照量 (实体去重优化 - Entity Deduplication)
   if (state.npcs && typeof state.npcs === 'object') {
     const npcDict = state.npcs;
     for (const npcKey of Object.keys(npcDict)) {
       const npc = npcDict[npcKey];
-      if (npc._ref) continue; // already optimized
+      if (npc._ref) continue; // 已经过优化处理喵 (Already optimized)
 
       const content = JSON.stringify(npc);
       const hash = fastHash(content);
@@ -266,7 +266,7 @@ async function optimizeGameState(state: any): Promise<any> {
   if (state.system && Array.isArray(state.system.promises)) {
     for (let i = 0; i < state.system.promises.length; i++) {
       const promise = state.system.promises[i];
-      if (promise._ref) continue; // already optimized
+      if (promise._ref) continue; // 已经过优化处理喵 (Already optimized)
 
       const content = JSON.stringify(promise);
       const hash = fastHash(content);
@@ -325,7 +325,7 @@ async function restoreGameState(state: any): Promise<any> {
     }
   }
 
-  // 还原阶段 D：NPC 字典解压 — 将 { _ref: hash } 形式的占位符反解为全量对象 (Expansion)
+  // 还原阶段 D：NPC 字典解压 — 将 { _ref: hash } 形式的占位符反解为全量对象 (对象膨胀还原 - Expansion)
   if (state.npcs && typeof state.npcs === 'object') {
     for (const npcKey of Object.keys(state.npcs)) {
       const npc = state.npcs[npcKey];
@@ -335,7 +335,7 @@ async function restoreGameState(state: any): Promise<any> {
     }
   }
 
-  // Restore Promises
+  // 还原 Promise 状态 (Restore Promises)
   if (state.system && Array.isArray(state.system.promises)) {
     for (let i = 0; i < state.system.promises.length; i++) {
       const promise = state.system.promises[i];
@@ -395,7 +395,7 @@ self.onmessage = async (e: MessageEvent) => {
           });
           const newSnapshotId = res[0].id;
 
-          // 快照自动剪枝：每个存档槽位仅保留最近的 MAX_SNAPSHOTS_PER_SAVE 份记录 (Memory Guard)
+          // 快照自动剪枝：每个存档槽位仅保留最近的 MAX_SNAPSHOTS_PER_SAVE 份记录 (内存守卫 - Memory Guard)
           try {
             const countRes = db.exec({
               sql: 'SELECT COUNT(*) as c FROM snapshots WHERE saveSlotId = ?',
@@ -416,7 +416,7 @@ self.onmessage = async (e: MessageEvent) => {
               if (oldestIds.length > 0) {
                 const idsToDelete = oldestIds.map((r: any) => r.id);
                 const placeholders = idsToDelete.map(() => '?').join(',');
-                // 重置聊天记录中的废弃快照引用，防止查询时产生悬挂指针 (Orphan Prevention)
+                // 重置聊天记录中的废弃快照引用，防止查询时产生悬挂指针 (孤儿预防 - Orphan Prevention)
                 db.exec({
                   sql: `UPDATE chats SET snapshotId = NULL WHERE snapshotId IN (${placeholders})`,
                   bind: idsToDelete
@@ -426,12 +426,12 @@ self.onmessage = async (e: MessageEvent) => {
                   bind: idsToDelete
                 });
                 log(
-                  `Pruned ${idsToDelete.length} old snapshots for save ${saveSlotId} (total was ${totalSnapshots})`
+                  `[快照管理] 已清理存档 ${saveSlotId} 的 ${idsToDelete.length} 份陈旧快照喵 (总计 ${totalSnapshots} 份)`
                 );
               }
             }
           } catch (pruneErr) {
-            error('Snapshot pruning failed (non-fatal):', pruneErr);
+            error('[快照管理] 快照自动剪枝失败喵 (非致命异常):', pruneErr);
           }
 
           result = { id: newSnapshotId };
@@ -455,7 +455,7 @@ self.onmessage = async (e: MessageEvent) => {
                 const restored = await restoreGameState(state);
                 snap.gameState = JSON.stringify(restored);
               } catch (e) {
-                console.warn('Failed to restore snapshot state', e);
+                console.warn('[快照管理] 还原快照状态逻辑失败喵', e);
               }
             }
             result = snap;
@@ -482,7 +482,7 @@ self.onmessage = async (e: MessageEvent) => {
                 const restored = await restoreGameState(state);
                 snap.gameState = JSON.stringify(restored);
               } catch (e) {
-                console.warn('Failed to restore latest snapshot state', e);
+                console.warn('[快照管理] 还原最新快照状态失败喵', e);
               }
             }
             result = snap;
@@ -521,16 +521,16 @@ self.onmessage = async (e: MessageEvent) => {
         break;
 
       default:
-        throw new Error(`Unknown message type: ${type}`);
+        throw new Error(`未知的消息类型喵: ${type}`);
     }
 
     self.postMessage({ id, type, result });
   } catch (err: any) {
-    error('Worker Error:', err);
+    error('[数据库工作线程] 发生内部异常喵:', err);
     self.postMessage({
       id,
       type,
-      error: err.message || String(err)
+      error: err.message || 'Worker 内部执行异常喵'
     });
   }
 };
@@ -575,7 +575,7 @@ async function exportSave(db: any, saveSlotId: number) {
     db.exec({ sql, bind, returnValue: 'resultRows', rowMode: 'object' });
 
   const saveSlots = getRows('SELECT * FROM save_slots WHERE id = ?', [saveSlotId]);
-  if (saveSlots.length === 0) throw new Error('Save not found');
+  if (saveSlots.length === 0) throw new Error('未找到指定的存档插槽喵');
 
   const rawSave = saveSlots[0];
   const saveSlotData = {
@@ -609,10 +609,10 @@ async function exportSave(db: any, saveSlotId: number) {
     saveSlotId
   ])[0].c;
 
-  console.log(`[Export] Starting export. Snapshots: ${snapshotsCount}, Chats: ${chats.length}`);
+  console.log(`[导出] 开始准备导出数据喵。快照总数: ${snapshotsCount}, 消息总数: ${chats.length}`);
 
   // =================================================================
-  // 阶段 1：执行快照增量压缩 (Deduplication Pass)
+  // 阶段 1：执行快照增量压缩 (增量去重Pass - Deduplication Pass)
   // 快速路径：跳过已处理过的优化快照 (即包含 "_ref" 标记的项)
   // =================================================================
   const OPTIMIZE_BATCH_SIZE = 50;
@@ -657,7 +657,7 @@ async function exportSave(db: any, saveSlotId: number) {
           updates.push({ id: s.id, gameState: newStr });
         }
       } catch (e) {
-        console.warn(`[Export] Optimization failed for snapshot ${s.id}`, e);
+        console.warn(`[导出] 快照 ${s.id} 的压缩优化步骤失败喵`, e);
         snapshotCache.set(s.id, originalStr);
       }
     }
@@ -689,7 +689,7 @@ async function exportSave(db: any, saveSlotId: number) {
     }
   }
 
-  console.log(`[Export] Optimization done. Processed: ${optimizedCount}, Skipped: ${skippedCount}`);
+  console.log(`[导出] 压缩处理完成喵。已处理: ${optimizedCount}, 已跳过: ${skippedCount}`);
 
   const facilities = getRows('SELECT * FROM facilities WHERE saveSlotId = ?', [saveSlotId]);
   const characters = getRows('SELECT * FROM characters');
@@ -698,7 +698,7 @@ async function exportSave(db: any, saveSlotId: number) {
   const staticData = getRows('SELECT * FROM static_data');
 
   // =================================================================
-  // 阶段 2：以流式写入方式构建 JSON 二进制大对象 (Blob)
+  // 阶段 2：以流式写入方式构建 JSON 二进制大对象 (二进制流序列化 - Blob)
   // =================================================================
   const jsonParts: string[] = [];
 
@@ -711,7 +711,7 @@ async function exportSave(db: any, saveSlotId: number) {
   jsonParts.push(`"facilities":${JSON.stringify(facilities)},`);
   jsonParts.push(`"staticData":${JSON.stringify(staticData)},`);
 
-  // 处理快照负载：优先消费阶段 1 构建的预优化缓存，避免二次触发大规模 DB 全表扫描 (Cache Hit Recovery)
+  // 处理快照负载：优先消费阶段 1 构建的预优化缓存，避免二次触发大规模 DB 全表扫描 (缓存命中恢复 - Cache Hit Recovery)
   jsonParts.push(`"snapshots":[`);
 
   let processedCount = 0;
@@ -730,21 +730,21 @@ async function exportSave(db: any, saveSlotId: number) {
       for (const s of batch) {
         const gameStateStr = snapshotCache.get(s.id) || 'null';
         const jsonItem = `{"id":${s.id},"saveSlotId":${s.saveSlotId},"chatId":${s.chatId},"createdAt":${s.createdAt},"gameState":${gameStateStr}}`;
-
+ 
         if (!isFirstSnapshot) jsonParts.push(',');
         jsonParts.push(jsonItem);
         isFirstSnapshot = false;
         processedCount++;
       }
-
+ 
       if (processedCount % 200 === 0) {
         await new Promise((resolve) => setTimeout(resolve, 0));
-        console.log(`[Export] Packaging: ${processedCount}/${snapshotsCount}`);
+        console.log(`[Export] 正在打包 JSON 数据流: ${processedCount}/${snapshotsCount} (流式写入 - JSON Streaming)`);
       }
     }
   }
-
-  // 迁移完成，立即显式释放缓存占用的内存空间 (Heap Shrink)
+ 
+  // 迁移完成，立即显式释放缓存占用的内存空间 (堆内存收缩 - Heap Shrink)
   snapshotCache.clear();
 
   jsonParts.push(']}');
@@ -810,13 +810,13 @@ function stripJsonSection(buffer: ArrayBuffer, keyName: string, keepLast: number
     if (keyFoundAt !== -1) break;
     cursor++;
   }
-
+ 
   if (keyFoundAt === -1) {
-    console.warn(`[导入] 在根层级未找到 Key "${keyName}"。`);
+    console.warn(`[导入] 在 JSON 根层级未找到键 "${keyName}"。`);
     return buffer;
   }
-
-  // 2. 定位数组字段的字节起始边界 (Array Start Bound)
+ 
+  // 2. 定位数组字段的字节起始边界 (数组边界定位 - Array Start Bound)
   cursor = keyFoundAt;
   let startBracket = -1;
   while (cursor < uint8.length) {
@@ -832,8 +832,8 @@ function stripJsonSection(buffer: ArrayBuffer, keyName: string, keepLast: number
   }
 
   if (startBracket === -1) return buffer;
-
-  // 3. 追踪数组终点符号位，并同步采集元素分隔符（逗号）的位置掩码 (Comma Mapping Pass)
+ 
+  // 3. 追踪数组终点符号位，并同步采集元素分隔符（逗号）的位置掩码 (逗号映射扫描 - Comma Mapping Pass)
   depth = 1;
   inString = false;
   escaped = false;
@@ -870,8 +870,8 @@ function stripJsonSection(buffer: ArrayBuffer, keyName: string, keepLast: number
 
   const endBracket = cursor;
   let stripEnd = endBracket;
-
-  // 4. 根据保留策略计算物理裁切的字节边界 (Boundary Calculation)
+ 
+  // 4. 根据保留策略计算物理裁切的字节边界 (字节边界计算 - Boundary Calculation)
   if (keepLast > 0) {
     let hasContent = false;
     for (let k = startBracket + 1; k < endBracket; k++) {
@@ -893,7 +893,7 @@ function stripJsonSection(buffer: ArrayBuffer, keyName: string, keepLast: number
     }
   }
 
-  // 5. 执行物理擦除：在指定字节序列区间填充空格占位符 (Fast Buffer Fill)
+  // 5. 执行物理擦除：在指定字节序列区间填充空格占位符 (缓冲区快速填充 - Fast Buffer Fill)
   for (let k = startBracket + 1; k < stripEnd; k++) {
     uint8[k] = 32;
   }
@@ -908,7 +908,7 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
       console.log('[导入] 正在解析字符串内容，长度:', jsonContent.length);
       data = JSON.parse(jsonContent);
     } else {
-      // ArrayBuffer
+      // 数组缓冲区对象喵 (ArrayBuffer)
       let buffer = jsonContent;
       console.log('[导入] 正在解析 ArrayBuffer 内容，大小:', buffer.byteLength);
 
@@ -918,12 +918,12 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
           '[导入] 文件体积过大，正在尝试剥离旧快照以节省内存...'
         );
         try {
-          // Try to keep the last 50 snapshots, strip the rest
+          // 性能策略：仅保留最后 50 份快照，其余旧快照执行流式剥离以减小堆占用。
           buffer = stripJsonSection(buffer, 'snapshots', 50);
           console.log('[导入] 快照处理完成。新大小:', buffer.byteLength);
         } catch (e) {
           console.error('[导入] 快照剥离失败:', e);
-          // Continue with original buffer
+          // 容错处理：剥离失败后尝试使用原始缓冲区继续解析。
         }
       }
 
@@ -940,7 +940,7 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
     throw new Error('存档文件格式无效');
   }
 
-  // Ensure snapshots is an array if we stripped it (it might be parsed as empty array if we replaced content)
+  // 结构加固：若快照字段被完全剥离，则将其重置为空数组以防止后续逻辑解构异常。
   if (!data.snapshots) data.snapshots = [];
 
   let newSaveId = 0;
@@ -966,17 +966,9 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
       }
     }
 
-    // NEW: Optimize snapshots INSIDE transaction (or before? No, references must exist first if we want to validte,
-    // but optimizeGameState inserts into static_data if missing.
-    // However, since we just imported static_data, optimizeGameState will see them if they exist?
-    // Actually optimizeGameState calculates hash and inserts if not exists.
-    // So if we imported static_data, optimizeGameState will generate same hash and IGNORE insert.
-    // BUT we need to process snapshots to ensure they are optimized (if importing old full save)
-    // 或者若导入的是已优化的新版存档，数据本身即已是引用形式。 (Pre-optimized)
-
-    // 我们可以在此处执行优化循环，但由于涉及数据库写入指令且 optimizeGameState 因 SHA1 变为异步函数，
-    // 建议在外部流程中处理。 (Async Safety)
-    // 设计笔记：由于 SHA1 涉及 WebCrypto 异步指令，我们必须将快照优化逻辑置于同步事务的回调范围之外执行。
+    // 设计笔记：由于静态资源已在上方逻辑中全量入库，此处只需关注数据的一致性引用。
+    // 如果导入的是旧版存档，我们可能需要在此处或后续异步流程中执行 optimizeGameState。
+    // 但鉴于 SHA1 性能开销，我们优先采用外部异步循环处理方案。
   });
 
   // 数据就绪：在正式落盘前执行全局快照压缩，以最大程度优化既有数据库的物理开销。
@@ -988,13 +980,13 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
         let state = snap.gameState;
         if (typeof state === 'string') state = JSON.parse(state);
 
-        // 执行数据压缩优化：提取出可公用的静态数据负载 (Static Extraction)
+        // 执行数据压缩优化：提取出可公用的静态数据负载 (静态数据抽离 - Static Extraction)
         // 注意：即便刚导入过静态库，此操作引发的重复插入会被 INSERT OR IGNORE 高效拦截。
         state = await optimizeGameState(state);
-
+ 
         snap.gameState = JSON.stringify(state);
       } catch (e) {
-        console.warn('Snapshot pre-optimization failed', e);
+        console.warn('快照预优化失败喵', e);
       }
     }
     console.log('[导入] 快照优化完成。');
@@ -1067,11 +1059,11 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
           });
 
           if (existing.length > 0) {
-            // Update
+            // 执行更新操作喵 (Update)
             const setClause = fields.map((k) => `${k} = ?`).join(', ');
             exec(`UPDATE characters SET ${setClause} WHERE uuid = ?`, [...values, mappedChar.uuid]);
           } else {
-            // Insert
+            // 执行插入操作喵 (Insert)
             const placeholders = fields.map(() => '?').join(', ');
             exec(
               `INSERT OR IGNORE INTO characters (${fields.join(', ')}) VALUES (${placeholders})`,
@@ -1080,8 +1072,7 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
           }
         } catch (e: any) {
           console.warn(`[导入] 角色 ${char.name || char.uuid} 导入失败:`, e);
-          // Continue with other characters? Or throw?
-          // Throwing stops the whole import. Let's throw to ensure data integrity.
+          // 抛出异常以触发事务回滚，确保数据库状态的一致性与完整性。
           throw new Error(`角色 ${char.name} 导入失败: ${e.message}`);
         }
       }

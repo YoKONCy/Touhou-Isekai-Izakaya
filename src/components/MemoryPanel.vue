@@ -57,7 +57,7 @@ async function handleJump(turnCount: number) {
 async function loadMemories() {
   if (!saveStore.currentSaveId) return;
 
-  // Fetch all memories for this save slot (sorted by ID DESC)
+  // 从后端服务拉取当前存档的所有记忆碎片喵 (Fetch all)
   let items = await dbService.getAllMemories(saveStore.currentSaveId);
 
   if (filterType.value !== 'all') {
@@ -98,14 +98,14 @@ function removeTag(index: number) {
 function openEditModal(mem: MemoryEntry) {
   editingMemory.value = _.cloneDeep(mem);
 
-  // Try parsing content
+  // 尝试自动嗅探并解析记忆正文内容喵 (Sniff content type)
   try {
     const parsed = JSON.parse(mem.content);
     if (typeof parsed === 'object' && parsed !== null) {
       editingContentData.value = parsed;
       editingMode.value = 'json';
     } else {
-      throw new Error('Not an object');
+      throw new Error('当前非标准的 JSON 对象喵');
     }
   } catch (e) {
     editingRawContent.value = mem.content;
@@ -126,7 +126,7 @@ async function saveEdit() {
       newContent = editingRawContent.value;
     }
 
-    // Update DB
+    // 同步执行数据库持久化热更新喵 (DB Update)
     await dbService.updateMemory(editingMemory.value.id, {
       content: newContent,
       gameDate: editingMemory.value.gameDate,
@@ -166,13 +166,13 @@ function formatContent(content: any) {
     if (str.trim().startsWith('{') || str.trim().startsWith('[')) {
       const obj = JSON.parse(str);
 
-      // Handle old variable_change array or JSON objects
+      // 处理旧版本的变量变更数组或复杂 JSON 对象喵 (Object formatting)
       if (Array.isArray(obj)) {
         return obj
           .map((a) => {
             if (a.type === 'UPDATE_PLAYER') {
               const isMoney = ['money', '金钱', '持有金钱'].includes(a.field);
-              if (!isMoney) return null; // Skip non-money player stats in this view
+              if (!isMoney) return null; // 该视图下仅展示金钱类的核心财产变动喵 (Skip context)
               const opStr = a.op === 'add' ? '+' : a.op === 'subtract' ? '-' : '=';
               return `${a.field}: ${opStr}${a.value}`;
             }
@@ -186,13 +186,13 @@ function formatContent(content: any) {
               const typeLabel = a.target === 'spell_cards' || a.target === '符卡' ? '符卡' : '物品';
               return `${opStr}${typeLabel}: ${itemName} x${count}`;
             }
-            return null; // Skip everything else (NPC updates, etc.)
+            return null; // 其余颗粒度过细的变动（如 NPC 好感度等）在此层级跳过喵 (Skip micro updates)
           })
           .filter(Boolean)
           .join('\n');
       }
 
-      // Format Alliance/Intelligence
+      // 针对联盟 (Alliance) 或 情报 (Intelligence) 类型的格式化输出喵
       if (obj.name && obj.content) {
         let res = `【${obj.name}】\n${obj.content}`;
         if (obj.related_characters && Array.isArray(obj.related_characters)) {
@@ -253,10 +253,10 @@ function getTypeLabel(type: string) {
     <div
       class="bg-izakaya-paper w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden rounded-xl shadow-2xl border-2 border-touhou-red/30 relative"
     >
-      <!-- Texture -->
+      <!-- 东方风格蒙层纹理 (Texture Overlay) 喵 -->
       <div class="absolute inset-0 pointer-events-none opacity-10 bg-texture-rice-paper"></div>
 
-      <!-- Header -->
+      <!-- 记忆库顶部标题栏 (Header) 喵 -->
       <div
         class="p-4 border-b border-izakaya-wood/10 flex items-center justify-between bg-touhou-red/5 relative z-10"
       >
@@ -272,7 +272,7 @@ function getTypeLabel(type: string) {
         </button>
       </div>
 
-      <!-- Toolbar -->
+      <!-- 搜索与筛选工具栏 (Toolbar) 喵 -->
       <div class="p-3 border-b border-izakaya-wood/10 flex gap-3 bg-white/40 relative z-10">
         <div class="relative flex-1 group">
           <Search
@@ -298,7 +298,7 @@ function getTypeLabel(type: string) {
         </select>
       </div>
 
-      <!-- Content -->
+      <!-- 记忆碎片展示区 (Content List) 喵 -->
       <div class="flex-1 overflow-y-auto p-4 bg-white/20 space-y-3 relative z-10 custom-scrollbar">
         <div
           v-if="memories.length === 0"
@@ -388,7 +388,7 @@ function getTypeLabel(type: string) {
             }}</span>
           </div>
 
-          <!-- Actions -->
+          <!-- 行内操作按钮组 (Row Actions) 喵 -->
           <div class="absolute top-2 right-2 flex items-center gap-1">
             <button
               @click.stop="openEditModal(mem)"
@@ -409,7 +409,7 @@ function getTypeLabel(type: string) {
       </div>
     </div>
 
-    <!-- Edit Modal -->
+    <!-- 记忆内容深度编辑器 (Edit Detail Modal) 喵 -->
     <div
       v-if="isEditing && editingMemory"
       class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
@@ -431,7 +431,7 @@ function getTypeLabel(type: string) {
         </div>
 
         <div class="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-white/30">
-          <!-- Metadata Editing -->
+          <!-- 存档元数据编辑区 (Metadata Editing) 喵 -->
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-1">
               <label class="text-xs font-bold text-izakaya-wood/60 uppercase tracking-wider"
@@ -468,7 +468,7 @@ function getTypeLabel(type: string) {
             </div>
           </div>
 
-          <!-- Tags Editing -->
+          <!-- 联想标签组编辑区 (Tags Editing) 喵 -->
           <div class="space-y-1 pt-2">
             <label class="text-xs font-bold text-izakaya-wood/60 uppercase tracking-wider"
               >标签 (Tags)</label
@@ -500,7 +500,7 @@ function getTypeLabel(type: string) {
             </div>
           </div>
 
-          <!-- Content Editing -->
+          <!-- 记忆正文分级编辑区 (Content Editing) 喵 -->
           <div class="space-y-3 pt-4 border-t border-izakaya-wood/10">
             <div class="flex items-center justify-between">
               <label class="text-xs font-bold text-izakaya-wood/60 uppercase tracking-wider"

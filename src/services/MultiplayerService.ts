@@ -63,7 +63,7 @@ class MultiplayerService {
         .replace('ws://', 'http://')
         .replace('/ws', '');
       const response = await fetch(`${baseUrl}/rooms`);
-      if (!response.ok) throw new Error('Failed to fetch rooms');
+      if (!response.ok) throw new Error('从官方中继服务器获取房间列表失败喵');
       return await response.json();
     } catch (e) {
       console.error('[联机] 获取房间列表失败:', e);
@@ -239,9 +239,9 @@ class MultiplayerService {
     // 设置连接超时熔断机制。
     const connectionTimeout = setTimeout(() => {
       if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
-        console.error('[联机] 连接官方服务器超时');
+        console.error('[联机] 连接官方服务器超时喵');
         this.ws.close();
-        onError(new Error('Connection timeout'));
+        onError(new Error('与服务器握手连接超时喵'));
       }
     }, 10000);
 
@@ -305,7 +305,7 @@ class MultiplayerService {
           }
         }
       } catch (e) {
-        console.warn('[联机] 解析消息流失败:', event.data, e);
+        console.warn('[联机] 解析消息流失败喵:', event.data, e);
       }
     };
   }
@@ -647,7 +647,7 @@ class MultiplayerService {
         const decryptedPayload = await cryptoService.decrypt(ciphertext, iv, this.cryptoKey);
         msg.payload = decryptedPayload;
       } catch (e) {
-        console.error('[联机] 解密失败:', e);
+        console.error('[联机] 消息解密失败喵 (可能使用了错误的房间密码):', e);
         return;
       }
     }

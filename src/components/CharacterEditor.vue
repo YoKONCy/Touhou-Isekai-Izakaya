@@ -38,18 +38,17 @@ const { confirm } = useConfirm();
 const selectedCategory = ref<string>('全部');
 const selectedCharId = ref<string | null>(null);
 const isEditing = ref(false);
-const mobileShowEditor = ref(false); // Mobile: show editor panel
+const mobileShowEditor = ref(false); // 移动端：显示编辑器面板喵 (Mobile: show editor panel)
 
-// Form data
 const formData = ref<Partial<CharacterCard>>({
   name: '',
   description: '',
   category: '未分类',
   tags: [],
   gender: 'female',
-  type: 'character', // Default type
+  type: 'character', // 默认为角色类型 喵
 
-  // Init defaults
+  // 初始化角色变量默认值喵 (Init defaults)
   initialPower: 'C',
   initialMaxHp: 100,
   initialResidence: '',
@@ -61,7 +60,7 @@ const formData = ref<Partial<CharacterCard>>({
 
 const tagInput = ref('');
 
-// Computed
+// 计算属性喵 (Computed)
 const categories = computed(() => ['全部', ...charStore.getCategories()]);
 
 const categoryCounts = computed(() => {
@@ -90,12 +89,12 @@ onMounted(async () => {
   await charStore.loadCharacters();
 });
 
-// Actions
+// 交互方法喵 (Actions)
 function handleSelectChar(char: CharacterCard) {
   selectedCharId.value = char.uuid;
   formData.value = { ...char };
   isEditing.value = true;
-  mobileShowEditor.value = true; // Mobile: show editor
+  mobileShowEditor.value = true; // 移动端：展示展示编辑器喵 (Mobile: show editor)
 }
 
 function handleNewChar() {
@@ -112,7 +111,7 @@ function handleNewChar() {
     initialMaxHp: 100
   };
   isEditing.value = true;
-  mobileShowEditor.value = true; // Mobile: show editor
+  mobileShowEditor.value = true; // 移动端专场：显示编辑器 喵
 }
 
 function handleMobileBack() {
@@ -122,13 +121,13 @@ function handleMobileBack() {
 async function handleReset() {
   if (await confirm('确定要重置当前编辑的内容吗？所有未保存的修改都将丢失。')) {
     if (selectedCharId.value) {
-      // Re-load from store
+      // 从商店重新加载喵 (Re-load from store)
       const original = charStore.characters.find((c) => c.uuid === selectedCharId.value);
       if (original) {
         formData.value = { ...original };
       }
     } else {
-      // Reset to new char defaults
+      // 重置为新角色默认值喵 (Reset to new char defaults)
       handleNewChar();
     }
   }
@@ -144,7 +143,7 @@ async function handleSave() {
     selectedCharId.value = newChar.uuid;
   }
 
-  // Refresh category list to include any new category added
+  // 刷新分类列表以包含新加入的分类喵 (Refresh category list)
   charStore.getCategories();
 }
 
@@ -215,10 +214,10 @@ function removeTag(index: number) {
     <div
       class="relative bg-stone-50 dark:bg-stone-900 w-full max-w-6xl h-[85vh] rounded-xl shadow-2xl flex flex-col overflow-hidden border-2 border-izakaya-wood/30"
     >
-      <!-- Texture Overlay -->
+      <!-- 东方风格蒙层纹理 (Texture Overlay) 喵 -->
       <div class="absolute inset-0 pointer-events-none opacity-40 bg-texture-rice-paper z-0"></div>
 
-      <!-- Header -->
+      <!-- 编辑器顶部状态栏 (Header) 喵 -->
       <div
         class="relative z-10 flex items-center justify-between p-4 border-b border-izakaya-wood/10 bg-touhou-red text-white shadow-md"
       >
@@ -237,12 +236,12 @@ function removeTag(index: number) {
       </div>
 
       <div class="relative z-10 flex-1 flex overflow-hidden">
-        <!-- Left: Category & List (Desktop always visible, Mobile hidden when editing) -->
+        <!-- 左侧：分类树与条目列表 (Category & List) 喵 -->
         <div
           class="w-full md:w-80 border-r border-izakaya-wood/10 flex flex-col bg-stone-100/80 dark:bg-stone-800/80 backdrop-blur-sm overflow-hidden h-full"
           :class="{ 'hidden md:flex': mobileShowEditor }"
         >
-          <!-- Category Sidebar Section -->
+          <!-- 分类筛选器侧边栏 (Category Sidebar Section) 喵 -->
           <div class="flex-shrink-0 flex flex-col max-h-[40%] border-b border-izakaya-wood/10">
             <div class="p-3 pb-2 flex items-center justify-between">
               <h3
@@ -290,7 +289,7 @@ function removeTag(index: number) {
                   >
                     {{ categoryCounts[cat] || 0 }}
                   </span>
-                  <!-- Actions (Only show for custom categories when active) -->
+                  <!-- 分类管理操作按钮 (Only show for custom categories when active) 喵 -->
                   <div
                     v-if="cat !== '全部' && cat !== '未分类' && selectedCategory === cat"
                     class="flex items-center gap-1 ml-1 animate-fade-in"
@@ -315,7 +314,7 @@ function removeTag(index: number) {
             </div>
           </div>
 
-          <!-- Character List Section -->
+          <!-- Lorebook 核心条目展示列表 (Character List Section) 喵 -->
           <div
             class="flex-1 flex flex-col overflow-hidden bg-stone-50/30 dark:bg-stone-900/10 min-h-0"
           >
@@ -332,7 +331,7 @@ function removeTag(index: number) {
               >
             </div>
 
-            <!-- Character List -->
+            <!-- 条目滚动容器 (Character List) 喵 -->
             <div class="flex-1 overflow-y-auto p-3 space-y-1.5 custom-scrollbar min-h-0">
               <button
                 v-for="char in filteredCharacters"
@@ -388,7 +387,7 @@ function removeTag(index: number) {
             </div>
           </div>
 
-          <!-- Factory Reset Button at the bottom -->
+          <!-- 危险：系统重置操作区 (Factory Reset Button) 喵 -->
           <div class="p-3 border-t border-izakaya-wood/10">
             <button
               @click="handleFactoryReset"
@@ -399,7 +398,7 @@ function removeTag(index: number) {
           </div>
         </div>
 
-        <!-- Right: Editor (Desktop always visible, Mobile slide in) -->
+        <!-- 右侧：条目详细编辑区 (Editor) 喵 -->
         <div
           class="flex-1 flex flex-col bg-white/60 dark:bg-stone-900/60 backdrop-blur-sm"
           :class="{
@@ -409,11 +408,11 @@ function removeTag(index: number) {
           }"
         >
           <div v-if="isEditing" class="flex-1 flex flex-col h-full">
-            <!-- Toolbar -->
+            <!-- 顶部操作工具栏 (Toolbar) 喵 -->
             <div
               class="h-14 md:h-16 border-b border-izakaya-wood/10 flex items-center justify-between px-4 md:px-6 bg-stone-50/80 dark:bg-stone-800/80"
             >
-              <!-- Mobile back button -->
+              <!-- 移动端：返回导航按钮 喵 -->
               <button
                 @click="handleMobileBack"
                 class="md:hidden p-2 -ml-2 hover:bg-stone-200 dark:hover:bg-stone-700 rounded-lg transition-colors"
@@ -456,12 +455,12 @@ function removeTag(index: number) {
               </div>
             </div>
 
-            <!-- Form -->
+            <!-- 设定信息表单区 (Form Area) 喵 -->
             <div
               class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 md:space-y-8 custom-scrollbar relative"
               style="-webkit-overflow-scrolling: touch"
             >
-              <!-- Type Selector -->
+              <!-- 实体类型嗅探切换 (Type Selector) 喵 -->
               <div>
                 <div class="flex items-center justify-between mb-2">
                   <label class="block text-sm font-bold text-izakaya-wood dark:text-stone-300"
@@ -542,7 +541,7 @@ function removeTag(index: number) {
                   </div>
                 </div>
 
-                <!-- Character Specific: Gender -->
+                <!-- 基于角色的特殊属性：性别 (Character Specific: Gender) 喵 -->
                 <div v-if="formData.type === 'character' || !formData.type">
                   <label class="block text-sm font-bold text-izakaya-wood dark:text-stone-300 mb-2"
                     >性别</label
@@ -559,7 +558,7 @@ function removeTag(index: number) {
                 </div>
               </div>
 
-              <!-- Character Initial Stats -->
+              <!-- TRPG 初始数值配置区 (Character Initial Stats) 喵 -->
               <div
                 v-if="formData.type === 'character' || !formData.type"
                 class="p-4 md:p-5 bg-stone-100/80 dark:bg-stone-800/50 rounded-xl border border-izakaya-wood/10 space-y-4"
@@ -660,7 +659,7 @@ function removeTag(index: number) {
                 </div>
               </div>
 
-              <!-- Spell Card Config -->
+              <!-- 符卡专属战斗属性配置 (Spell Card Config) 喵 -->
               <div
                 v-if="formData.type === 'spell_card'"
                 class="p-5 bg-blue-50/80 dark:bg-blue-900/10 rounded-xl border border-blue-200 dark:border-blue-800 space-y-4"

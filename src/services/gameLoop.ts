@@ -150,12 +150,12 @@ class GameLoopService {
         const guestKeys = Object.keys(guestInputs);
 
         if (guestKeys.length > 0) {
-          const hostName = gameStore.state.player.name || 'Host';
-          let aggregatedContent = `[${hostName} (Host)]: ${userContent}\n`;
+          const hostName = gameStore.state.player.name || '房主大人';
+          let aggregatedContent = `[${hostName} (房主)]: ${userContent}\n`;
 
           for (const key of guestKeys) {
             const companion = gameStore.state.multiplayer_companions?.[key];
-            const name = companion?.name || `Guest(${key.substring(0, 4)})`;
+            const name = companion?.name || `客机喵(${key.substring(0, 4)})`;
             aggregatedContent += `[${name}]: ${guestInputs[key]}\n`;
           }
 
@@ -177,17 +177,17 @@ class GameLoopService {
       this.currentStage.value = 'preparing';
       const promptContext = await promptService.build(finalUserContent, retrievedMemories);
 
-      // [提示词调试] 打印上下文组成结构
+      // [提示词调试] 打印上下文组成结构喵
       console.log(
-        '[提示词调试] 上下文详情 (Sections):',
-        promptContext.sections.map((s) => `${s.id}: ${s.tokenCount} tokens`).join(', ')
+        '[提示词调试] 上下文详情 (分段信息):',
+        promptContext.sections.map((s) => `${s.id}: ${s.tokenCount} 字符(Tokens)`).join(', ')
       );
-      console.log('[提示词调试] 提示词 Token 总量:', promptContext.totalTokens);
+      console.log('[提示词调试] 提示词 Token 总消耗量:', promptContext.totalTokens);
 
       const messages = promptService.toOpenAIMessages(promptContext);
 
-      // DEBUG: 打印 LLM1 提示词
-      console.log('【LLM1 Debug】Prompt Messages:', JSON.parse(JSON.stringify(messages)));
+      // 调试：打印故事模型 (LLM1) 的最终提示词消息喵
+      console.log('【故事模型调试】提示词消息流:', JSON.parse(JSON.stringify(messages)));
 
       // 2. LLM #1: 故事生成（流式）
       this.currentStage.value = 'generating_story';
@@ -277,8 +277,8 @@ class GameLoopService {
           }
 
           if (!response || !response.choices || response.choices.length === 0) {
-            console.error('[游戏循环] 无效的 OpenAI 响应:', response);
-            throw new Error('OpenAI API 未返回任何选项 (choices)');
+            console.error('[游戏循环] 无效的对话模型响应喵:', response);
+            throw new Error('对话模型 API 未返回任何有效选项 (Choices) 喵');
           }
 
           rawContent = response.choices[0]?.message?.content || '';
@@ -303,8 +303,8 @@ class GameLoopService {
       // 使用 rawContent 进行提取，确保即使被隐藏也能捕获内部思考
       let finalStory = rawContent;
 
-      // DEBUG: 打印 LLM1 响应
-      console.log('【LLM1 调试】原始响应:', rawContent);
+      // 调试：打印对话模型 (LLM1) 的原始响应内容喵
+      console.log('【故事模型调试】原始响应内容:', rawContent);
 
       // 提取并剥离 COT 内容
       let thoughtContent = '';
@@ -585,8 +585,8 @@ class GameLoopService {
         for (const pData of promiseTriggerData.promises) {
           const newPromise: any = {
             id: uuidv4(),
-            giver: pData.giver || 'Unknown',
-            content: pData.content || 'No content',
+            giver: pData.giver || '一位神秘人',
+            content: pData.content || '暂无具体约定内容',
             createdTime: `${gameStore.state.player.date} ${gameStore.state.player.time}`,
             status: 'active',
             acceptedTurn: gameStore.state.system.turn_count
@@ -786,7 +786,7 @@ class GameLoopService {
           debugLog: {
             logicInput: logicInputSnapshot,
             logicOutput: JSON.stringify(logicResult, null, 2),
-            logicThinking: logicResult.thinking || '逻辑模型未返回思考过程。'
+            logicThinking: logicResult.thinking || '逻辑模型未返回思考过程喵。'
           }
         });
       }
@@ -913,9 +913,9 @@ class GameLoopService {
       // 次要后备检查
       if (!narrative || narrative.trim() === '') {
         console.warn(
-          '[游戏循环] 从 LogicService 接收到空叙事，正在启用应急降级方案。'
+          '[游戏循环] 从逻辑解析层接收到空叙事，正在启用应急降级方案喵。'
         );
-        narrative = `(系统提示：由于技术原因，战斗润色描写失败。以下是战斗原始信息)\n${resultSummary}`;
+        narrative = `(系统提示：由于技术原因，战斗润色描写失败喵。以下是战斗原始信息)\n${resultSummary}`;
       }
 
       console.log('[游戏循环] 已接收战斗叙事描写，最终字符长度:', narrative.length);
@@ -929,10 +929,10 @@ class GameLoopService {
       this.isBackgroundProcessing.value = false; // 解锁以允许 handleUserAction 继续运行
       await this.handleUserAction(content);
     } catch (error) {
-      console.error('Combat Completion Error:', error);
-      this.isBackgroundProcessing.value = false; // 出错时确保解锁 UI
-      // 后备方案
-      const content = `(系统提示：战斗结束。以下是结算信息)\n${resultSummary}\n(请根据结算结果继续描写接下来的剧情)`;
+      console.error('[游戏循环] 战斗结算处理异常喵:', error);
+      this.isBackgroundProcessing.value = false; // 出错时也要确保解锁 UI 喵
+      // 容错降级方案喵
+      const content = `(系统提示：战斗结束喵。以下是结算信息)\n${resultSummary}\n(请根据结算结果继续描写接下来的剧情喵)`;
       await this.handleUserAction(content);
     }
   }
@@ -1016,12 +1016,12 @@ class GameLoopService {
         name: name,
         description: '玩家持有的符卡技能',
         cost: cost,
-        // targetType: 'enemy', // Removed: Not in SpellCard interface
+        // targetType: 'enemy', // 已移除：SpellCard 接口中不包含此字段
         damage: 0,
         scope: isAoe ? 'aoe' : 'single',
         type: 'attack',
-        isUltimate: multiplier >= 3.5, // 简单的启发式算法：高倍率 = 终极技
-        hitRate: multiplier >= 3.5 ? 1.0 : 0.1 // 启发式命中率
+        isUltimate: multiplier >= 3.5, // 简单的启发式算法：高倍率判断为奥义
+        hitRate: multiplier >= 3.5 ? 1.0 : 0.1 // 简单的命中率分配喵
       };
     };
 
@@ -1138,7 +1138,7 @@ class GameLoopService {
       maxHp: player.max_hp,
       mp: player.mp,
       maxMp: player.max_mp,
-      power: (player.power as PowerLevel) || 'D', // 默认回退值
+      power: (player.power as PowerLevel) || 'D', // 若未定义则默认回落至 D 级喵
       spellCards: (player.spell_cards || []).map((card: any) => {
         if (typeof card === 'string') {
           return createSpellCard(card);
@@ -1212,7 +1212,7 @@ class GameLoopService {
                 hp: staticChar.initialMaxHp || 1000,
                 max_hp: staticChar.initialMaxHp || 1000,
                 power: staticChar.initialPower || 'C',
-                combatLevel: 1 // Default
+                combatLevel: 1 // 默认等级
               };
             }
           }

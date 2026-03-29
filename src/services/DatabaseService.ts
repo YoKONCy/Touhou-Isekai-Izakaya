@@ -44,7 +44,7 @@ export class DatabaseService {
     };
 
     this.worker.onerror = (err) => {
-      console.error('Database Worker Error:', err);
+      console.error('[数据库服务] Worker 线程崩溃或加载失败喵:', err);
     };
   }
 
@@ -53,22 +53,22 @@ export class DatabaseService {
   }
 
   /**
-   * 辅助方法：在将数据发送至 Worker 前执行序列化清理。
-   * 此操作旨在剥离 Vue 的响应式代理 (Proxies)，并确保对象满足 postMessage 的结构化克隆要求。
+   * 辅助方法：在将数据发送至 Worker 前执行序列化清理喵。
+   * 此操作旨在剥离 Vue 的响应式代理 (Proxies)，并确保对象满足 postMessage 的结构化克隆要求喵。
    */
   private sanitize<T>(data: T): T {
     if (data === undefined || data === null) return data;
     try {
       return JSON.parse(JSON.stringify(data));
     } catch (e) {
-      console.error('Failed to sanitize data:', e);
+      console.error('[数据库服务] 数据清洗序列化失败喵:', e);
       return data;
     }
   }
 
   public async init(): Promise<void> {
     await this.exec('SELECT 1');
-    console.log('[数据库服务] Worker 已初始化就绪。');
+    console.log('[数据库服务] Worker 已初始化就绪喵！');
   }
 
   public async getDbInfo(): Promise<{ type: string; sqliteVersion?: string; diagnostics?: any }> {
@@ -141,7 +141,7 @@ export class DatabaseService {
       'INSERT INTO save_slots (name, summary, lastPlayed, location, playTime, isMultiplayer) VALUES (?, ?, ?, ?, ?, ?)',
       [name, summary, now, location, 0, isMultiplayer ? 1 : 0]
     );
-    // 获取最后一次插入操作生成的物理 RowID
+    // 获取最后一次插入操作生成的物理行 ID (RowID)喵
     const res = await this.exec('SELECT last_insert_rowid() as id');
     return res[0].id;
   }
@@ -200,8 +200,8 @@ export class DatabaseService {
   async deleteChatMessagesBySnapshotIds(snapshotIds: number[]): Promise<void> {
     if (snapshotIds.length === 0) return;
     const placeholders = snapshotIds.map(() => '?').join(',');
-    // 逻辑考量：是否需要同步销毁快照文件？
-    // 当前逻辑采用由 ChatStore 触发的“清理这些消息引用的快照记录”方案。
+    // 逻辑考量：是否需要同步销毁快照物理记录？ (逻辑评估)
+    // 当前逻辑采用由 ChatStore 触发的“清理这些消息引用的快照记录”方案 (引用回收)。
     await this.exec(`DELETE FROM snapshots WHERE id IN (${placeholders})`, snapshotIds);
   }
 
@@ -291,7 +291,7 @@ export class DatabaseService {
     );
   }
 
-  // --- 存档导入/导出 (Import / Export) ---
+  // --- 存档数据交换与导入/导出 (Import / Export) ---喵
 
   async exportSave(saveSlotId: number): Promise<Blob> {
     return new Promise((resolve, reject) => {
@@ -302,8 +302,8 @@ export class DatabaseService {
           if (data instanceof Blob) {
             resolve(data);
           } else {
-            console.error('Unexpected data format from worker export', data);
-            // 容错回退：兼容旧版数据格式（尽管 Worker 已完成升级）。
+            console.error('[数据库服务] 导出数据格式校验失败喵:', data);
+            // 兼容性降级：尝试将非 Blob 的旧格式序列化为 JSON 进行导出喵。
             try {
               const json = JSON.stringify(data);
               resolve(new Blob([json], { type: 'application/json' }));
@@ -335,7 +335,7 @@ export class DatabaseService {
           payload: { jsonContent: fileContent }
         },
         [fileContent]
-      ); // 性能优化：通过所有权转移 (Transferable Object) 方式传递 ArrayBuffer
+      ); // 性能优化：通过所有权转移 (Transferable Object) 方式高效传递 ArrayBuffer 喵
     });
   }
 
@@ -371,7 +371,8 @@ export class DatabaseService {
       try {
         return JSON.parse(res[0].raw_data);
       } catch (e) {
-        console.error('Failed to parse settings:', e);
+        console.error('[数据库服务] 解析应用设置失败喵:', e);
+        return null;
       }
     }
     return null;
@@ -424,7 +425,7 @@ export class DatabaseService {
     const existing = await this.exec('SELECT id FROM facilities WHERE id = ?', [facility.id]);
 
     if (existing.length > 0) {
-      // Update
+      // 如果设施已存在，则同步更新全量特征字段 (Update)喵
       await this.exec(
         `UPDATE facilities SET 
           name = ?, location = ?, description = ?, status = ?, 
@@ -443,7 +444,7 @@ export class DatabaseService {
         ]
       );
     } else {
-      // Insert
+      // 若设施不存在，则执行初始化注册插入指令 (Insert)喵
       await this.exec(
         `INSERT INTO facilities (
           id, saveSlotId, name, location, description, status, 
@@ -523,7 +524,7 @@ export class DatabaseService {
       'SELECT * FROM memories WHERE saveSlotId = ? AND type = ? ORDER BY id DESC LIMIT ?',
       [saveSlotId, type, limit]
     );
-    // 逆序列化解析 JSON 存储字段
+    // 逆序列化解析 JSON 存储字段 (解析为 JS 对象)
     return rows.map(this.parseMemoryRow);
   }
 
@@ -615,12 +616,12 @@ export class DatabaseService {
         row.related_entities = JSON.parse(row.related_entities);
       if (typeof row.characters === 'string') row.characters = JSON.parse(row.characters);
     } catch (e) {
-      // ignore parse error
+      // 静默处理反序列化异常 (Ignore Parse Error)喵
     }
     return row;
   }
 
-  // --- Chat Helpers for Memory ---
+  // --- 记忆系统关联的会话辅助方法 (Chat Message Context Helpers) ---喵
 
   async getChat(id: number): Promise<any | null> {
     const res = await this.exec('SELECT * FROM chats WHERE id = ?', [id]);
@@ -635,7 +636,7 @@ export class DatabaseService {
   }
 
   async getPrecedingUserMessage(chatId: number, saveSlotId: number): Promise<any | null> {
-    // 检索上下文：获取当前消息之前的最后一条用户输入 (Preceding User Prompt)
+    // 检索上下文：获取当前消息之前的最后一条用户输入 (回溯用户 Prompt)
     const res = await this.exec(
       'SELECT * FROM chats WHERE id < ? AND saveSlotId = ? AND role = ? ORDER BY id DESC LIMIT 1',
       [chatId, saveSlotId, 'user']
@@ -659,7 +660,7 @@ export class DatabaseService {
   }
 
   // =================================================================
-  //  角色设定库管理方法 (Character / Lorebook)
+  // --- 静态角色设定库/世界观词条管理 (Character Lorebook) ---
   // =================================================================
 
   async getAllCharacters(): Promise<any[]> {
@@ -669,7 +670,7 @@ export class DatabaseService {
         if (typeof row.tags === 'string') row.tags = JSON.parse(row.tags);
         if (typeof row.stats === 'string') {
           const stats = JSON.parse(row.stats);
-          // Transparently map stats fields to top level
+          // 将 stats 字段中的属性透明映射到对象顶层 (属性展开)喵
           return { ...row, ...stats };
         }
       } catch (e) {
@@ -698,7 +699,7 @@ export class DatabaseService {
     ];
     const placeholders = fields.map(() => '?').join(', ');
 
-    // Extract stats fields
+    // 提取特征属性字段 (Stats 分离)喵
     const coreFields = [
       'uuid',
       'name',
@@ -743,7 +744,7 @@ export class DatabaseService {
     const fields = [];
     const values = [];
 
-    // 核心通用字段映射 (Direct Mapping)
+    // 1. 核心映射特征：直接字段覆盖链路 (Lorebook Direct Mapping)喵
     const directFields = [
       'uuid',
       'name',
@@ -756,9 +757,8 @@ export class DatabaseService {
     ];
     const jsonFields = ['tags'];
 
-    // We need to handle 'stats' specially.
-    // Since we don't have the existing stats here, we might need to fetch them first or do a partial update in SQL if possible.
-    // However, for Lorebook, overwriting the whole stats object is usually fine as the UI sends the full object.
+    // 2. 针对扩展属性 (Stats) 对象执行打补丁更新 (Stats Patch Injection)喵
+    // 由于 Lorebook 设定库通常由 UI 层发送全量对象，此处直接按协议执行全量覆盖即可。
 
     const stats: any = {};
     const coreFields = [...directFields, ...jsonFields, 'id', 'stats'];
@@ -771,15 +771,14 @@ export class DatabaseService {
         fields.push(`${key} = ?`);
         values.push(JSON.stringify(updates[key]));
       } else if (!coreFields.includes(key)) {
-        // It's a stat field
+        // 判定这是一个特征属性 (Stat) 字段喵
         stats[key] = updates[key];
       }
     }
 
-    // If stats were updated, we need to merge them with existing or just overwrite
-    // The safest way is to fetch existing first, but for now let's see if we can just append to fields
+    // 如果 stats 有更新，我们需要执行合并逻辑
     if (Object.keys(stats).length > 0 || updates.stats) {
-      // Fetch existing stats to merge
+      // 获取现有的 stats 对象以执行深度合并
       const existing = await this.exec('SELECT stats FROM characters WHERE id = ?', [id]);
       let finalStats = {};
       if (existing.length > 0 && existing[0].stats) {

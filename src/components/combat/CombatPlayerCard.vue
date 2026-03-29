@@ -1,19 +1,19 @@
 <template>
-  <!-- Player Side (Bottom Left) -->
+  <!-- 玩家阵营卡片区域 (左下角) -->
   <div
     class="absolute bottom-0 left-0 w-[45%] h-[70%] flex flex-col justify-end items-start pl-10 pb-10"
   >
     <div
-      class="relative group w-full h-full flex flex-col justify-end items-center transition-all duration-500 hover:scale-105 transform translate-y-10 -translate-x-10"
+      class="relative group w-full h-full flex flex-col justify-end items-center transition-all duration-500 hover:scale-110 transform translate-y-10 -translate-x-10"
     >
-      <!-- Character Sprite Placeholder -->
+      <!-- 角色立绘容器 (Character Sprite Placeholder) -->
       <div class="relative w-full h-full flex items-end justify-center pointer-events-auto">
-        <!-- Alive State -->
+        <!-- 存活状态表现 (Alive State) -->
         <div
           v-if="player && player.hp > 0"
           class="w-80 h-[500px] relative animate-float transform skew-x-[-5deg]"
         >
-          <!-- Ally Sprite (Blurred Background) with Transition -->
+          <!-- 支援角色立绘 (模糊背景动效) -->
           <transition name="ally-fade" mode="out-in">
             <div
               v-if="sortedAllies[0]"
@@ -32,12 +32,12 @@
             </div>
           </transition>
 
-          <!-- 1. Card Base -->
+          <!-- 1. 卡片地基底色层 -->
           <div
             class="absolute inset-0 rounded-t-3xl overflow-hidden backdrop-blur-sm border-b-4 border-red-500 shadow-[0_0_50px_rgba(220,38,38,0.3)] bg-gradient-to-t from-red-900/40 to-transparent z-0"
           ></div>
 
-          <!-- 2. Character Sprite (Popping out) -->
+          <!-- 2. 主角立绘弹出层 (Popping out) -->
           <div
             class="absolute -bottom-0 -left-12 w-[130%] h-[115%] z-10 pointer-events-none flex items-end"
           >
@@ -45,11 +45,11 @@
               :src="getSpriteUrl('主角')"
               @error="(e) => ((e.target as HTMLImageElement).src = defaultSprite)"
               class="w-full h-full object-cover object-top drop-shadow-2xl transition-transform duration-500 group-hover:scale-[1.02]"
-              alt="Player"
+              alt="玩家主角"
             />
           </div>
 
-          <!-- 3. Overlay & Text -->
+          <!-- 3. 文字标签与渐变遮罩层 -->
           <div class="absolute inset-0 rounded-t-3xl overflow-hidden z-20 pointer-events-none">
             <div
               class="absolute inset-0 bg-gradient-to-t from-red-600/60 to-transparent mix-blend-overlay"
@@ -62,7 +62,7 @@
           </div>
         </div>
 
-        <!-- Dead State (Shattered) -->
+        <!-- 战损/死亡状态展现 (Shattered / Dead State) -->
         <div
           v-else-if="player"
           class="w-80 h-[500px] relative transform skew-x-[-5deg] pointer-events-none"
@@ -104,7 +104,7 @@
           </div>
         </div>
 
-        <!-- Damage Popup for Player -->
+        <!-- 数值弹出窗口 (Damage/Heal Popup) -->
         <div
           v-for="p in player?.popups"
           :key="p.id"
@@ -120,12 +120,12 @@
         </div>
       </div>
 
-      <!-- Player Status HUD -->
+      <!-- 玩家状态 HUD 指标条 -->
       <div
         v-if="player"
         class="absolute -right-20 top-[46%] flex flex-col gap-3 transform skew-x-[-10deg] pointer-events-auto"
       >
-        <!-- HP Bar -->
+        <!-- 生命值条 -->
         <div class="relative transition-transform hover:scale-110 group">
           <div
             class="bg-black/80 border-l-8 pl-6 pr-10 py-3 text-3xl font-bold font-mono clip-hud-left relative"
@@ -141,7 +141,7 @@
             </div>
           </div>
 
-          <!-- AP Display -->
+          <!-- 行动点计数展示 (Action Points) -->
           <div
             class="absolute -left-2 -top-12 flex gap-2 pointer-events-none transform skew-x-[10deg] z-50"
           >
@@ -168,7 +168,7 @@
           </div>
         </div>
 
-        <!-- P Point Gauge -->
+        <!-- P 点能量槽 (P Point Gauge) -->
         <div
           class="absolute -left-24 top-0 w-20 h-20 bg-black/80 rounded-full border-2 flex items-center justify-center transition-transform hover:scale-110"
           :class="[
@@ -221,7 +221,7 @@
           </div>
         </div>
 
-        <!-- Shield & Dodge Stats -->
+        <!-- 护盾与闪避率面板数据 (Shield & Dodge Stats) -->
         <div class="flex gap-2 ml-12">
           <div
             class="bg-black/80 border-l-4 border-cyan-400 pl-4 pr-4 py-1 text-lg font-bold font-mono text-cyan-400 clip-hud-left flex items-center gap-2"
@@ -237,7 +237,7 @@
           </div>
         </div>
 
-        <!-- Buffs -->
+        <!-- 增益与减益状态图标集合 (Buffs/Debuffs) -->
         <div
           class="flex flex-wrap gap-1 mt-2 ml-16 max-w-[280px] transform skew-x-[10deg] pointer-events-auto min-h-[32px] justify-start"
         >
@@ -280,7 +280,7 @@
           </div>
         </div>
 
-        <!-- Allies Stack -->
+        <!-- 盟友堆叠选择列表 (Allies Stack) -->
         <div
           v-if="allies.length > 0"
           class="relative mt-2 ml-12 w-[280px] h-[140px] transform skew-x-[10deg] pointer-events-none perspective-[1000px]"
@@ -345,7 +345,7 @@
                 ></div>
               </div>
 
-              <!-- Buffs (Top Card Only) -->
+              <!-- 盟友增益列表展示 (仅针对栈顶符卡/激活角色) -->
               <div
                 v-if="index === 0 && ally.buffs && ally.buffs.length > 0"
                 class="flex flex-wrap gap-1 mt-1 pl-2 animate-fade-in relative z-[101]"
@@ -372,7 +372,7 @@
                 </div>
               </div>
 
-              <!-- Damage Popup -->
+              <!-- 盟友数值弹出层 (Damage Popup) -->
               <div
                 v-for="p in ally.popups"
                 :key="p.id"

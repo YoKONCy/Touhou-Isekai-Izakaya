@@ -738,7 +738,7 @@ MP：${p.mp}/${p.max_mp}
         const contentToPass = block.id === 'long_term_memory' ? memoryContent : block.content;
         await handler(ctx, contentToPass);
       } else {
-        console.warn(`No handler found for prompt block: ${block.id}`);
+        console.warn(`[指令服务] 未找到指令块的处理器喵: ${block.id}`);
       }
     }
 

@@ -6,18 +6,18 @@ const emit = defineEmits<{
   (e: 'action'): void;
 }>();
 
-// Joystick state
+// 摇杆状态记录
 const joystickContainer = ref<HTMLDivElement | null>(null);
 const isDragging = ref(false);
 const joystickX = ref(0);
 const joystickY = ref(0);
 const touchId = ref<number | null>(null);
 
-// Configuration
+// 摇杆参数配置
 const maxDistance = 50;
 const deadZone = 10;
 
-// Compute the clamped position
+// 计算摇杆头部的偏移样式
 const joystickStyle = computed(() => ({
   transform: `translate(${joystickX.value}px, ${joystickY.value}px)`,
   transition: isDragging.value ? 'none' : 'transform 0.2s ease-out'
@@ -66,10 +66,10 @@ function updatePosition(touch: Touch) {
   let dx = touch.clientX - centerX;
   let dy = touch.clientY - centerY;
 
-  // Calculate distance from center
+  // 计算距离中心点的距离
   const distance = Math.sqrt(dx * dx + dy * dy);
 
-  // Clamp to max distance
+  // 限制摇杆移动的最大距离
   if (distance > maxDistance) {
     dx = (dx / distance) * maxDistance;
     dy = (dy / distance) * maxDistance;
@@ -78,7 +78,7 @@ function updatePosition(touch: Touch) {
   joystickX.value = dx;
   joystickY.value = dy;
 
-  // Emit direction (normalized -1 to 1)
+  // 发送移动方向（归一化为 -1 到 1）
   if (distance > deadZone) {
     emit('move', {
       x: dx / maxDistance,
@@ -89,7 +89,7 @@ function updatePosition(touch: Touch) {
   }
 }
 
-// Prevent scrolling when touching joystick
+// 在触摸摇杆时阻止页面滚动
 onMounted(() => {
   document.addEventListener('touchmove', preventScroll, { passive: false });
 });
@@ -107,7 +107,7 @@ function preventScroll(e: TouchEvent) {
 
 <template>
   <div class="virtual-controls md:hidden">
-    <!-- Virtual Joystick -->
+    <!-- 虚拟摇杆 -->
     <div
       ref="joystickContainer"
       class="joystick-container"
@@ -129,7 +129,7 @@ function preventScroll(e: TouchEvent) {
       </div>
     </div>
 
-    <!-- Action Button -->
+    <!-- 交互动作按钮 -->
     <button class="action-button" @touchstart.prevent="emit('action')">
       <span class="action-icon">✋</span>
       <span class="action-label">互动</span>

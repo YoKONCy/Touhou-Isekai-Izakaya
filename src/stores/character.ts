@@ -44,7 +44,8 @@ export const useCharacterStore = defineStore('character', () => {
     for (const path in allModules) {
       const charData = (allModules[path] as any).default || allModules[path];
 
-      // Infer Type and Category from Path (if not specified in JSON or is generic 'other'/'character')
+      // 从物理路径推断类型 (Type) 和 分类 (Category)
+      // (如果 JSON 中未指定，或为通用的 'other'/'character')
       let inferredType = charData.type;
       let inferredCategory = charData.category;
 
@@ -100,7 +101,7 @@ export const useCharacterStore = defineStore('character', () => {
           const updateData = {
             name: charData.name,
             description: desc,
-            // Update other fields if necessary, but name/desc are the main ones
+            // 如有必要，更新其他字段，但名称和描述是核心项
             tags: charData.tags || [],
             category: charData.category || '未分类',
             type: inferredType
@@ -152,7 +153,7 @@ export const useCharacterStore = defineStore('character', () => {
         // 角色已在库中命中，跳过核心数据覆盖以保护玩家的自定义编辑成果
         continue;
       } else {
-        // CREATE new character
+        // 创建新角色记录 (Create)
         if (charData.name && charData.description) {
           const newCard: CharacterCard = {
             ...charData,
@@ -163,7 +164,7 @@ export const useCharacterStore = defineStore('character', () => {
             type: inferredType
           };
 
-          // Remove ID if present in JSON to let DB auto-increment
+          // 移除 JSON 中可能存在的 ID 字段，交由数据库自动递增生成
           delete newCard.id;
 
           await dbService.addCharacter(newCard);
@@ -178,7 +179,7 @@ export const useCharacterStore = defineStore('character', () => {
   }
 
   async function addCharacter(card: Omit<CharacterCard, 'id' | 'uuid'> & { uuid?: string }) {
-    // Deep clone to remove Vue Proxies before saving to DB
+    // 深拷贝以移除 Vue Proxy 代理，确保存入 IndexedDB 时的序列化安全性
     const rawCard = JSON.parse(JSON.stringify(card));
 
     const newCard: CharacterCard = {
@@ -197,7 +198,7 @@ export const useCharacterStore = defineStore('character', () => {
     const char = characters.value.find((c) => c.uuid === uuid);
     if (!char || !char.id) return;
 
-    // Deep clone updates too
+    // 更新数据也需要执行深拷贝
     const rawUpdates = JSON.parse(JSON.stringify(updates));
 
     await dbService.updateCharacter(char.id, rawUpdates);
@@ -219,14 +220,14 @@ export const useCharacterStore = defineStore('character', () => {
     await loadCharacters();
   }
 
-  // Find character by name (fuzzy match or exact)
+  // 根据名称寻找角色 (模糊或精确匹配)
   function findCharacterByName(name: string) {
-    // This is a simple fuzzy search for UI purposes or manual lookup
-    // For canonical ID resolution, use resolveCharacterId in characterMapping.ts
+    // 这里的实现主要用于 UI 展现或手动快速查找喵
+    // 如果是用于规范的 ID 解析与映射，请优先使用 characterMapping.ts 中的 resolveCharacterId 服务
     return characters.value.find((c) => c.name.includes(name) || name.includes(c.name));
   }
 
-  // Get all unique categories
+  // 获取所有唯一的分类列表
   function getCategories() {
     const categories = new Set(characters.value.map((c) => c.category || '未分类'));
     return Array.from(categories).sort();
@@ -248,7 +249,7 @@ export const useCharacterStore = defineStore('character', () => {
   async function deleteCategory(name: string) {
     if (!name) return;
 
-    // Move all characters in this category to '未分类'
+    // 将该分类下的所有角色移动到“未分类”
     const charsToUpdate = characters.value.filter((c) => (c.category || '未分类') === name);
 
     for (const char of charsToUpdate) {

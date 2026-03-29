@@ -35,11 +35,11 @@ const emit = defineEmits<{
 const gameStore = useGameStore();
 const activeTab = ref<'action' | 'interaction' | 'logs'>('action');
 
-// --- Action Logic ---
+// --- 行动决策逻辑喵 (Action Logic) ---
 const actionInput = ref('');
 const isReady = ref(false);
 
-// Debounced draft update
+// 带防抖的动作输入草稿更新喵 (Debounced draft update)
 const updateDraft = _.debounce((content: string) => {
   if (gameStore.multiplayer.isMultiplayer) {
     multiplayerService.sendDraft(content);
@@ -64,15 +64,15 @@ function handleActionSubmit() {
   isReady.value = true;
   audioManager.playClick();
 
-  // If Host, we don't necessarily "submit" to self yet,
-  // we wait for everyone or click the final "Broadcast" button in App.vue (handleMultiplayerSubmit)
+  // 针对房主 (Host) 喵：我们不会立即将行动“提交”至消息流，而是先等待所有成员就绪 喵
+  // 最终的广播操作将由 App.vue (handleMultiplayerSubmit) 统筹触发 喵
   // Actually, the App.vue expects the host action to be passed back.
 
-  // For Guest, we send to Host
+  // 针对客机 (Guest) 喵：我们的行动描述将直接加密传输给房主 (Host) 汇总 喵
   if (!gameStore.multiplayer.isHost) {
     multiplayerService.sendGuestAction(actionInput.value);
   } else {
-    // Host just updates their own status locally for others to see
+    // 房主端仅需在本地更新自身“就绪”状态，供其他客机实时同步视图 喵
     const me = gameStore.multiplayer.players.find((p) => p.isMe);
     if (me) me.status = 'ready';
   }
@@ -83,9 +83,9 @@ function handleCancelReady() {
   audioManager.playClick();
 
   if (!gameStore.multiplayer.isHost) {
-    // Re-send draft with empty or original content to trigger Host side status change
-    // Host logic will update player status based on PLAYER_ACTION or PLAYER_DRAFT
-    // To explicitly "unready", we should send a message that Host interprets as "drafting"
+    // 重新发送原始或空的草稿内容，以此触发房主侧的逻辑感知并撤销“就绪”状态 喵
+    // 房主端逻辑会根据侦听到的 PLAYER_ACTION 或 PLAYER_DRAFT 来实时计算成员状态 喵
+    // 为了显式声明“取消准备”，我们发送一个会被房主解析为“草稿编辑中”的信号 喵
     multiplayerService.sendDraft(actionInput.value);
   } else {
     const me = gameStore.multiplayer.players.find((p) => p.isMe);
@@ -100,7 +100,7 @@ function finalizeDecision() {
   isReady.value = false;
 }
 
-// --- Interaction Logic ---
+// --- 跑团互动逻辑喵 (Interaction Logic) ---
 const chatInput = ref('');
 const oocMessages = ref<
   Array<{ senderId: string; name: string; content: string; timestamp: number }>
@@ -110,13 +110,11 @@ function sendChat() {
   if (!chatInput.value.trim()) return;
   multiplayerService.sendChat(chatInput.value);
 
-  // Local append ONLY for Host.
-  // For Guest, the message will come back via 'mp-chat-message' from Host broadcast.
+  // 房主侧 (Host) 不执行本地直接追加，而是等待广播回路将消息弹回，确保时间轴一致性 喵
+  // 针对客机端 (Guest)，消息会通过房主分发的 'mp-chat-message' 广播指令统一下达 喵
   if (gameStore.multiplayer.isHost) {
-    // Host will receive their own broadcast in handleChatMessage too, so we shouldn't push locally if we trust the broadcast loop.
-    // However, if we want instant feedback, we push locally. But then we must ignore the echo.
-    // For now, let's REMOVE local push for Host too, and rely purely on broadcast for consistency.
-    // If latency is an issue, we can optimize later with IDs.
+    // 如果信任分发回路，此处应移除本地抢跑推入逻辑，以防出现消息重影 喵
+    // 若后续体感延迟过高，可以引入唯一消息 ID (UUID) 进行乐观更新与去重 喵
   }
 
   chatInput.value = '';
@@ -126,8 +124,8 @@ function sendChat() {
 const handleChatMessage = (e: any) => {
   const { senderId, content, timestamp } = e.detail;
 
-  // Check for duplicates (simple dedupe by content + sender + recent time)
-  // Or just rely on the fact that we removed local push.
+  // 简单的幂等去重检测 (基于内容、发送者及邻近时间戳) 喵
+  // 目前已切换至全量广播模型，故本地逻辑无需重复推入 喵
   const isDuplicate = oocMessages.value.some(
     (m) =>
       m.senderId === senderId && m.content === content && Math.abs(m.timestamp - timestamp) < 1000
@@ -143,13 +141,13 @@ const handleChatMessage = (e: any) => {
     timestamp
   });
 
-  // Keep last 50 messages
+  // 内存循环队列：仅保留最近 50 条谈话记录 喵
   if (oocMessages.value.length > 50) {
     oocMessages.value.shift();
   }
 };
 
-// --- System Logs ---
+// --- 系统操作日志喵 (System Logs) ---
 const systemLogs = ref<
   Array<{
     type: 'info' | 'success' | 'warning' | 'error' | 'roll';
@@ -163,7 +161,7 @@ function addLog(message: string, type: 'info' | 'success' | 'warning' | 'error' 
   if (systemLogs.value.length > 30) systemLogs.value.pop();
 }
 
-// --- Voting Logic ---
+// --- 投票系统逻辑喵 (Voting Logic) ---
 const activeVote = ref<{
   id: string;
   proposal: string;
@@ -242,7 +240,7 @@ function handleKickPlayer(playerId: string, playerName: string) {
   }
 }
 
-// --- Energy Logic ---
+// --- 能源池管理逻辑喵 (Energy Logic) ---
 const totalEnergy = computed(() => gameStore.multiplayer.totalEnergy || 0);
 
 const isContributing = ref(false);
@@ -273,7 +271,7 @@ function handleToggleSharing() {
   audioManager.playClick();
 }
 
-// --- Dice Logic ---
+// --- 位面之骰逻辑喵 (Dice Logic) ---
 const isRolling = ref(false);
 const lastRollResult = ref<{ type: string; value: number } | null>(null);
 
@@ -326,7 +324,7 @@ const handleResetDraft = () => {
   isReady.value = false;
 };
 
-// --- Event Listeners ---
+// --- 事件监听器注册喵 (Event Listeners) ---
 onMounted(() => {
   window.addEventListener('mp-chat-message', handleChatMessage);
   window.addEventListener('mp-vote-started', handleVoteStarted);
@@ -334,7 +332,7 @@ onMounted(() => {
   window.addEventListener('mp-dice-roll', handleDiceEvent);
   window.addEventListener('mp-reset-draft', handleResetDraft);
 
-  // Listen for other system events that might come via MultiplayerService
+  // 侦听通过 MultiplayerService 分发的各项系统业务指令 喵
   addLog('已进入跑团决策系统', 'success');
 });
 
@@ -346,7 +344,7 @@ onUnmounted(() => {
   window.removeEventListener('mp-reset-draft', handleResetDraft);
 });
 
-// --- Computed ---
+// --- 计算属性集合喵 (Computed) ---
 const players = computed(() => gameStore.multiplayer.players);
 const companions = computed(() => {
   const list = [];
@@ -365,19 +363,19 @@ const allReady = computed(() => {
 
 <template>
   <div v-if="isOpen" class="fixed inset-0 z-[60] flex items-center justify-center p-4 md:p-8">
-    <!-- Backdrop -->
+    <!-- 磨砂背景遮罩喵 (Backdrop) -->
     <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="emit('close')"></div>
 
-    <!-- Modal -->
+    <!-- 决策系统弹窗主体喵 (Modal) -->
     <div
       class="relative w-full max-w-4xl h-[80vh] bg-izakaya-paper rounded-2xl shadow-2xl flex flex-col overflow-hidden border-2 border-izakaya-wood/20 animate-fade-in-up"
     >
-      <!-- Texture -->
+      <!-- 背景纸纹装饰喵 (Texture) -->
       <div
         class="absolute inset-0 pointer-events-none opacity-40 bg-texture-rice-paper mix-blend-multiply"
       ></div>
 
-      <!-- Header -->
+      <!-- 标题栏喵 (Header) -->
       <header
         class="h-14 bg-izakaya-wood text-white px-6 flex items-center justify-between relative z-10"
       >
@@ -403,7 +401,7 @@ const allReady = computed(() => {
         </button>
       </header>
 
-      <!-- Tabs Navigation -->
+      <!-- 系统功能分页导航 (Tabs Navigation) 喵 -->
       <nav class="flex bg-white/50 border-b border-izakaya-wood/10 relative z-10">
         <button
           @click="activeTab = 'action'"
@@ -443,14 +441,14 @@ const allReady = computed(() => {
         </button>
       </nav>
 
-      <!-- Content Area -->
+      <!-- 核心内容区域喵 (Content Area) -->
       <main class="flex-1 overflow-hidden flex flex-col relative z-10">
         <!-- 1. Action Tab -->
         <div v-if="activeTab === 'action'" class="flex-1 flex flex-col md:flex-row overflow-hidden">
-          <!-- Left: Input & Drafts -->
+          <!-- 左侧：输入区域与实时草稿墙 (Input & Drafts) 喵 -->
           <div class="flex-1 flex flex-col p-4 border-r border-izakaya-wood/10 overflow-hidden">
             <div class="flex-1 flex flex-col gap-4 overflow-hidden">
-              <!-- Action Input -->
+              <!-- 行动描述录入框 (Action Input) 喵 -->
               <div class="space-y-2">
                 <label class="text-sm font-bold text-izakaya-wood flex items-center gap-2">
                   <Activity class="w-4 h-4" /> 你的行动描述
@@ -485,7 +483,7 @@ const allReady = computed(() => {
                 </div>
               </div>
 
-              <!-- Real-time Drafts -->
+              <!-- 多人联动：各成员实时草稿流 (Real-time Drafts) 喵 -->
               <div class="flex-1 flex flex-col min-h-0">
                 <h3 class="text-sm font-bold text-izakaya-wood mb-2 flex items-center gap-2">
                   <Zap class="w-4 h-4 text-yellow-600" /> 实时草稿流
@@ -531,7 +529,7 @@ const allReady = computed(() => {
               </div>
             </div>
 
-            <!-- Host Control -->
+            <!-- 房主管理与决策汇总面板 (Host Control) 喵 -->
             <div
               v-if="gameStore.multiplayer.isHost"
               class="mt-4 p-4 bg-touhou-red/5 rounded-xl border border-touhou-red/20"
@@ -571,7 +569,7 @@ const allReady = computed(() => {
             </div>
           </div>
 
-          <!-- Right: Roll Tools & Energy & Vote -->
+          <!-- 右侧边栏：位面骰、能源池与实时投票喵 (Right: Roll Tools & Energy & Vote) -->
           <div
             class="w-full md:w-72 p-4 bg-izakaya-paper/50 flex flex-col gap-4 overflow-y-auto custom-scrollbar"
           >
@@ -648,7 +646,7 @@ const allReady = computed(() => {
                   <Zap class="w-4 h-4" /> API 能源池
                 </h3>
                 <div class="flex items-center gap-2">
-                  <!-- Sharing Toggle (Host Only) -->
+                  <!-- 能源池共享权限切换 (仅房主可用) 喵 -->
                   <div v-if="gameStore.multiplayer.isHost" class="flex items-center gap-1.5 mr-1">
                     <span class="text-[10px] font-bold text-yellow-700/60 uppercase">共享</span>
                     <button
@@ -688,7 +686,7 @@ const allReady = computed(() => {
                 </div>
               </div>
 
-              <!-- Status View -->
+              <!-- 数值状态视图喵 (Status View) -->
               <div v-if="!isContributing" class="space-y-2 animate-fade-in">
                 <div class="flex justify-between items-end">
                   <span
@@ -739,7 +737,7 @@ const allReady = computed(() => {
                 </div>
               </div>
 
-              <!-- Contribution View -->
+              <!-- 能源贡献视图喵 (Contribution View) -->
               <div v-else class="space-y-3 animate-fade-in-up">
                 <div class="grid grid-cols-2 gap-2">
                   <button
@@ -847,7 +845,7 @@ const allReady = computed(() => {
           v-if="activeTab === 'interaction'"
           class="flex-1 flex flex-col md:flex-row overflow-hidden"
         >
-          <!-- Left: OOC Chat -->
+          <!-- 左侧：戏外交流聊天室 (OOC Chat) 喵 -->
           <div class="flex-1 flex flex-col p-4 border-r border-izakaya-wood/10 overflow-hidden">
             <h3 class="text-sm font-bold text-izakaya-wood mb-2 flex items-center gap-2">
               <MessageSquare class="w-4 h-4" /> OOC (戏外交流)
@@ -900,7 +898,7 @@ const allReady = computed(() => {
             </div>
           </div>
 
-          <!-- Right: Character Status -->
+          <!-- 右侧：队友与本尊的实时属性看板 (Character Status) 喵 -->
           <div class="w-full md:w-80 p-4 overflow-y-auto">
             <h3 class="text-sm font-bold text-izakaya-wood mb-4 flex items-center gap-2">
               <User class="w-4 h-4" /> 角色实时状态
@@ -911,7 +909,7 @@ const allReady = computed(() => {
                 :key="comp?.id || Math.random()"
                 class="p-4 bg-white/80 rounded-2xl border border-izakaya-wood/10 shadow-sm relative overflow-hidden"
               >
-                <!-- Avatar Background -->
+                <!-- 角色背景艺术字或头像蒙层 (Avatar Background) 喵 -->
                 <div
                   v-if="comp?.avatarUrl"
                   class="absolute right-0 top-0 w-16 h-16 opacity-10 pointer-events-none"
@@ -944,7 +942,7 @@ const allReady = computed(() => {
                 </div>
 
                 <div class="space-y-1.5">
-                  <!-- HP Bar -->
+                  <!-- 生命值状态条 (HP Bar) 喵 -->
                   <div class="space-y-0.5">
                     <div class="flex justify-between text-[10px]">
                       <span class="flex items-center gap-1"
@@ -961,7 +959,7 @@ const allReady = computed(() => {
                       ></div>
                     </div>
                   </div>
-                  <!-- MP Bar -->
+                  <!-- 灵力值状态条 (MP Bar) 喵 -->
                   <div class="space-y-0.5">
                     <div class="flex justify-between text-[10px]">
                       <span class="flex items-center gap-1"
@@ -1023,7 +1021,7 @@ const allReady = computed(() => {
         </div>
       </main>
 
-      <!-- Footer / API Info -->
+      <!-- 页脚：通信链路状态与 API 概览 (Footer / API Info) 喵 -->
       <footer
         class="h-10 bg-white/80 border-t border-izakaya-wood/10 px-6 flex items-center justify-between text-[10px] text-gray-400 relative z-10"
       >
@@ -1041,7 +1039,7 @@ const allReady = computed(() => {
       </footer>
     </div>
 
-    <!-- Vote Creation Modal -->
+    <!-- 议题投票发起框 (Vote Creation Modal) 喵 -->
     <div
       v-if="isVoteCreationOpen"
       class="absolute inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in"
@@ -1049,7 +1047,7 @@ const allReady = computed(() => {
       <div
         class="bg-izakaya-paper rounded-xl shadow-2xl p-6 max-w-md w-full border-2 border-izakaya-wood/20 relative overflow-hidden"
       >
-        <!-- Texture -->
+        <!-- 纸张纹理蒙层 (Texture Overflow) 喵 -->
         <div
           class="absolute inset-0 pointer-events-none opacity-40 bg-texture-rice-paper mix-blend-multiply"
         ></div>
@@ -1098,7 +1096,7 @@ const allReady = computed(() => {
       </div>
     </div>
 
-    <!-- Voting Modal -->
+    <!-- 实时表决弹窗 (Voting Modal) 喵 -->
     <div
       v-if="activeVote"
       class="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in"

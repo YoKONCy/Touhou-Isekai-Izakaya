@@ -1,7 +1,7 @@
 {
   "name": "touhouisekai",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.7.9",
   "license": "GPL-3.0",
   "type": "module",
   "scripts": {

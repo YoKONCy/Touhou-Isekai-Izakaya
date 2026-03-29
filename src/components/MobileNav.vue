@@ -17,6 +17,7 @@ const props = defineProps<{
   activePanel: 'chat' | 'status' | 'map' | 'characters' | 'quests';
 }>();
 
+// 定义移动端专用的底部导航栏项配置矩阵，包含对应的核心视图 ID、语义化图标及 UI 标签 喵
 const navItems = [
   { id: 'chat', icon: MessageCircle, label: '对话' },
   { id: 'status', icon: User, label: '状态' },
@@ -25,6 +26,7 @@ const navItems = [
   { id: 'quests', icon: ListTodo, label: '任务' }
 ] as const;
 
+// 处理底部导航项的点击交互：播放音效并向上冒泡切换面板指令 喵
 function handleNavClick(panel: (typeof navItems)[number]['id']) {
   audioManager.playSoftClick();
   emit('switch-panel', panel);
@@ -32,7 +34,7 @@ function handleNavClick(panel: (typeof navItems)[number]['id']) {
 </script>
 
 <template>
-  <!-- Bottom Navigation Bar - Mobile Only -->
+  <!-- 底部导航栏 - 仅限移动端喵 (Bottom Navigation Bar - Mobile Only) -->
   <nav
     class="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-izakaya-paper/95 backdrop-blur-md border-t-2 border-izakaya-wood/20 safe-area-bottom"
   >
@@ -48,7 +50,7 @@ function handleNavClick(panel: (typeof navItems)[number]['id']) {
             : 'text-izakaya-wood/60 active:text-izakaya-wood'
         ]"
       >
-        <!-- Active indicator -->
+        <!-- 选中状态指示器喵 -->
         <div
           v-if="activePanel === item.id"
           class="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-touhou-red rounded-b-full"
@@ -62,7 +64,7 @@ function handleNavClick(panel: (typeof navItems)[number]['id']) {
         <span class="text-[10px] font-bold font-display">{{ item.label }}</span>
       </button>
 
-      <!-- Menu button -->
+      <!-- 菜单按钮喵 -->
       <button
         @click="emit('open-drawer')"
         class="flex flex-col items-center justify-center flex-1 h-full py-1 text-izakaya-wood/60 active:text-izakaya-wood transition-colors"
@@ -75,7 +77,7 @@ function handleNavClick(panel: (typeof navItems)[number]['id']) {
 </template>
 
 <style scoped>
-/* Safe area for devices with home indicator */
+/* 适配带有 Home 指示条的设备安全区喵 */
 .safe-area-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }

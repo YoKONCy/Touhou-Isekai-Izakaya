@@ -29,15 +29,18 @@ import {
   HelpCircle,
   Camera,
   Home,
-  Utensils
+  Utensils,
+  Trash2
 } from 'lucide-vue-next';
 import { audioManager } from '@/services/audio';
 import { TALENTS } from '@/data/talents';
+import { useToastStore } from '@/stores/toast';
 
 import PlayerConfigModal from './PlayerConfigModal.vue';
 import FacilityPanel from './FacilityPanel.vue';
 
 const gameStore = useGameStore();
+const toastStore = useToastStore();
 
 const emit = defineEmits<{
   (e: 'open-help', sectionId?: string): void;
@@ -46,7 +49,7 @@ const emit = defineEmits<{
 
 const player = computed(() => gameStore.me);
 
-// Player Config Modal
+// 玩家信息配置模态框控制喵
 const showPlayerConfig = ref(false);
 
 function openPlayerConfig() {
@@ -61,13 +64,13 @@ defineExpose({
   handleOpenSpells,
   handleOpenRecipes,
   handleOpenFacility
-});
+}); // 这里是暴露给外层调用的接口喵 (Expose) 喵
 
-// Talent Tree Logic
+// 技能等级与天赋树逻辑 (思维导图式交互 - Talent Tree Logic)喵
 const activeTalentTab = ref<'combat' | 'knowledge'>('combat');
 const selectedTalentId = ref<string | null>(null);
 
-// Drag to scroll logic
+// 画布拖拽滚动逻辑 (交互增强 - Drag to scroll logic)喵
 const treeContainer = ref<HTMLElement | null>(null);
 const isDragging = ref(false);
 const startX = ref(0);
@@ -81,15 +84,15 @@ function handleWheel(e: WheelEvent) {
   if (!treeContainer.value) return;
   e.preventDefault();
 
-  const zoomStep = 0.1;
-  const minZoom = 0.4;
-  const maxZoom = 2.0;
+  const zoomStep = 0.1; // 缩放步长 喵
+  const minZoom = 0.4; // 最小缩放比例 喵
+  const maxZoom = 2.0; // 最大缩放比例 喵
 
   if (e.deltaY < 0) {
-    // Zoom in
+    // 放大画布 (Zoom in) 喵
     zoomLevel.value = Math.min(maxZoom, zoomLevel.value + zoomStep);
   } else {
-    // Zoom out
+    // 缩小画布 (Zoom out) 喵
     zoomLevel.value = Math.max(minZoom, zoomLevel.value - zoomStep);
   }
 }
@@ -113,8 +116,8 @@ function handleMouseMove(e: MouseEvent) {
   const x = e.pageX - container.offsetLeft;
   const y = e.pageY - container.offsetTop;
 
-  // Natural dragging: move 1:1 with mouse movement
-  // The scrollable area already scales with zoomLevel, so we don't need to compensate here
+  // 自然拖拽体验：物理移动与滑鼠同步 (平滑位移 - Natural dragging)喵
+  // 滚动区域已随缩放比例自适应，此处无需额外补偿喵
   const walkX = (x - startX.value) * 1.5;
   const walkY = (y - startY.value) * 1.5;
 
@@ -140,7 +143,7 @@ function handleMouseLeave() {
   }
 }
 
-// Touch event handlers for mobile support
+// 适配行动端的触摸事件处理器 (跨端交互 - Touch event handlers)喵
 function handleTouchStart(e: TouchEvent) {
   const container = treeContainer.value;
   if (!container || !e.touches[0]) return;
@@ -194,7 +197,7 @@ function getTalentStatus(talent: any) {
   const unlocked = player.value.unlockedTalents || [];
   if (unlocked.includes(talent.id)) return 'unlocked';
 
-  // Check prerequisites
+  // 校验学习前置条件 (Check prerequisites) 喵
   const prereqs = talent.prerequisites || [];
   if (prereqs.length === 0) return 'available';
 
@@ -206,29 +209,30 @@ function getTalentStatus(talent: any) {
 
 function getLineStatus(fromId: string, toId: string) {
   const unlocked = player.value.unlockedTalents || [];
-  // Path is active if both are unlocked
+  // 若两端节点均已解锁，则连线呈激活态 (Path is active) 喵
   if (unlocked.includes(fromId) && unlocked.includes(toId)) return 'active';
-  // Path is "potential" if prerequisite is unlocked but child is not
+  // 若仅前置节点解锁，则连线呈待选态 (Potential) 喵
   if (unlocked.includes(fromId)) return 'available';
   return 'inactive';
 }
 
 function getCurvedPath(fromNode: any, toNode: any) {
   // Calculate coordinates based on the same logic as the nodes
-  const x1 = fromNode.position.x * 160 + 800 + 55; // center x (offset 800 for 1600px width)
-  const y1 = fromNode.position.y * 140 + 100 + 55; // center y
-  const x2 = toNode.position.x * 160 + 800 + 55; // center x
-  const y2 = toNode.position.y * 140 + 100 + 55; // center y
+  // 根据节点位置计算对应的画布坐标 喵
+  const x1 = fromNode.position.x * 160 + 800 + 55; // 起点中心 X (基于 1600 像素总宽度偏移) 喵
+  const y1 = fromNode.position.y * 140 + 100 + 55; // 起点中心 Y 喵
+  const x2 = toNode.position.x * 160 + 800 + 55; // 终点中心 X 喵
+  const y2 = toNode.position.y * 140 + 100 + 55; // 终点中心 Y 喵
 
-  // If they are in the same column, draw a straighter line
+  // 若起始点位于同一垂线，则绘制直线以增强秩序感 喵
   if (Math.abs(x1 - x2) < 5) {
     return `M ${x1} ${y1} L ${x2} ${y2}`;
   }
 
-  // Use a more "tensioned" cubic bezier curve
-  // Control points are adjusted based on vertical distance to prevent deep S-curves
+  // 使用带有极性拉力的三次贝塞尔曲线 喵
+  // 根据垂向距离动态调整控制点，防止过度弯折 喵 (S-curves prevention) 喵
   const distY = Math.abs(y2 - y1);
-  const cpOffset = Math.min(distY * 0.5, 60); // Cap the offset for long vertical jumps
+  const cpOffset = Math.min(distY * 0.5, 60); // 限制大跨度跳跃时的弯曲幅度 喵
 
   return `M ${x1} ${y1} C ${x1} ${y1 + cpOffset}, ${x2} ${y2 - cpOffset}, ${x2} ${y2}`;
 }
@@ -259,7 +263,7 @@ async function handleUnlockTalent() {
   }
 }
 
-// Display Name: Prioritize PromptStore's metadata, fallback to GameStore
+// 玩家昵称显示：优先从 PromptStore 获取元数据，若无则回退到 GameStore 的基础定义喵
 const displayName = computed(() => {
   return player.value.name || '玩家';
 });
@@ -291,7 +295,7 @@ const reputationLabel = computed(() => {
   return '罄竹难书';
 });
 
-// Modals
+// 各类功能菜单模态框状态管理 (各系统容器 - Modals)喵
 const showItemsModal = ref(false);
 const showSpellsModal = ref(false);
 const showRecipesModal = ref(false);
@@ -330,7 +334,7 @@ function handleSelectItem(item: any) {
   selectedItem.value =
     typeof item === 'object'
       ? item
-      : { name: item, description: '暂无描述', type: 'unknown', count: 1 };
+      : { name: item, description: '暂无详细设定喵', type: 'unknown', count: 1 };
   audioManager.playSoftClick();
 }
 
@@ -380,6 +384,21 @@ function handleBackToItems() {
   audioManager.playPageFlip();
 }
 
+function handleDiscardItem(item: any) {
+  if (!item) return;
+  if (confirm(`确定要丢弃 [${item.name || item.id}] 吗？\n这是不可逆转的操作，请三思喵！`)) {
+    gameStore.applyAction({
+      type: 'INVENTORY',
+      target: 'items',
+      op: 'remove',
+      value: { id: item.id || item.name, count: item.count || 1 }
+    });
+    toastStore.addToast({ message: `已丢弃 ${item.name || item.id}`, type: 'warning' });
+    audioManager.playError();
+    handleBackToItems();
+  }
+}
+
 function handleBackToSpells() {
   selectedSpell.value = null;
   audioManager.playPageFlip();
@@ -390,9 +409,7 @@ function handleBackToRecipes() {
   audioManager.playPageFlip();
 }
 
-// Avatar Upload & Crop Logic
-// Logic moved to PlayerConfigModal.vue
-
+// 头像上传与裁剪逻辑 (已迁移至 PlayerConfigModal.vue 统筹管理喵)
 function getItemTypeLabel(type: string) {
   const map: Record<string, string> = {
     material: '素材',
@@ -438,7 +455,7 @@ function formatBuffEffect(effect: any) {
     const statName = statMap[effect.targetStat] || effect.targetStat;
     const val = Number(effect.value);
     const sign = val > 0 ? '+' : '';
-    // Assume percentage for stat mods usually
+    // 通常情况下默认为百分比属性加成喵
     return `${statName} ${sign}${Math.round(val * 100)}%`;
   }
 
@@ -455,17 +472,17 @@ function formatBuffEffect(effect: any) {
   <div
     class="bg-izakaya-paper shadow-floating rounded-none p-5 space-y-5 font-sans text-izakaya-wood transition-all duration-300 border-x-4 border-y border-x-izakaya-wood/20 border-y-izakaya-wood/10 relative overflow-hidden group/card"
   >
-    <!-- Texture Overlay -->
+    <!-- 纹理层叠装饰 (Texture Overlay)喵 -->
     <div
       class="absolute inset-0 pointer-events-none opacity-30 bg-texture-rice-paper mix-blend-multiply"
     ></div>
 
-    <!-- Decorative Shimenawa (Simulated) -->
+    <!-- 装饰性注连绳构件 (模拟注连绳 - Decorative Shimenawa)喵 -->
     <div
       class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-touhou-red/80 via-white to-touhou-red/80 opacity-50"
     ></div>
 
-    <!-- Header: Name & Identity -->
+    <!-- 角色基础信息栏 (Header: Name & Identity) 喵 -->
     <div
       class="border-b-2 border-dashed border-izakaya-wood/20 pb-3 relative z-10 flex flex-col items-center"
     >
@@ -481,7 +498,7 @@ function formatBuffEffect(effect: any) {
         />
         <User v-else class="w-8 h-8 text-touhou-red opacity-80" />
 
-        <!-- Hover Overlay -->
+        <!-- 头像悬浮编辑器遮罩 (Hover Overlay) 喵 -->
         <div
           class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity"
         >
@@ -505,9 +522,9 @@ function formatBuffEffect(effect: any) {
       </div>
     </div>
 
-    <!-- Bars: HP & MP -->
+    <!-- 核心状态条区 (Bars: HP & MP) 喵 -->
     <div class="space-y-4 relative z-10 px-1">
-      <!-- HP -->
+      <!-- 气血状态 (HP) 喵 -->
       <div class="space-y-1.5 group/hp">
         <div class="flex justify-between text-xs font-bold font-serif-display tracking-wide">
           <span
@@ -539,7 +556,7 @@ function formatBuffEffect(effect: any) {
         </div>
       </div>
 
-      <!-- MP -->
+      <!-- 灵力状态 (MP) 喵 -->
       <div class="space-y-1.5 group/mp">
         <div class="flex justify-between text-xs font-bold font-serif-display tracking-wide">
           <span
@@ -572,14 +589,14 @@ function formatBuffEffect(effect: any) {
       </div>
     </div>
 
-    <!-- Stats Grid -->
+    <!-- 基础属性网格区 (Stats Grid) 喵 -->
     <div class="grid grid-cols-2 gap-y-3 gap-x-2 text-sm py-2 px-1 relative z-10">
       <div class="flex items-center gap-2 group/stat" title="金钱">
         <Coins class="w-4 h-4 text-marisa-gold group-hover/stat:rotate-12 transition-transform" />
         <span class="font-mono font-bold text-izakaya-wood">{{ player.money }}</span>
       </div>
       <div class="flex items-center gap-2 group/stat relative" title="战斗力">
-        <!-- Burning Effect Background -->
+        <!-- 焚毁特效背景 (Burning Effect) 喵 -->
         <div
           v-if="Number(player.power) >= 80"
           class="absolute -inset-3 bg-orange-500/20 rounded-full blur-md -z-10 animate-pulse pointer-events-none"
@@ -594,7 +611,7 @@ function formatBuffEffect(effect: any) {
           :class="{ 'text-burning': Number(player.power) >= 80 }"
         >
           {{ player.power }}
-          <!-- Flame Particles -->
+          <!-- 动态火焰粒子 (Flame Particles) 喵 -->
           <template v-if="Number(player.power) >= 80">
             <span
               class="flame-particle -top-3 -left-1 opacity-70"
@@ -633,7 +650,7 @@ function formatBuffEffect(effect: any) {
       </div>
     </div>
 
-    <!-- Combat Level / Proficiency -->
+    <!-- 战斗等级与熟练度进度条 (Combat Level / Proficiency) 喵 -->
     <div class="px-2 py-1 mb-2 relative z-10 group/lvl" title="战斗熟练等级">
       <div class="flex justify-between items-center text-xs mb-1">
         <span class="font-bold text-izakaya-wood flex items-center gap-1">
@@ -652,7 +669,7 @@ function formatBuffEffect(effect: any) {
       </div>
     </div>
 
-    <!-- Location & Facility -->
+    <!-- 当前方位与设施管理 (Location & Facility) 喵 -->
     <div class="flex items-center gap-2 relative z-10">
       <div
         class="flex-1 flex items-center gap-2 text-sm bg-white/40 border border-izakaya-wood/10 p-2.5 rounded-lg text-izakaya-wood shadow-sm hover:bg-white/60 transition-colors truncate"
@@ -670,7 +687,7 @@ function formatBuffEffect(effect: any) {
       </button>
     </div>
 
-    <!-- Interactive Collections -->
+    <!-- 交互式收集要素菜单 (Interactive Collections) 喵 -->
     <div class="space-y-2 pt-1 relative z-10">
       <div class="grid grid-cols-3 gap-2">
         <button
@@ -736,8 +753,8 @@ function formatBuffEffect(effect: any) {
       </button>
     </div>
 
-    <!-- Modals -->
-    <!-- Item Modal -->
+    <!-- 各子系统弹窗容器集群 (Modals) 喵 -->
+    <!-- 背包物品陈列弹窗 (Item Modal) 喵 -->
     <Teleport to="body">
       <div
         v-if="showItemsModal"
@@ -763,7 +780,7 @@ function formatBuffEffect(effect: any) {
             </button>
           </div>
           <div class="p-4 overflow-y-auto min-h-[300px] bg-white/30 relative z-10 custom-scrollbar">
-            <!-- List View -->
+            <!-- 物品列表浏览模式 (List View) 喵 -->
             <div v-if="!selectedItem" class="grid grid-cols-3 gap-3">
               <div
                 v-if="!player.items || player.items.length === 0"
@@ -787,25 +804,45 @@ function formatBuffEffect(effect: any) {
                 <span class="text-xs font-medium line-clamp-2 text-izakaya-wood font-display">{{
                   typeof item === 'object' ? item.name : item
                 }}</span>
-                <span
-                  class="absolute top-1 right-1 bg-touhou-red text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-sm"
+                <div
                   v-if="typeof item === 'object' && item.count > 1"
-                  >x{{ item.count }}</span
+                  class="absolute top-1 right-1 bg-touhou-red text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-sm z-20 pointer-events-none"
                 >
+                  x{{ item.count }}
+                </div>
+
+                <!-- 快速丢弃按钮 (仅在悬浮时显示)喵 -->
+                <button
+                  @click.stop="handleDiscardItem(item)"
+                  class="absolute bottom-1 right-1 p-1.5 bg-red-500/80 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 shadow-sm z-30"
+                  title="快速丢弃"
+                >
+                  <Trash2 class="w-2.5 h-2.5" />
+                </button>
               </div>
             </div>
 
-            <!-- Detail View -->
+            <!-- 物品详细信息展示模式 (Detail View) 喵 -->
             <div
               v-else
               class="flex flex-col h-full animate-in slide-in-from-right-4 fade-in duration-200"
             >
-              <button
-                @click="handleBackToItems"
-                class="self-start mb-4 flex items-center gap-1 text-sm text-izakaya-wood/60 hover:text-touhou-red transition-colors"
-              >
-                &larr; 返回列表
-              </button>
+              <div class="flex justify-between items-center mb-4 w-full">
+                <button
+                  @click="handleBackToItems"
+                  class="flex items-center gap-1 text-sm text-izakaya-wood/60 hover:text-touhou-red transition-colors"
+                >
+                  &larr; 返回列表
+                </button>
+                <button
+                  @click="handleDiscardItem(selectedItem)"
+                  class="flex items-center gap-1 text-xs text-red-500/70 py-1 px-2 hover:bg-red-50 hover:text-red-700 rounded transition-colors group border border-transparent hover:border-red-200"
+                  title="丢弃该物品"
+                >
+                  <Trash2 class="w-3.5 h-3.5 group-hover:-rotate-12 transition-transform" />
+                  丢弃
+                </button>
+              </div>
 
               <div
                 class="flex flex-col items-center p-6 bg-white/60 rounded-xl border border-izakaya-wood/10 shadow-sm relative overflow-hidden"
@@ -863,7 +900,7 @@ function formatBuffEffect(effect: any) {
       </div>
     </Teleport>
 
-    <!-- Spell Modal -->
+    <!-- 符卡名录模态框 (Spell Modal)喵 -->
     <Teleport to="body">
       <div
         v-if="showSpellsModal"
@@ -872,7 +909,7 @@ function formatBuffEffect(effect: any) {
         <div
           class="bg-izakaya-paper w-full max-w-md rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[70vh] border-2 border-touhou-red/30 relative"
         >
-          <!-- Texture -->
+          <!-- 背景星尘纹理 (Texture)喵 -->
           <div class="absolute inset-0 pointer-events-none opacity-10 bg-texture-stardust"></div>
 
           <div
@@ -889,7 +926,7 @@ function formatBuffEffect(effect: any) {
             </button>
           </div>
           <div class="p-4 overflow-y-auto min-h-[300px] relative z-10 custom-scrollbar">
-            <!-- List View -->
+            <!-- 符卡列表视图 (List View)喵 -->
             <div v-if="!selectedSpell" class="grid grid-cols-1 gap-2">
               <div
                 v-if="!player.spell_cards || player.spell_cards.length === 0"
@@ -956,7 +993,7 @@ function formatBuffEffect(effect: any) {
               </div>
             </div>
 
-            <!-- Detail View -->
+            <!-- 符卡详细信息展示模式 (Detail View) 喵 -->
             <div
               v-else
               class="flex flex-col h-full animate-in slide-in-from-right-4 fade-in duration-200"
@@ -981,32 +1018,29 @@ function formatBuffEffect(effect: any) {
                   {{ selectedSpell.name }}
                 </h4>
 
-                <!-- Level & Experience -->
-                <div class="w-full max-w-[200px] mb-4 relative z-10">
-                  <div class="flex justify-between items-end mb-1">
-                    <span class="text-xs font-bold text-izakaya-wood/70"
-                      >等级 {{ selectedSpell.level || 1 }}</span
-                    >
-                    <span
-                      class="text-[10px] text-izakaya-wood/50"
-                      v-if="(selectedSpell.level || 1) < 30"
-                    >
-                      {{ selectedSpell.experience || 0 }} / 100 EXP
-                    </span>
-                    <span class="text-[10px] text-touhou-red font-bold" v-else>MAX LEVEL</span>
-                  </div>
-                  <div class="w-full h-1.5 bg-stone-200 rounded-full overflow-hidden shadow-inner">
-                    <div
-                      class="h-full bg-gradient-to-r from-marisa-gold to-marisa-gold-dim transition-all duration-700"
-                      :style="{
-                        width: `${(selectedSpell.level || 1) >= 30 ? 100 : selectedSpell.experience || 0}%`
-                      }"
-                    ></div>
-                  </div>
+                <!-- 等级与经验信息 (Level & EXP Info)喵 -->
+                <div class="flex items-center justify-between w-full mb-1 relative z-10 px-2">
+                  <span class="text-[10px] text-izakaya-wood/40 uppercase font-bold tracking-wider">
+                    等级熟练度 (EXP)
+                  </span>
+                  <span v-if="(selectedSpell.level || 1) < 30" class="text-[10px] text-marisa-gold-dim font-bold">
+                    Lv.{{ selectedSpell.level || 1 }}
+                  </span>
+                  <span v-else class="text-[10px] text-touhou-red font-bold">
+                    已达到巅峰等级喵 (MAX)
+                  </span>
+                </div>
+                <div class="w-full h-1.5 bg-stone-200 rounded-full overflow-hidden shadow-inner mb-4">
+                  <div
+                    class="h-full bg-gradient-to-r from-marisa-gold to-marisa-gold-dim transition-all duration-700"
+                    :style="{
+                      width: `${(selectedSpell.level || 1) >= 30 ? 100 : selectedSpell.experience || 0}%`
+                    }"
+                  ></div>
                 </div>
 
-                <!-- Stats Badge -->
-                <div class="flex flex-wrap justify-center gap-2 mb-4 relative z-10">
+              <!-- 属性徽章栏 (Stats Badge)喵 -->
+              <div class="flex flex-wrap justify-center gap-2 mb-4 relative z-10">
                   <span
                     class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded border border-blue-200"
                   >
@@ -1092,7 +1126,7 @@ function formatBuffEffect(effect: any) {
       </div>
     </Teleport>
 
-    <!-- Recipe Modal -->
+    <!-- 食谱名录展示弹窗 (Recipe Modal) 喵 -->
     <Teleport to="body">
       <div
         v-if="showRecipesModal"
@@ -1101,7 +1135,7 @@ function formatBuffEffect(effect: any) {
         <div
           class="bg-izakaya-paper w-full max-w-md rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[70vh] border-2 border-orange-400/30 relative"
         >
-          <!-- Texture -->
+          <!-- 背景纸纹装饰层 (Texture Overlay) 喵 -->
           <div class="absolute inset-0 pointer-events-none opacity-10 bg-texture-stardust"></div>
 
           <div
@@ -1118,7 +1152,7 @@ function formatBuffEffect(effect: any) {
             </button>
           </div>
           <div class="p-4 overflow-y-auto min-h-[300px] bg-white/30 relative z-10 custom-scrollbar">
-            <!-- List View -->
+            <!-- 食谱列表视图 (List View)喵 -->
             <div v-if="!selectedRecipe" class="grid grid-cols-1 gap-2">
               <div
                 v-if="!player.recipes || player.recipes.length === 0"
@@ -1163,7 +1197,7 @@ function formatBuffEffect(effect: any) {
               </div>
             </div>
 
-            <!-- Detail View -->
+            <!-- 菜品详细设定展示模式 (Detail View) 喵 -->
             <div
               v-else
               class="flex flex-col h-full animate-in slide-in-from-right-4 fade-in duration-200"
@@ -1230,7 +1264,7 @@ function formatBuffEffect(effect: any) {
       </div>
     </Teleport>
 
-    <!-- Talent Tree Modal -->
+    <!-- 技能天赋树全局看板 (Talent Tree Modal)喵 -->
     <Teleport to="body">
       <div
         v-if="showTalentTreeModal"
@@ -1239,10 +1273,10 @@ function formatBuffEffect(effect: any) {
         <div
           class="bg-izakaya-paper w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden flex flex-col h-[85vh] border-2 border-green-500/30 relative"
         >
-          <!-- Texture -->
+          <!-- 装饰纹理 (Texture)喵 -->
           <div class="absolute inset-0 pointer-events-none opacity-10 bg-texture-stardust"></div>
 
-          <!-- Header -->
+          <!-- 顶部栏 (Header)喵 -->
           <div
             class="p-4 border-b border-izakaya-wood/10 flex justify-between items-center bg-green-500/5 relative z-10"
           >
@@ -1251,7 +1285,7 @@ function formatBuffEffect(effect: any) {
                 <GitBranch class="w-5 h-5 text-green-600" /> 技能天赋树
               </h3>
 
-              <!-- Tabs -->
+              <!-- 选项卡 (Tabs)喵 -->
               <div class="flex bg-white/40 p-1 rounded-lg border border-izakaya-wood/10">
                 <button
                   @click="activeTalentTab = 'combat'"
@@ -1307,7 +1341,7 @@ function formatBuffEffect(effect: any) {
           </div>
 
           <div class="flex-1 flex overflow-hidden relative z-10 bg-white/30">
-            <!-- Zoom Indicator (Fixed relative to viewport) -->
+            <!-- 环境缩放指示器 (Zoom Indicator) 喵 -->
             <div
               class="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-full border border-izakaya-wood/20 shadow-md pointer-events-none transition-opacity duration-300"
             >
@@ -1317,7 +1351,7 @@ function formatBuffEffect(effect: any) {
               >
             </div>
 
-            <!-- Tree View (Left/Center) -->
+            <!-- 天赋树主画布区域 (Tree View)喵 -->
             <div
               ref="treeContainer"
               class="flex-1 overflow-auto custom-scrollbar relative p-8 bg-izakaya-paper/50 cursor-grab active:cursor-grabbing select-none group touch-none"
@@ -1331,9 +1365,9 @@ function formatBuffEffect(effect: any) {
               @touchcancel="handleTouchEnd"
               @wheel.prevent="handleWheel"
             >
-              <!-- Scaling Wrapper: 
-                     1. Outer div expands to the scaled size to ensure scrollbars work correctly 
-                     2. Inner div uses transform: scale and origin: 0 0 for performance
+              <!-- 缩放容器包装层：
+                     1. 外层 div 随缩放比例动态扩充画布，确保滚动条逻辑精确计算喵
+                     2. 内层 div 利用 CSS Transform: Scale 以榨取最佳渲染性能喵 (硬件加速方案)
                 -->
               <div
                 class="relative mx-auto"
@@ -1352,7 +1386,7 @@ function formatBuffEffect(effect: any) {
                     transform: `scale(${zoomLevel})`
                   }"
                 >
-                  <!-- Web Background Effect (Optimized) -->
+                  <!-- 背景特效 -->
                   <div class="absolute inset-0 pointer-events-none opacity-[0.02] overflow-hidden">
                     <svg width="100%" height="100%" style="will-change: transform">
                       <defs>
@@ -1376,7 +1410,7 @@ function formatBuffEffect(effect: any) {
                     </svg>
                   </div>
 
-                  <!-- Connecting Lines (Curved Paths) -->
+                  <!-- 连线 -->
                   <svg
                     class="absolute inset-0 w-full h-full pointer-events-none z-0"
                     style="will-change: transform"
@@ -1414,7 +1448,7 @@ function formatBuffEffect(effect: any) {
                     </template>
                   </svg>
 
-                  <!-- Nodes -->
+                  <!-- 天赋节点 (Nodes)喵 -->
                   <div
                     v-for="talent in activeTalentTab === 'combat' ? combatTalents : []"
                     :key="talent.id"
@@ -1431,7 +1465,7 @@ function formatBuffEffect(effect: any) {
                     }"
                     @click="handleTalentClick(talent)"
                   >
-                    <!-- Hexagonal Shape via Clip-path -->
+                    <!-- 利用齐次切片方案绘制的六边形节点背景 (Hexagonal Shape) 喵 -->
                     <div
                       class="absolute inset-0 bg-current opacity-10 rounded-xl transform rotate-45 scale-90 border-2 border-transparent transition-transform duration-300 node-bg"
                     ></div>
@@ -1463,7 +1497,7 @@ function formatBuffEffect(effect: any) {
                       </div>
                     </div>
 
-                    <!-- Connection Points (Visual only) -->
+                    <!-- 逻辑连接锚点视觉渲染 (Connection Points) 喵 -->
                     <div
                       v-if="talent.prerequisites.length > 0"
                       class="absolute -top-1 w-2 h-2 rounded-full bg-current opacity-40"
@@ -1481,7 +1515,7 @@ function formatBuffEffect(effect: any) {
               </div>
             </div>
 
-            <!-- Sidebar Info (Right) -->
+            <!-- 详情信息侧边栏 (Sidebar Info)喵 -->
             <div
               class="w-64 bg-white/60 border-l border-izakaya-wood/10 p-4 flex flex-col shadow-xl backdrop-blur-sm z-20"
             >
@@ -1524,7 +1558,7 @@ function formatBuffEffect(effect: any) {
                   </p>
                 </div>
 
-                <!-- Prerequisites Section -->
+                <!-- 前置条件需求面板 (Prerequisites Section)喵 -->
                 <div v-if="selectedTalent.prerequisites.length > 0" class="mb-6">
                   <div
                     class="text-[10px] uppercase tracking-wider text-izakaya-wood/40 font-bold mb-2"
@@ -1589,14 +1623,14 @@ function formatBuffEffect(effect: any) {
       </div>
     </Teleport>
 
-    <!-- Player Config Modal -->
+    <!-- 玩家人物资料编辑器入口 (Player Config Modal) 喵 -->
     <PlayerConfigModal
       :is-open="showPlayerConfig"
       @close="showPlayerConfig = false"
       @open-summary="(count) => emit('open-summary', count)"
     />
 
-    <!-- Facility Modal -->
+    <!-- 居酒屋设施状况概览 (Facility Modal) 喵 -->
     <FacilityPanel :is-open="showFacilityModal" @close="handleCloseFacility" />
   </div>
 </template>
@@ -1665,7 +1699,7 @@ function formatBuffEffect(effect: any) {
 }
 
 .node-bg {
-  @apply border-2;
+  border-width: 2px;
   transition:
     transform 0.3s,
     opacity 0.3s,

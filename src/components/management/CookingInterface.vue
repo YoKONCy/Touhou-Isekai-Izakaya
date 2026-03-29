@@ -4,16 +4,16 @@ import { X, ChefHat, Flame, Timer, Check, Info } from 'lucide-vue-next';
 import type { Ingredient, CookingSession } from '@/types/management';
 
 const props = defineProps<{
-  customerRequirement?: string; // e.g. "I want something spicy"
+  customerRequirement?: string; // 例如: "我想要点辣的"
 }>();
 
 const emit = defineEmits(['close', 'finish']);
 
 onMounted(() => {
-  // console.log('Cooking Interface Mounted');
+  // console.log('烹饪界面已挂载');
 });
 
-// State
+// 状态定义 (State)
 const dishName = ref('');
 const potIngredients = ref<{ ingredient: Ingredient; timeAdded: number; x: number; y: number }[]>(
   []
@@ -21,7 +21,7 @@ const potIngredients = ref<{ ingredient: Ingredient; timeAdded: number; x: numbe
 const isDragging = ref(false);
 const draggedIngredient = ref<Ingredient | null>(null);
 const cookingTime = ref(0);
-const accumulatedHeat = ref(0); // Total heat energy
+const accumulatedHeat = ref(0); // 累计热量
 const fireLevel = ref<'low' | 'medium' | 'high'>('medium');
 const timerInterval = ref<number | null>(null);
 const potHovered = ref(false);
@@ -32,7 +32,7 @@ const HEAT_RATES = {
   high: 4
 };
 
-// Constants
+// 烹饪常量配置 (Constants)
 const BASE_INGREDIENTS: Ingredient[] = [
   { id: 'rice', name: '大米', type: 'base', icon: '🍚', color: '#f5f5f5' },
   { id: 'flour', name: '面粉', type: 'base', icon: '🌾', color: '#fff8e1' },
@@ -51,14 +51,14 @@ const SPECIAL_INGREDIENTS: Ingredient[] = [
   { id: 'onion', name: '洋葱', type: 'vegetable', icon: '🧅', color: '#e1bee7' }
 ];
 
-// Computed
+// 计算属性 (Computed)
 const currentPhase = computed(() => {
-  // Phase depends on accumulated heat now
-  // Adjusted thresholds since heat accumulates faster
+  // 阶段取决于当前累计热量
+  // 调整阈值以适应更快的加热速度
   if (accumulatedHeat.value < 20) return '预热';
   if (accumulatedHeat.value < 60) return '烹饪中';
   if (accumulatedHeat.value < 100) return '收汁';
-  return '过火';
+  return '焦糊';
 });
 
 const phaseColor = computed(() => {
@@ -68,15 +68,15 @@ const phaseColor = computed(() => {
   return 'text-red-500';
 });
 
-// Methods
+// 逻辑方法 (Methods)
 const startCooking = () => {
   if (timerInterval.value) return;
   const startTime = Date.now();
   timerInterval.value = window.setInterval(() => {
-    // Increment real time
+    // 增加实际时间
     cookingTime.value = Math.floor((Date.now() - startTime) / 1000);
 
-    // Increment heat based on fire level
+    // 根据火候增加热量
     accumulatedHeat.value += HEAT_RATES[fireLevel.value];
   }, 1000);
 };
@@ -106,13 +106,12 @@ const handleDrop = (event: DragEvent) => {
   potHovered.value = false;
 
   if (draggedIngredient.value) {
-    // Start timer on first ingredient if not started
+    // 如果尚未开始，则在放入第一个食材时启动计时器
     if (potIngredients.value.length === 0) {
       startCooking();
     }
 
-    // Add to pot with random position within the pot area
-    // We'll just store normalized coordinates (0-100%)
+    // 将食材放入锅中，位置随机
     const x = 20 + Math.random() * 60;
     const y = 30 + Math.random() * 40;
 
@@ -122,8 +121,6 @@ const handleDrop = (event: DragEvent) => {
       x,
       y
     });
-
-    // Visual effect logic could go here
   }
 
   handleDragEnd();
@@ -138,6 +135,7 @@ const handleDragLeave = () => {
   potHovered.value = false;
 };
 
+// 完成烹饪结算处理
 const finishCooking = () => {
   if (timerInterval.value) {
     clearInterval(timerInterval.value);
@@ -171,7 +169,7 @@ onUnmounted(() => {
 
 <template>
   <div class="cooking-overlay animate-fade-in">
-    <!-- Header -->
+    <!-- 页眉区域 -->
     <div class="cooking-header">
       <div class="header-left">
         <ChefHat class="w-8 h-8 text-orange-400" />
@@ -183,7 +181,7 @@ onUnmounted(() => {
     </div>
 
     <div class="cooking-container">
-      <!-- Left Panel: Pot Area -->
+      <!-- 左侧面板：烹饪锅区域 -->
       <div class="pot-section">
         <div class="pot-status">
           <div class="status-card">
@@ -197,7 +195,7 @@ onUnmounted(() => {
                 class="fire-btn low"
                 :class="{ active: fireLevel === 'low' }"
                 @click="setFireLevel('low')"
-                title="小火"
+                title="小火慢炖"
               >
                 S
               </button>
@@ -205,7 +203,7 @@ onUnmounted(() => {
                 class="fire-btn medium"
                 :class="{ active: fireLevel === 'medium' }"
                 @click="setFireLevel('medium')"
-                title="中火"
+                title="中火烹饪"
               >
                 M
               </button>
@@ -213,22 +211,22 @@ onUnmounted(() => {
                 class="fire-btn high"
                 :class="{ active: fireLevel === 'high' }"
                 @click="setFireLevel('high')"
-                title="大火"
+                title="大火爆炒"
               >
                 L
               </button>
             </div>
           </div>
           <div class="status-card">
-            <span class="label">烹饪时间</span>
+            <span class="label">累计用时</span>
             <div class="value flex items-center gap-2">
               <Timer class="w-5 h-5 text-gray-400" />
-              <span class="text-white">{{ cookingTime }}s</span>
+              <span class="text-white">{{ cookingTime }}秒</span>
             </div>
           </div>
         </div>
 
-        <!-- The Pot -->
+        <!-- 烹饪锅容器 -->
         <div
           class="pot-container"
           :class="{ 'pot-hovered': potHovered }"
@@ -239,13 +237,13 @@ onUnmounted(() => {
           <div class="pot-rim"></div>
           <div class="pot-body">
             <div class="soup-base">
-              <!-- Bubbling animation could go here -->
+              <!-- 气泡动画 -->
               <div class="bubble b1"></div>
               <div class="bubble b2"></div>
               <div class="bubble b3"></div>
             </div>
 
-            <!-- Floating Ingredients -->
+            <!-- 锅内漂浮食材 -->
             <transition-group name="toss">
               <div
                 v-for="(item, index) in potIngredients"
@@ -262,7 +260,7 @@ onUnmounted(() => {
           <div class="pot-handle-right"></div>
         </div>
 
-        <!-- Dish Naming & Finish -->
+        <!-- 菜品命名与结算导出 -->
         <div class="finish-section">
           <input
             v-model="dishName"
@@ -277,9 +275,9 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- Right Panel: Ingredients -->
+      <!-- 右侧面板：食材仓库 -->
       <div class="ingredients-section">
-        <!-- Customer Request Hint -->
+        <!-- 顾客要求提示 -->
         <div class="request-hint" v-if="customerRequirement">
           <Info class="w-4 h-4 text-blue-400" />
           <span class="text-sm text-gray-300"
@@ -287,7 +285,7 @@ onUnmounted(() => {
           >
         </div>
 
-        <!-- Base Ingredients -->
+        <!-- 基础素材分类 -->
         <div class="category-group">
           <h3 class="category-title">基础素材 (无限)</h3>
           <div class="ingredients-grid">
@@ -305,7 +303,7 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Special Ingredients -->
+        <!-- 持有食材分类 -->
         <div class="category-group mt-6">
           <h3 class="category-title">持有食材</h3>
           <div class="ingredients-grid">

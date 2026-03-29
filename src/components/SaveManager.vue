@@ -74,8 +74,8 @@ watch(
       if (saves.value.length === 0) {
         isCreating.value = true;
       }
-      // Check if migration might be needed
-      const needed = await checkMigrationNeeded(true); // pass true to skip localStorage check
+      // 检测是否需要执行存档迁移 (Migration check) / 此处传入 true 以跳过 localStorage 冗余校验 喵
+      const needed = await checkMigrationNeeded(true);
       showMigrationButton.value = needed;
     }
   }
@@ -115,7 +115,7 @@ async function handleCreate() {
   tempSaveName.value = newSaveName.value.trim();
   tempIsMultiplayer.value = isCreatingMultiplayer.value;
   showWizard.value = true;
-  // We don't close SaveManager yet, just overlay Wizard
+  // 此处暂不关闭 SaveManager 遮盖层，直接在其上层弹出 Wizard 向导 喵
 }
 
 async function onWizardComplete(data: any) {
@@ -124,10 +124,10 @@ async function onWizardComplete(data: any) {
   isCreatingMultiplayer.value = false;
   newSaveName.value = '';
 
-  // 1. Create Save
+  // 1. 执行物理建档操作 喵
   const id = await saveStore.createSave(tempSaveName.value, tempIsMultiplayer.value);
 
-  // 2. Switch to it (Resets state)
+  // 2. 切换至新存档并重置全局状态 喵
   await saveStore.switchSave(id);
 
   // 3. Apply Wizard Data
@@ -150,7 +150,7 @@ async function onWizardComplete(data: any) {
     spell_cards: data.stats.spell_cards || []
   });
 
-  // 3.1 Update System Config (Difficulty)
+  // 3.1 同步更新系统配置项中的难度等级 喵
   if (data.difficulty) {
     const currentSystem = gameStore.state.system;
     gameStore.updateState({
@@ -161,14 +161,14 @@ async function onWizardComplete(data: any) {
     });
   }
 
-  // 4. Send initial message if provided (Store Start)
-  // Define mapPromise outside to track background generation
+  // 4. 发送初始对话引导词以启动剧情 喵 (Store Start)
+  // 在外部定义 mapPromise 以便异步追踪背景地图的生成进度 喵
   let mapPromise: Promise<any> = Promise.resolve(null);
 
   if (data.initialMessage) {
     console.log('[SaveManager] Checking store description:', data.storeDescription);
     if (data.storeDescription) {
-      // Generate initial map from store description (Parallel execution)
+      // 根据居酒屋店铺描述并行生成初始地图瓦片 喵 (Parallel execution)
       console.log('[SaveManager] Starting initial map generation (Background)...');
       mapPromise = generateMap('New Izakaya', data.storeDescription).catch((e) => {
         console.error('Failed to generate initial map', e);
@@ -177,13 +177,13 @@ async function onWizardComplete(data: any) {
     }
   }
 
-  // 5. Create initial snapshot to persist the configured state
+  // 5. 创建初始快照以持久化当前的配置化状态 喵
   await chatStore.createInitialSnapshot();
 
   // Close UI immediately to show game interface
   emit('close');
 
-  // 6. Trigger LLM response if needed
+  // 6. 根据初始消息内容触发 LLM 剧情响应 喵
   if (data.initialMessage) {
     console.log('[SaveManager] Triggering initial LLM response with message:', data.initialMessage);
     gameLoop.handleUserAction(data.initialMessage).catch((e) => {
@@ -193,7 +193,7 @@ async function onWizardComplete(data: any) {
     console.log('[SaveManager] No initial message provided, skipping LLM trigger.');
   }
 
-  // 7. Handle Map Completion (Update state when ready)
+  // 7. 地图生成完成后的回调处理 喵 (当资源就绪时更新状态)
   if (data.storeDescription) {
     mapPromise.then((initialMap) => {
       if (initialMap) {
@@ -219,7 +219,7 @@ async function handleExport(save: any) {
   try {
     console.log(`[SaveManager] Exporting save ${save.id} (${save.name})...`);
     const blob = await saveStore.exportSave(save.id);
-    // const blob = new Blob([json], { type: 'application/json' }); // exportSave now returns Blob directly
+    // saveStore.exportSave 现在已支持直接返回 Blob 对象，无需额外包装 喵
 
     // Check size
     if (blob.size > 100 * 1024 * 1024) {
@@ -236,7 +236,7 @@ async function handleExport(save: any) {
     document.body.appendChild(a);
     a.click();
 
-    // Cleanup after a delay to ensure the browser has started the download
+    // 执行延时清理，确保浏览器已成功启动下载任务 喵
     setTimeout(() => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
@@ -281,7 +281,7 @@ async function handleImport(event: Event) {
       });
       alert(`导入存档失败: ${error?.message || '未知错误 (请检查控制台详情)'}`);
     } finally {
-      // Reset input
+      // 重置文件选择框的状态 喵
       if (fileInput.value) fileInput.value.value = '';
     }
   };
@@ -355,7 +355,7 @@ function formatTime(timestamp: number) {
       <div
         class="relative bg-stone-50 dark:bg-stone-900 w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] border-2 border-izakaya-wood/30"
       >
-        <!-- Texture Overlay -->
+        <!-- 纸纹纹理装饰层 (Texture Overlay) 喵 -->
         <div
           class="absolute inset-0 pointer-events-none opacity-40 bg-texture-rice-paper z-0"
         ></div>
@@ -435,7 +435,7 @@ function formatTime(timestamp: number) {
               状态：已连接 (远程)
             </div>
             <p class="text-[10px] text-blue-400 uppercase tracking-widest font-bold">
-              Remote Multiplayer Session
+              远程多人联机 喵
             </p>
           </div>
 
@@ -768,7 +768,7 @@ function formatTime(timestamp: number) {
             </div>
           </div>
         </div>
-        <!-- Hidden File Input -->
+        <!-- 隐藏的文件上传输入控件 喵 -->
         <input type="file" ref="fileInput" class="hidden" accept=".json" @change="handleImport" />
       </div>
     </div>

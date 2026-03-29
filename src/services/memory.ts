@@ -64,7 +64,7 @@ const EXTRACTION_SYSTEM_PROMPT = `
 }
 
 核心提取重点清单:
-- 关于世界规则或角色背景的新事实 (Fact Finding)。
+- 关于世界规则或角色背景的新事实 (事实发现)。
 - 角色间羁绊、关系或立场的变动。
 - 重要的玩家物理行动（如：设施建造、大型战斗、大宗交易）。
 - 关键剧情里程碑的推进。
@@ -128,14 +128,14 @@ interface MemoryEntry {
  */
 export class MemoryService {
   /**
-   * 更新记忆关联图谱 (Memory Graph Persistence)
+   * 更新记忆关联图谱 (记忆图谱持久化：Memory Graph Persistence)
    * 建立“时间轴序列 (Sequence)”与“实体星型 (Entity Star)”的多维逻辑链接。
    */
   public async updateGraph(newMemory: MemoryEntry) {
     if (!newMemory.id) return;
 
     try {
-      // 1. 时间轴链接 (Sequence Link)：将当前动作节点链接至同类型的上一条历史记忆。
+      // 1. 时间轴链接 (序列链接：Sequence Link)：将当前动作节点链接至同类型的上一条历史记忆。
       const recentMemories = await dbService.getMemoriesByType(
         newMemory.saveSlotId,
         newMemory.type,
@@ -152,10 +152,10 @@ export class MemoryService {
         }
       }
 
-      // 2. 实体星型链接 (Entity Star)：跨越时间维度，将提及相同实体的所有记忆节点进行强关联。
+      // 2. 实体星型链接 (实体关联网：Entity Star)：跨越时间维度，将提及相同实体的所有记忆节点进行强关联。
       if (newMemory.related_entities && newMemory.related_entities.length > 0) {
         for (const entity of newMemory.related_entities) {
-          // 深度检索：寻找历史长河中所有提及该实体的记忆切片 (Cross-time Retrieval)
+          // 深度检索：寻找历史长河中所有提及该实体的记忆切片 (跨时空检索)喵
           const relevant = await dbService.searchMemories(newMemory.saveSlotId, [entity]);
           // 逻辑过滤：剔除自身节点以防生成逻辑自环
           const others = relevant.filter((m) => m.id !== newMemory.id).slice(0, 5);
@@ -165,7 +165,7 @@ export class MemoryService {
               await dbService.addMemoryRelation(newMemory.id, other.id, 'entity', 0.8);
               memoryGraph.addConnection(newMemory.id, other.id, 0.8, 'entity');
 
-              // 补全双向关联 (Bidirectional Reinforcement)
+              // 补全双向关联 (双向强化权重)喵
               await dbService.addMemoryRelation(other.id, newMemory.id, 'entity', 0.8);
               memoryGraph.addConnection(other.id, newMemory.id, 0.8, 'entity');
             }
@@ -197,7 +197,7 @@ export class MemoryService {
     signal?: AbortSignal
   ) {
     if (signal?.aborted) return;
-    // 1. 持久化“硬记忆 (Hard Memories)”：基于 Actions 进行的客观物理世界变量变更。
+    // 1. 持久化“硬记忆 (确定的物理事实)”：基于动作反馈执行的客观物理世界变量变更 (Hard Memories)。
     // 这些是从逻辑决策系统输出的确定性事实，具有最高的真实权重。
     // [优化策略]：目前主要将具备经营与资产属性的变更（金钱、物品、符卡）记录为硬记忆项。
     if (actions && actions.length > 0) {
@@ -219,7 +219,7 @@ export class MemoryService {
         const gameStore = useGameStore();
         const charStore = useCharacterStore();
 
-        // 文本格式化：将原始指令载荷转换为模型可读的高质量文本 (Human-readable Injection)
+        // 文本格式化：将原始指令载荷转换为模型可读的高质量文本 (人类可读化注入)喵
         const readableContent = variableChanges
           .map((a) => {
             if (a.type === 'UPDATE_PLAYER') {
@@ -256,7 +256,7 @@ export class MemoryService {
           if (a.type === 'INVENTORY') tags.push('物品', 'inventory');
         });
 
-        // [Fix] Prevent duplicates for variable changes (redundant check, but safe)
+        // [补丁] 再次清理同回合变量变更，确保记忆唯一性喵 (Prevent duplicates)
         await dbService.deleteMemories(saveSlotId, 'variable_change', turnCount);
 
         const memData = {
@@ -270,7 +270,7 @@ export class MemoryService {
             gameStore.state.npcs
           ),
           tags: [...new Set(tags)],
-          importance: 2, // Default importance for stat changes
+          importance: 2, // 状态变更的默认重要性等级 (Low-Mid)
           createdAt: Date.now(),
           gameDate: context?.date,
           gameTime: context?.time,
@@ -283,32 +283,32 @@ export class MemoryService {
       }
     }
 
-    // 2. 持久化“软记忆 (Soft Memories)”：通过书记员模型提取剧情摘要与关键事件 (Neural Extraction)
+    // 2. 持久化“软记忆 (摘要与事件摘录)”：通过书记员模型提取剧情摘要与关键事件 (Soft Memories - Neural Extraction)
     // 触发策略：仅在存在实质性对话上下文时执行认知提取。
     const dialogueContent = `User (${userParam.name}): ${userParam.input}\nAI: ${aiResponse}`;
 
-    // 语境补全：获取当前活跃的所有设施快照，辅助模型执行精准识别 (Contextual Awareness)
+    // 语境补全：获取当前活跃的所有设施快照，辅助模型执行精准识别 (上下文感知补全)喵
     const facilities = await dbService.getFacilities(saveSlotId);
     const facilitiesContext = facilities
       .map(
         (f) =>
-          `- [${f.id}] ${f.name} (${f.location}): ${f.description ? f.description.substring(0, 50) + '...' : 'No description'}`
+          `- [${f.id}] ${f.name} (${f.location}): ${f.description ? f.description.substring(0, 50) + '...' : '暂无详情'}`
       )
       .join('\n');
 
     try {
       const prompt = `
-Existing Facilities:
-${facilitiesContext || 'None'}
+已知设施列表:
+${facilitiesContext || '暂无已注册设施'}
 
-Dialogue:
+当前对白:
 ${dialogueContent}
 
-Actions Taken:
+已执行动作清单:
 ${JSON.stringify(actions)}
       `;
 
-      // 调用书记员 LLM #3 (Scribe Model) 进行认知提取
+      // 调用书记员 LLM #3 模型进行认知提取
       const response = await generateCompletion({
         systemPrompt: EXTRACTION_SYSTEM_PROMPT,
         messages: [{ role: 'user', content: prompt }],
@@ -317,14 +317,14 @@ ${JSON.stringify(actions)}
         signal
       });
 
-      if (!response) throw new Error('Empty response from Memory LLM');
+      if (!response) throw new Error('书记员记忆提取模型返回了空响应喵');
 
       // 使用统一的清理逻辑
       const content = this.cleanJsonString(response);
 
       const result = JSON.parse(content);
 
-      // 错误嗅探：检测模型是否返回了有效的 JSON 记忆载荷 (Sanity Check)
+      // 合规性检测：检测模型是否返回了有效的 JSON 格式记忆载荷 (Sanity Check)喵
       if (result.error) {
         console.warn('Memory extraction received system error response:', result.message);
         return;
@@ -353,17 +353,17 @@ ${JSON.stringify(actions)}
         await this.broadcastMemory({ ...summaryData, id: mid });
       }
 
-      // [设施层关联逻辑]：检测并处理设施所有权变动 (Facility Logic Guard)
+      // [设施层关联逻辑]：检测并处理设施所有权变动 (设施逻辑守卫 - Facility Logic Guard)
       if (result.facility && result.facility.name) {
         await dbService.deleteMemories(saveSlotId, 'facility', turnCount);
 
         const f = result.facility;
 
-        // --- 逻辑拦截：同步更新设施注册表 (Facility Registry Consistency) ---
+        // --- 逻辑拦截：同步更新设施注册表 (设施数据一致性维护)喵 ---
         let facilityId = f.id === 'null' ? null : f.id;
         let existingFacility = facilities.find((ef) => ef.id === facilityId);
 
-        // 纠错机制：启用名称模糊匹配 (Exact/Fuzzy Match) 以防模型因微小命名差导致设施自我复制 (Duplication Guard)
+        // 纠错机制：启用名称模糊匹配，防止模型因微小命名差导致设施自我复制 (防重复录入守卫)喵
         if (!existingFacility && f.name) {
           existingFacility = facilities.find((ef) => {
             if (ef.name === f.name) return true;
@@ -385,7 +385,7 @@ ${JSON.stringify(actions)}
           
           if (existingFacility) {
             facilityId = existingFacility.id;
-            f.name = existingFacility.name; // Force use existing name
+            f.name = existingFacility.name; // 强制使用已登记设施的正式名称喵
           }
         }
 
@@ -415,7 +415,7 @@ ${JSON.stringify(actions)}
           '无';
         const staff = f.staff?.length > 0 ? f.staff.join('、') : '无';
 
-        // 文本塑造：构建一个信息详尽、符合直觉的设施描述文本快照 (Rich Content Composition)
+        // 文本塑造：构建一个信息详尽、符合直觉的设施描述文本快照 (富文本内容合成模式)喵
         let readableFacility = `【${f.name}】\n`;
         readableFacility += `地点：${f.location || '未知'}\n`;
         readableFacility += `介绍：${f.description || '无'}\n`;
@@ -449,7 +449,7 @@ ${JSON.stringify(actions)}
         await this.broadcastMemory({ ...facilityData, id: mid });
       }
 
-      // 联盟逻辑 (Alliance Tracking)
+      // 联盟/外交关系追踪 (Alliance Tracking)喵
       if (result.alliance && result.alliance.name) {
         // [幂等保护]
         await dbService.deleteMemories(saveSlotId, 'alliance', turnCount);
@@ -461,7 +461,7 @@ ${JSON.stringify(actions)}
           content: JSON.stringify(result.alliance),
           related_entities: result.alliance.related_characters || [],
           tags: ['alliance'],
-          importance: 5, // Always critical
+          importance: 5, // 对于联盟/重大誓约，始终保持最高重要性权重
           createdAt: Date.now(),
           gameDate: context?.date,
           gameTime: context?.time,
@@ -473,7 +473,7 @@ ${JSON.stringify(actions)}
         await this.broadcastMemory({ ...allianceData, id: mid });
       }
 
-      // 情报逻辑 (Intelligence Tracking)
+      // 情报/绝密档案追踪 (Intelligence Tracking)喵
       if (result.intelligence && result.intelligence.name) {
         // [幂等保护]
         await dbService.deleteMemories(saveSlotId, 'intelligence', turnCount);
@@ -485,7 +485,7 @@ ${JSON.stringify(actions)}
           content: JSON.stringify(result.intelligence),
           related_entities: [],
           tags: ['intelligence'],
-          importance: 5, // Always critical
+          importance: 5, // 绝密情报始终视为最重要记忆喵
           createdAt: Date.now(),
           gameDate: context?.date,
           gameTime: context?.time,
@@ -508,20 +508,20 @@ ${JSON.stringify(actions)}
    * 辅助逻辑：允许用户/系统针对特定 AI 消息强制触发记忆补提操作。
    */
   async retryExtraction(messageId: number) {
-    // 1. Fetch the assistant message
+    // 1. 检索对应的 AI 助手的回复消息喵
     const assistantMsg = await dbService.getChat(messageId);
     if (!assistantMsg || assistantMsg.role !== 'assistant') {
       throw new Error('无效的消息ID或消息不是AI回复');
     }
 
-    // 2. Fetch the user message (preceding this assistant message)
+    // 2. 检索该 AI 消息之前的上一条用户输入喵
     const userMsg = await dbService.getPrecedingUserMessage(messageId, assistantMsg.saveSlotId);
 
     if (!userMsg) {
       throw new Error('找不到关联的用户输入');
     }
 
-    // 3. Fetch the snapshot
+    // 3. 检索当时对应的状态快照喵
     if (!assistantMsg.snapshotId) {
       throw new Error('该轮次没有关联的状态快照，无法重新生成记忆');
     }
@@ -532,7 +532,7 @@ ${JSON.stringify(actions)}
 
     const gameState = JSON.parse(snapshot.gameState);
 
-    // 4. Extract actions from debugLog
+    // 4. 从调试日志中解析出当时执行的动作列表喵
     let actions: any[] = [];
     if (assistantMsg.debugLog?.logicOutput) {
       try {
@@ -543,7 +543,7 @@ ${JSON.stringify(actions)}
       }
     }
 
-    // 5. Call extractAndSave
+    // 5. 调用核心提取方法完成记忆补填喵
     return await this.extractAndSave(
       assistantMsg.saveSlotId,
       gameState.system.turn_count,
@@ -562,6 +562,7 @@ ${JSON.stringify(actions)}
     );
   }
 
+  // 存档回退：回退到指定的游戏回合，并删除之后的所有记忆。
   async rollback(saveSlotId: number, targetTurnCount: number) {
     // 物理层级移除：清除所有在该目标回合 (Turn) 之后产生的历史记忆切片，实现存档时间回溯。
     // SQL: DELETE FROM memories WHERE saveSlotId = ? AND turnCount > ?
@@ -576,7 +577,7 @@ ${JSON.stringify(actions)}
    */
   async getGlobalMemories(saveSlotId: number): Promise<string> {
     try {
-      // Fetch all alliance and intelligence memories
+      // 抓取该存档下所有的联盟和绝密情报记录喵
       const alliances = await dbService.getMemoriesByType(saveSlotId, 'alliance');
       const intelligences = await dbService.getMemoriesByType(saveSlotId, 'intelligence');
 
@@ -587,7 +588,7 @@ ${JSON.stringify(actions)}
         alliances.forEach((m) => {
           try {
             const data = JSON.parse(m.content);
-            content += `- [${data.name}]: ${data.content} (Related: ${data.related_characters?.join(', ') || 'None'})\n`;
+            content += `- [${data.name}]: ${data.content} (相关角色: ${data.related_characters?.join(', ') || '暂无数据'})\n`;
           } catch (e) {
             content += `- ${m.content}\n`;
           }
@@ -616,7 +617,7 @@ ${JSON.stringify(actions)}
   }
 
   /**
-   * 动态记忆检索核心：根据当前输入的语义空间，检索最相关的历史切片以注入上下文 (Dynamic RAG Retrieval)。
+   * 动态记忆检索 (RAG) 核心：根据当前输入的语义空间，检索最相关的历史切片以注入上下文喵。
    */
   async retrieve(
     saveSlotId: number,
@@ -642,7 +643,7 @@ ${JSON.stringify(actions)}
 
         // 按设施名去重，只保留每个设施最新的状态
         const facilityMap = new Map<string, MemoryEntry>();
-        // Note: allRecentFacilities is already sorted by ID DESC (newest first)
+        // 注：allRecentFacilities 已经按 ID 逆序排列（即最新状态优先）喵
         allRecentFacilities.forEach((m) => {
           const name =
             this.extractFacilityNameFromContent(m.content) ||
@@ -655,7 +656,7 @@ ${JSON.stringify(actions)}
         const latestFacilities = Array.from(facilityMap.values());
 
         console.log(
-          `[Memory Retrieval] Checking ${latestFacilities.length} unique facilities. Current Location:`,
+          `[记忆检索] 正在筛查 ${latestFacilities.length} 个独立设施的状态记录。当前位置:`,
           currentLocation
         );
 
@@ -678,7 +679,7 @@ ${JSON.stringify(actions)}
 
         if (matchedFacilities.length > 0) {
           console.log(
-            `[Memory Retrieval] Injecting ${matchedFacilities.length} facility memories.`
+            `[记忆检索] 正在注入 ${matchedFacilities.length} 条通过地点匹配到的设施记忆喵。`
           );
           result.push(
             ...matchedFacilities.map((m) => {
@@ -711,14 +712,14 @@ ${JSON.stringify(actions)}
         const searchResults = await dbService.searchMemories(saveSlotId, keywords);
         keywordMatches = searchResults.filter((m) => m.type === 'summary');
 
-        // --- PEDSA Graph Activation ---
+        // --- 启用基于 PEDSA 算法的图谱扩散激活机制 (Graph Activation)喵 ---
         try {
           await memoryGraph.ensureInitialized(saveSlotId);
 
           if (keywordMatches.length > 0) {
             const seedMap = new Map<number, number>();
             keywordMatches.forEach((m) => {
-              if (m.id) seedMap.set(m.id, 1.0); // Initial energy 1.0
+              if (m.id) seedMap.set(m.id, 1.0); // 设置扩散初始能量值为 1.0 喵
             });
 
             const activationResults = memoryGraph.spreadActivation(seedMap);
@@ -741,7 +742,7 @@ ${JSON.stringify(actions)}
 
             if (topActivatedIds.length > 0) {
               console.log(
-                `[MemoryGraph] Found ${topActivatedIds.length} associated memories via spreading activation.`
+                `[记忆图谱] 通过扩散激活算法发现了 ${topActivatedIds.length} 条关联记忆喵。`
               );
               graphMatches = await dbService.getMemoriesByIds(topActivatedIds);
             }
@@ -784,7 +785,7 @@ ${JSON.stringify(actions)}
             })
           );
         } else {
-          // 兜底方案：单纯的关键词匹配打分 + 线性时间衰减修正 (Keyword Search + Time Decay)
+          // 兜底方案：单纯的关键词匹配打分 + 线性时间衰减修正 (关键词搜索 + 时间衰减检索机制)喵
           const scoredCandidates = summaryCandidates.map((m) => ({
             memory: m,
             score: this.calculateRelevanceScore(m, keywords, currentTurnCount)

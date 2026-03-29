@@ -281,7 +281,7 @@ const handleJoinRoom = async () => {
         isMe: true
       };
 
-      // Local preview update, waiting for real sync
+      // 本地预览状态更新，等待真实的网络同步指令喵 (Wait for sync)
       gameStore.updatePlayers([
         { id: 'host', name: '房主', identity: '房主', isHost: true, isMe: false },
         {
@@ -334,7 +334,7 @@ const handleCreateRoom = async () => {
     );
     gameStore.setRoomInfo(newRoomId, passwordInput.value, roomNameInput.value || newRoomId);
 
-    // Local preview update
+    // 本地即时预览状态更新喵 (Local update)
     gameStore.updatePlayers([
       {
         id: multiplayerService.identityKey,
@@ -382,10 +382,10 @@ const copyRoomId = () => {
     <div
       class="bg-izakaya-paper w-full max-w-lg rounded-xl shadow-paper flex flex-col max-h-[90vh] border border-izakaya-wood/10 relative overflow-hidden"
     >
-      <!-- Texture -->
+      <!-- 东方风格蒙层纹理 (Texture Overlay) 喵 -->
       <div class="absolute inset-0 pointer-events-none opacity-10 bg-texture-rice-paper"></div>
 
-      <!-- Header -->
+      <!-- 联机面板顶部标题栏 (Header Area) 喵 -->
       <div
         class="flex items-center justify-between p-4 border-b border-izakaya-wood/10 bg-white/40 relative z-10"
       >
@@ -401,9 +401,9 @@ const copyRoomId = () => {
         </button>
       </div>
 
-      <!-- Content -->
+      <!-- 系统核心交互内容容器 (Content Body) 喵 -->
       <div class="flex-1 overflow-hidden flex relative z-10">
-        <!-- TOS Overlay -->
+        <!-- 用户服务协议/风险告知层 (TOS Overlay) 喵 -->
         <div
           v-if="!hasAgreedToTos"
           class="absolute inset-0 z-[100] bg-izakaya-paper flex flex-col animate-fade-in"
@@ -473,7 +473,7 @@ const copyRoomId = () => {
           </div>
         </div>
 
-        <!-- Sidebar Navigation -->
+        <!-- 功能模块侧边导航切换区 (Sidebar Nav) 喵 -->
         <div
           class="w-16 border-r border-izakaya-wood/10 bg-izakaya-wood/5 flex flex-col items-center py-4 gap-4"
         >
@@ -512,14 +512,14 @@ const copyRoomId = () => {
           </button>
         </div>
 
-        <!-- Main Content Area -->
+        <!-- 核心业务逻辑承载区 (Main Tab Content) 喵 -->
         <div class="flex-1 flex flex-col overflow-hidden bg-white/30">
-          <!-- Lobby Tab -->
+          <!-- 联机大厅面层：搜寻与创建房间 (Lobby Tab) 喵 -->
           <div
             v-if="activeTab === 'lobby'"
             class="flex-1 flex flex-col overflow-hidden animate-fade-in"
           >
-            <!-- Server Selector -->
+            <!-- 服务器线路选择与连接管理区 (Relay Server Selector) 喵 -->
             <div class="p-4 border-b border-izakaya-wood/10 bg-white/40">
               <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-2">
@@ -589,7 +589,7 @@ const copyRoomId = () => {
               </div>
             </div>
 
-            <!-- Lobby Sub-Tabs -->
+            <!-- 大厅精细化子选项卡 (Join/Create Tabs) 喵 -->
             <div
               v-if="!gameStore.multiplayer.isMultiplayer"
               class="flex-1 flex flex-col overflow-hidden p-4"
@@ -623,7 +623,7 @@ const copyRoomId = () => {
                   ]"
                 >
                   创建房间
-                  <!-- Tooltip for disabled state -->
+                  <!-- 创建按钮禁用状态下的浮动说明 (Disabled Tooltip) 喵 -->
                   <div
                     v-if="!isCurrentSaveMultiplayer"
                     class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-black/80 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity"
@@ -633,7 +633,7 @@ const copyRoomId = () => {
                 </button>
               </div>
 
-              <!-- Public Room List -->
+              <!-- 公开可存取房间列表 (Public Room View) 喵 -->
               <div
                 v-if="lobbySubTab === 'join'"
                 class="flex-1 flex flex-col overflow-hidden space-y-3"
@@ -650,7 +650,7 @@ const copyRoomId = () => {
                 </div>
 
                 <div class="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1">
-                  <!-- Loading State -->
+                  <!-- 列表骨架屏/加载中动态指示器 (Loading State) 喵 -->
                   <div
                     v-if="isFetchingRooms"
                     class="flex flex-col items-center justify-center py-12 opacity-40"
@@ -659,7 +659,7 @@ const copyRoomId = () => {
                     <span class="text-xs font-bold text-izakaya-wood">正在同步大厅列表...</span>
                   </div>
 
-                  <!-- Empty State -->
+                  <!-- 暂无有效连接的空状态占位 (Empty State) 喵 -->
                   <div
                     v-else-if="publicRooms.length === 0"
                     class="flex flex-col items-center justify-center py-12 bg-white/40 border border-dashed border-izakaya-wood/10 rounded-2xl"
@@ -669,7 +669,7 @@ const copyRoomId = () => {
                     <p class="text-[10px] text-izakaya-wood/20 mt-1">您可以尝试创建自己的房间</p>
                   </div>
 
-                  <!-- Room Cards -->
+                  <!-- 详细房间属性卡片 (Room Context Cards) 喵 -->
                   <div
                     v-else
                     v-for="room in publicRooms"
@@ -739,7 +739,7 @@ const copyRoomId = () => {
                 </div>
               </div>
 
-              <!-- Create Panel (Internalized) -->
+              <!-- 启动联机房间配置面板 (Create Room Form) 喵 -->
               <div v-if="lobbySubTab === 'create'" class="space-y-4 animate-fade-in">
                 <div class="p-4 bg-white border border-izakaya-wood/10 rounded-2xl space-y-4">
                   <div class="space-y-2">
@@ -786,12 +786,12 @@ const copyRoomId = () => {
               </div>
             </div>
 
-            <!-- Connected View (Minimalist Lobby) -->
+            <!-- 已接入联机网络后的预览视图 (Connected Mini-Lobby) 喵 -->
             <div
               v-if="gameStore.multiplayer.isMultiplayer"
               class="flex-1 flex flex-col p-6 overflow-hidden animate-fade-in relative"
             >
-              <!-- Background Decor -->
+              <!-- 面板背景氛围装饰物喵 (Decorations) -->
               <div class="absolute inset-0 pointer-events-none opacity-5">
                 <div
                   class="absolute top-10 left-10 w-32 h-32 bg-touhou-red rounded-full filter blur-3xl"
@@ -801,7 +801,7 @@ const copyRoomId = () => {
                 ></div>
               </div>
 
-              <!-- Connection Status -->
+              <!-- 当前网络连接健康度监控 (Connection Health Status) 喵 -->
               <div class="mb-6 relative z-10">
                 <div
                   class="p-5 bg-white/80 backdrop-blur-md border border-green-200/50 rounded-2xl shadow-lg relative overflow-hidden group"
@@ -862,7 +862,7 @@ const copyRoomId = () => {
                 </div>
               </div>
 
-              <!-- Quick Stats -->
+              <!-- 房间关键运行指标概览 (Key Stats) 喵 -->
               <div class="grid grid-cols-2 gap-4 mb-6 relative z-10">
                 <div
                   class="p-4 bg-white/60 border border-izakaya-wood/10 rounded-2xl shadow-sm hover:shadow-md transition-shadow"
@@ -911,7 +911,7 @@ const copyRoomId = () => {
             </div>
           </div>
 
-          <!-- Profile Tab -->
+          <!-- 访客身份设定面层：人设与秘钥管理 (Profile Tab) 喵 -->
           <div
             v-if="activeTab === 'profile'"
             class="flex-1 flex flex-col p-6 overflow-hidden animate-fade-in"
@@ -927,7 +927,7 @@ const copyRoomId = () => {
             </div>
 
             <div class="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-6">
-              <!-- Current Profile Card -->
+              <!-- 当前已生效的角色状态预览卡片 (Current Active Profile) 喵 -->
               <div
                 class="p-6 bg-white border border-izakaya-wood/10 rounded-2xl shadow-sm relative overflow-hidden group"
               >
@@ -983,7 +983,7 @@ const copyRoomId = () => {
                 </div>
               </div>
 
-              <!-- Identity Key Management -->
+              <!-- 全球身份持久化秘钥管理区 (Identity Key Storage) 喵 -->
               <div
                 class="p-5 bg-izakaya-wood/5 border border-izakaya-wood/10 rounded-2xl space-y-4"
               >
@@ -1051,7 +1051,7 @@ const copyRoomId = () => {
             </div>
           </div>
 
-          <!-- Room Tab -->
+          <!-- 实时房间成员及其状态监控面板 (Room Members Tab) 喵 -->
           <div
             v-if="activeTab === 'room'"
             class="flex-1 flex flex-col p-6 overflow-hidden animate-fade-in"
@@ -1135,7 +1135,7 @@ const copyRoomId = () => {
               </div>
             </div>
 
-            <!-- Quick Tip -->
+            <!-- 联机交互机制快捷提示 (Interactions Tip) 喵 -->
             <div
               class="mt-6 p-4 bg-blue-50/50 border border-blue-100 rounded-2xl flex gap-3 items-start"
             >
@@ -1151,7 +1151,7 @@ const copyRoomId = () => {
             </div>
           </div>
 
-          <!-- Settings Tab -->
+          <!-- 联机系统高级参数配置 (Technical Settings) 喵 -->
           <div
             v-if="activeTab === 'settings'"
             class="flex-1 flex flex-col p-6 overflow-hidden animate-fade-in"

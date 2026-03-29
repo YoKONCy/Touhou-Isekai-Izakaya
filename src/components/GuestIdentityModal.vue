@@ -45,7 +45,7 @@ const formData = ref({
   money: 500
 });
 
-// Initialize form data when opened
+// 当模态框开启时同步注入初始表单数据喵 (Init context)
 watch(
   () => props.isOpen,
   (newVal) => {
@@ -91,13 +91,10 @@ const handleSelectPreset = (preset: any) => {
   }
   formData.value.persona = personaDesc;
 
-  // Don't overwrite name if user has set one, unless it's empty
-  if (!formData.value.name) {
-    // formData.value.name = '玩家'; // Maybe don't set a default name from preset as they are generic
-  }
-
+  // 提示：此处不建议从预设中强制覆盖玩家显示名称，以保持身份识别的连贯性喵 (Keep name stable)
+  
   audioManager.playClick();
-  activeTab.value = 'custom'; // Switch back to custom tab to review
+  activeTab.value = 'custom'; // 切回自定义标签页以供查看
 };
 
 const RANKS = [
@@ -134,12 +131,12 @@ const RANKS = [
     <div
       class="bg-izakaya-paper w-full max-w-2xl rounded-xl shadow-2xl flex flex-col max-h-[90vh] border border-izakaya-wood/20 relative overflow-hidden"
     >
-      <!-- Texture -->
+      <!-- 东方风格蒙层纹理 (Texture Overlay) 喵 -->
       <div
         class="absolute inset-0 pointer-events-none opacity-20 bg-texture-rice-paper mix-blend-multiply"
       ></div>
 
-      <!-- Header -->
+      <!-- 模态框顶部状态栏 (Header) 喵 -->
       <div
         class="flex items-center justify-between p-4 border-b border-izakaya-wood/10 bg-white/40 relative z-10"
       >
@@ -155,7 +152,7 @@ const RANKS = [
         </button>
       </div>
 
-      <!-- Tabs -->
+      <!-- 选项卡导航区 (Tabs Section) 喵 -->
       <div class="flex border-b border-izakaya-wood/10 bg-white/20 relative z-10">
         <button
           @click="
@@ -197,9 +194,8 @@ const RANKS = [
         </button>
       </div>
 
-      <!-- Content -->
       <div class="flex-1 overflow-y-auto custom-scrollbar p-6 bg-white/30 relative z-10">
-        <!-- Custom Tab -->
+        <!-- 自定义身份详情面层 (Custom Detail Tab) 喵 -->
         <div v-if="activeTab === 'custom'" class="space-y-5 animate-fade-in">
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
@@ -299,7 +295,7 @@ const RANKS = [
           </div>
         </div>
 
-        <!-- Preset Tab -->
+        <!-- 身份预设模板面层 (Preset Templates Tab) 喵 -->
         <div
           v-if="activeTab === 'preset'"
           class="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in"
@@ -341,7 +337,7 @@ const RANKS = [
         </div>
       </div>
 
-      <!-- Footer -->
+      <!-- 对话框确认/取消操作区 (Footer Actions) 喵 -->
       <div
         class="p-4 border-t border-izakaya-wood/10 bg-white/40 flex justify-end gap-3 relative z-10"
       >

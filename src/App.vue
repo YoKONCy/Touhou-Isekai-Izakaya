@@ -36,7 +36,8 @@ import {
   HelpCircle,
   History,
   Gavel,
-  Network
+  Network,
+  Github
 } from 'lucide-vue-next';
 import PromptBuilder from '@/components/PromptBuilder.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
@@ -770,6 +771,18 @@ const mpAllReady = computed(() => {
             class="px-1 md:px-1.5 py-0.5 text-[8px] md:text-[10px] font-bold text-white bg-touhou-red rounded-sm uppercase tracking-wider shadow-sm transform translate-y-0.5"
             >beta</span
           >
+          <a
+            href="https://github.com/YoKONCy/Touhou-Isekai-Izakaya"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="ml-2 md:ml-4 text-izakaya-wood/60 hover:text-touhou-red transition-all duration-300 hover:scale-[1.02] flex items-end justify-center p-1.5 px-2 rounded-lg hover:bg-touhou-red/10 group"
+            title="访问开源仓库"
+          >
+            <div class="relative flex items-end">
+              <Github class="w-4 h-4 md:w-5 md:h-5 drop-shadow-sm" />
+              <span class="text-[9px] md:text-[10px] font-bold font-mono leading-none ml-1 mb-[-2px] opacity-80 group-hover:opacity-100 tracking-tighter">GitHub</span>
+            </div>
+          </a>
         </div>
       </div>
 

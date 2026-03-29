@@ -33,10 +33,10 @@ const toastStore = useToastStore();
 const showDebug = ref(false);
 const isEditing = ref(false);
 const isRegenerating = ref(false);
-const editContent = ref('');
-const showActionMenu = ref(false);
-const closeMenuTimer = ref<number | null>(null);
-const isTouchDevice = ref(false);
+const editContent = ref(''); // 文本编辑区的暂存内容 喵
+const showActionMenu = ref(false); // 是否磁吸展示操作菜单 喵
+const closeMenuTimer = ref<number | null>(null); // 用于延迟平滑关闭菜单的计时器 喵
+const isTouchDevice = ref(false); // 嗅探当前是否为触摸屏设备 喵
 
 // 调试面板展开状态
 const expandedSections = ref({
@@ -48,15 +48,15 @@ const expandedSections = ref({
 
 function toggleSection(section: keyof typeof expandedSections.value) {
   console.log(
-    '[ChatBubble] Toggling section:',
+    '[聊天气泡] 正在切换折叠面板喵:',
     section,
-    'Current state:',
+    '当前状态:',
     expandedSections.value[section]
   );
   expandedSections.value[section] = !expandedSections.value[section];
 }
 
-// 获取思维链内容，优先使用逻辑模型 (LLM2) 的 debugLog
+// 获取思维链内容，优先使用逻辑模型 (LLM2) 的 debugLog 喵
 const logicThinkingContent = computed(() => {
   return props.message.debugLog?.logicThinking || props.message.thought_content || '';
 });
@@ -107,6 +107,7 @@ const renderedContent = computed(() => {
 });
 
 const hasDebugLog = computed(() => {
+  // 判断当前消息是否挂载了调试日志或原始思维链 喵
   const hasLog = !!props.message.debugLog || !!props.message.thought_content;
   return hasLog;
 });
@@ -338,7 +339,7 @@ async function handleRegenerateMemory() {
           >
             <span class="flex items-center gap-2 font-bold text-gray-400">
               <Terminal class="w-3 h-3" />
-              调试信息 (Debug Info)
+              后台演算详情 (Debug Info) 喵
             </span>
             <button
               @click="showDebug = false"
@@ -350,7 +351,7 @@ async function handleRegenerateMemory() {
 
           <div class="p-3 overflow-x-auto custom-scrollbar max-h-[400px]">
             <div v-if="hasDebugLog" class="space-y-4">
-              <!-- Logic Input -->
+              <!-- 逻辑引擎输入上下文 (Logic Input) 喵 -->
               <div class="group/debug-section">
                 <div
                   @click="toggleSection('input')"
@@ -368,7 +369,7 @@ async function handleRegenerateMemory() {
                 >
               </div>
 
-              <!-- Logic Thinking (CoT) -->
+              <!-- 逻辑引擎思维链演算过程 (Logic Thinking - CoT) 喵 -->
               <div class="group/debug-section">
                 <div
                   @click="toggleSection('thinking')"
@@ -387,7 +388,7 @@ async function handleRegenerateMemory() {
                 </div>
               </div>
 
-              <!-- Logic Output -->
+              <!-- 逻辑引擎结构化输出结果 (Logic Output) 喵 -->
               <div class="group/debug-section">
                 <div
                   @click="toggleSection('output')"
@@ -405,7 +406,7 @@ async function handleRegenerateMemory() {
                 >
               </div>
 
-              <!-- Illustration Prompt -->
+              <!-- 绘图引擎生成的描述词记录 (Illustration Prompt) 喵 -->
               <div v-if="message.illustrationPrompt" class="group/debug-section">
                 <div
                   @click="toggleSection('illustration')"
@@ -433,7 +434,7 @@ async function handleRegenerateMemory() {
         </div>
       </div>
 
-      <!-- Actions -->
+      <!-- 消息操作按钮喵 (Actions) -->
       <div
         v-if="!isEditing"
         class="absolute top-0 transition-opacity duration-200 z-20"
@@ -444,9 +445,9 @@ async function handleRegenerateMemory() {
         @mouseenter="handleMouseEnterMenu"
         @mouseleave="handleMouseLeaveMenu"
       >
-        <!-- Action Menu Container -->
+        <!-- 菜单容器喵 (Action Menu Container) -->
         <div class="relative">
-          <!-- Menu Toggle Button -->
+          <!-- 菜单切换按钮喵 (Menu Toggle Button) -->
           <button
             @click.stop="toggleActionMenu"
             class="p-1.5 bg-white/80 backdrop-blur rounded-full shadow-sm border border-izakaya-wood/10 hover:bg-white hover:border-touhou-red/30 transition-all text-izakaya-wood/60 hover:text-touhou-red"
@@ -454,7 +455,7 @@ async function handleRegenerateMemory() {
             <MoreVertical class="w-4 h-4" />
           </button>
 
-          <!-- Dropdown Menu -->
+          <!-- 下拉菜单内容喵 (Dropdown Menu) -->
           <div
             class="absolute top-full mt-2 glass-paper rounded-lg py-1 min-w-[140px] z-50 transition-all duration-200 shadow-paper border border-izakaya-wood/10"
             :class="[
@@ -464,13 +465,13 @@ async function handleRegenerateMemory() {
               isUser ? 'left-0' : 'right-0'
             ]"
           >
-            <!-- Texture -->
+            <!-- 纸纹装饰喵 (Texture) -->
             <div
               class="absolute inset-0 pointer-events-none opacity-20 bg-texture-rice-paper rounded-lg"
             ></div>
 
             <div class="relative z-10">
-              <!-- Common Actions -->
+              <!-- 通用操作喵 (Common Actions) -->
               <button
                 @click.stop="handleCopy"
                 class="w-full px-3 py-2 text-sm text-left hover:bg-touhou-red/5 flex items-center gap-2 text-izakaya-wood transition-colors group/item"
@@ -487,7 +488,7 @@ async function handleRegenerateMemory() {
                 <span>编辑内容</span>
               </button>
 
-              <!-- Assistant Specific -->
+              <!-- 助手专属操作喵 (Assistant Specific) -->
               <template v-if="!isUser && !isSystem">
                 <button
                   @click.stop="showDebug = !showDebug"
@@ -521,10 +522,10 @@ async function handleRegenerateMemory() {
                 </button>
               </template>
 
-              <!-- Divider -->
+              <!-- 分隔线喵 (Divider) -->
               <div class="border-t border-izakaya-wood/10 my-1 mx-2"></div>
 
-              <!-- Delete -->
+              <!-- 删除选项喵 (Delete) -->
               <button
                 @click.stop="handleDelete"
                 class="w-full px-3 py-2 text-sm text-left hover:bg-red-50 flex items-center gap-2 text-red-600 transition-colors group/item"

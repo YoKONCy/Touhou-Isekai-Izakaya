@@ -1,7 +1,7 @@
 <template>
-  <!-- Effect Overlay Layer -->
+  <!-- 战斗特效图层 (Effect Overlay Layer) -->
   <div class="absolute inset-0 z-[60] pointer-events-none">
-    <!-- 1. Point-based Effects (Slash / Enemy Hit / Talk / Hit / Single Spell) -->
+    <!-- 1. 基于坐标点的局部音效与视觉反馈 (斩击 / 敌方受击 / 嘴遁 / 普攻 / 单体符卡) -->
     <div
       v-if="
         activeEffect.show &&
@@ -10,7 +10,7 @@
       class="absolute z-[60] pointer-events-none flex items-center justify-center"
       :style="{ left: activeEffect.x + 'px', top: activeEffect.y + 'px' }"
     >
-      <!-- Single Spell Effect (Focused Beam) -->
+      <!-- 单体符卡特效：聚焦光束 (Focused Beam) -->
       <div
         v-if="activeEffect.type === 'spell_single'"
         class="relative flex items-center justify-center"
@@ -26,7 +26,7 @@
         ></div>
       </div>
 
-      <!-- Slash Effect (Combo) -->
+      <!-- 斩击连段特效 (Combo Slash) -->
       <div v-if="activeEffect.type === 'slash'" class="relative w-[300px] h-[300px]">
         <div
           class="absolute inset-0 bg-white clip-shard-diag-1 animate-slash-combo-1 mix-blend-overlay"
@@ -39,30 +39,29 @@
         ></div>
       </div>
 
-      <!-- Enemy Hit Effect (Spark) - P5 Style -->
+      <!-- 敌方受击/连击火花 (Spark) - P5 (Persona 5) 风格实现 -->
       <div
         v-if="activeEffect.type === 'enemy' || activeEffect.type === 'hit'"
         class="w-[300px] h-[300px] flex items-center justify-center"
       >
-        <!-- 1. Background Black/Red Flash -->
         <div
           class="absolute w-[120%] h-[120%] bg-black clip-starburst animate-flash-fade opacity-80"
         ></div>
-        <!-- 2. Core Yellow Spark -->
+        <!-- 核心黄色火花层 (Core Yellow Spark) -->
         <div
           class="absolute w-full h-full bg-yellow-300 clip-starburst animate-hit-spark mix-blend-screen drop-shadow-[0_0_10px_rgba(255,255,0,0.8)]"
         ></div>
-        <!-- 3. Red Inner jagged -->
+        <!-- 内部红色锯齿切口层 (Red Inner jagged) -->
         <div
           class="absolute w-[80%] h-[80%] bg-red-600 clip-jagged-slash-2 animate-hit-spark mix-blend-multiply delay-75"
         ></div>
-        <!-- 4. Expanding Ring (Jagged) -->
+        <!-- 外扩冲击波圆环 (Expanding Ring) -->
         <div
           class="absolute w-[150%] h-[150%] border-[10px] border-white clip-starburst animate-ping-slow opacity-80"
         ></div>
       </div>
 
-      <!-- Talk Effect (Word Projectile) -->
+      <!-- 嘴遁/言语说服特效 (Word Projectile) -->
       <div
         v-if="activeEffect.type === 'talk'"
         class="relative flex items-center justify-center w-[800px] pointer-events-none"
@@ -75,15 +74,15 @@
       </div>
     </div>
 
-    <!-- 2. Fullscreen Spell Effect (Magic Circle) -->
+    <!-- 2. 全屏符卡覆盖特效 (Magic Circle / 魔法阵) -->
     <div
       v-if="activeEffect.show && activeEffect.type === 'spell_aoe'"
       class="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none overflow-hidden"
     >
-      <!-- Background Dim & Flash -->
+      <!-- 背景变暗与瞬间闪白 (Background Dim & Flash) -->
       <div class="absolute inset-0 bg-black/40 animate-fade-in-fast backdrop-blur-[2px]"></div>
 
-      <!-- Magic Circle Container -->
+      <!-- 核心魔法阵容器 (Magic Circle Container) -->
       <div
         class="relative w-[min(90vw,90vh)] h-[min(90vw,90vh)] flex items-center justify-center animate-scale-in-elastic"
       >
@@ -142,7 +141,7 @@
           <div class="absolute inset-0 border-t-[8px] border-t-purple-600 rounded-full"></div>
         </div>
 
-        <!-- Layer 4: Central Energy Blast -->
+        <!-- 核心能量爆发层 (Central Energy Blast) -->
         <div
           class="absolute w-[10%] h-[10%] bg-white rounded-full animate-pulse shadow-[0_0_80px_#fff,0_0_120px_#a855f7]"
         ></div>
@@ -170,7 +169,7 @@
       ></div>
     </div>
 
-    <!-- 3. AOE Hit Effect (Massive Explosion) -->
+    <!-- 3. 全场 AOE 命中特效 (Massive Explosion / 巨型爆炸) -->
     <div
       v-if="activeEffect.show && activeEffect.type === 'hit_aoe'"
       class="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none"
@@ -180,7 +179,7 @@
         class="absolute inset-0 bg-red-600 opacity-20 animate-flash-fade mix-blend-overlay"
       ></div>
 
-      <!-- 1. Expanding Shockwave Ring -->
+      <!-- 1. 极速扩张的冲击波圆环 (Expanding Shockwave Ring) -->
       <div
         class="absolute w-[120vw] h-[120vw] border-[100px] border-white/80 rounded-full animate-shockwave opacity-80 mix-blend-screen"
       ></div>
@@ -210,7 +209,7 @@
       <div class="absolute inset-0 bg-white opacity-60 animate-flash-out mix-blend-screen"></div>
     </div>
 
-    <!-- 4. Ultimate Impact (Fullscreen Beam) -->
+    <!-- 4. 终极奥义冲击 (Ultimate Impact / 全屏光束) -->
     <div
       v-if="activeEffect.show && activeEffect.type === 'ultimate_impact'"
       class="fixed inset-0 z-[250] flex items-center justify-center pointer-events-none overflow-hidden"
@@ -263,8 +262,20 @@ defineProps<{
 .clip-shard-diag-2 {
   clip-path: polygon(100% 0, 0 0, 100% 100%);
 }
+.clip-rect-left { 
+  clip-path: polygon(10% 0, 100% 0, 100% 100%, 0% 100%); 
+}
 .clip-triangle {
   clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+}
+.clip-starburst { 
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); 
+}
+.clip-jagged-slash-1 { 
+  clip-path: polygon(0% 20%, 20% 0%, 100% 40%, 90% 100%, 0% 80%); 
+} 
+.clip-jagged-slash-2 { 
+  clip-path: polygon(20% 0%, 80% 0%, 100% 80%, 40% 100%, 0% 20%); 
 }
 
 .animate-spin-slow {
@@ -291,6 +302,14 @@ defineProps<{
 .animate-slash {
   animation: slash 0.3s ease-out forwards;
 }
+.animate-slash-combo-1 { animation: slashCombo1 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-slash-combo-2 { animation: slashCombo2 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards; }
+.animate-slash-combo-3 { animation: slashCombo3 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s forwards; }
+
+.animate-word-projectile { animation: wordProjectile 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-beam-expand { animation: beamExpand 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+.animate-screen-shatter { animation: screenShatter 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+.animate-hit-spark { animation: hitSpark 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
 @keyframes shockwave {
   0% {
@@ -374,5 +393,49 @@ defineProps<{
     transform: scale(1) rotate(45deg);
     opacity: 0;
   }
+}
+
+@keyframes slashCombo1 {
+  0% { transform: scale(0) rotate(20deg) translate(-50px, -50px); opacity: 0; }
+  30% { transform: scale(1.5) rotate(20deg) translate(0, 0); opacity: 1; }
+  100% { transform: scale(1.2) rotate(20deg) translate(20px, 20px); opacity: 0; }
+}
+@keyframes slashCombo2 {
+  0% { transform: scale(0) rotate(-20deg) translate(50px, -50px); opacity: 0; }
+  30% { transform: scale(1.5) rotate(-20deg) translate(0, 0); opacity: 1; }
+  100% { transform: scale(1.2) rotate(-20deg) translate(-20px, 20px); opacity: 0; }
+}
+@keyframes slashCombo3 {
+  0% { transform: scale(0) rotate(0deg); opacity: 0; }
+  40% { transform: scale(1.5) rotate(180deg); opacity: 1; }
+  100% { transform: scale(2) rotate(180deg); opacity: 0; }
+}
+
+@keyframes wordProjectile {
+  0% { transform: translateX(-100vw) scale(0.5) rotate(-10deg); opacity: 0; filter: blur(10px); }
+  60% { transform: translateX(0) scale(1.2) rotate(0deg); opacity: 1; filter: blur(0); }
+  80% { transform: translateX(20px) scale(1) rotate(5deg); }
+  100% { transform: translateX(0) scale(1) rotate(0deg); opacity: 0; }
+}
+
+@keyframes beamExpand {
+  0% { transform: scaleX(0); opacity: 0; }
+  10% { transform: scaleX(0.1); opacity: 1; background: white; }
+  30% { transform: scaleX(1.5); background: yellow; }
+  100% { transform: scaleX(2); opacity: 0; }
+}
+
+@keyframes screenShatter {
+  0% { transform: translate(0, 0) rotate(0); filter: hue-rotate(0deg); }
+  25% { transform: translate(-20px, 20px) rotate(-2deg); filter: hue-rotate(90deg) invert(1); }
+  50% { transform: translate(20px, -20px) rotate(2deg); filter: hue-rotate(180deg) invert(0); }
+  75% { transform: translate(-10px, -10px) rotate(-1deg); filter: hue-rotate(270deg) invert(1); }
+  100% { transform: translate(0, 0) rotate(0); filter: hue-rotate(0deg) invert(0); }
+}
+
+@keyframes hitSpark {
+  0% { transform: scale(0.2) rotate(0deg); opacity: 1; }
+  30% { transform: scale(1.8) rotate(45deg); opacity: 1; }
+  100% { transform: scale(1.5) rotate(45deg); opacity: 0; }
 }
 </style>

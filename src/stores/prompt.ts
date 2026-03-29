@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-// import { db } from '@/db'; // TODO: Add prompt order to DB if needed, for now using local storage or memory
+// import { db } from '@/db'; // TODO: 如果需要，可以把 Prompt 顺序存入数据库，目前使用本地存储或内存。喵~
 
 export interface PromptOption {
   id: string;
@@ -13,12 +13,12 @@ export interface PromptBlock {
   name: string;
   description: string;
   enabled: boolean;
-  configurable: boolean; // Whether content can be edited
-  content?: string; // Custom content for configurable blocks
-  metadata?: Record<string, any>; // Extra data (e.g. playerName for user_persona)
+  configurable: boolean; // 区块内容是否可编辑
+  content?: string; // 可自定编辑的区块内容
+  metadata?: Record<string, any>; // 额外元数据 (如玩家姓名等)
   role: 'system' | 'user' | 'assistant';
-  options?: PromptOption[]; // For blocks with multiple selectable options
-  selectedOptionId?: string; // Currently selected option ID
+  options?: PromptOption[]; // 包含多个可选子项的区块
+  selectedOptionId?: string; // 当前选中的子项 ID
 }
 
 const SYSTEM_ROOT_BASE = `<log>
@@ -350,7 +350,7 @@ const DEFAULT_BLOCKS: PromptBlock[] = [
     name: '叙事人称',
     description: '选择游戏叙事的视角（第一/第二/第三人称）。',
     enabled: true,
-    configurable: false, // The block itself isn't editable text, but has options
+    configurable: false, // 该区块不可直接编辑，但可以通过选项切换内容
     role: 'system',
     selectedOptionId: 'second_person',
     options: [
@@ -804,7 +804,7 @@ const DEFAULT_BLOCKS: PromptBlock[] = [
     "可能光顾的特殊NPC名1",
     "可能光顾的特殊NPC名2"
   ],
-  "difficulty": "normal" // easy | normal | hard
+  "difficulty": "normal" // 难度等级：easy | normal | hard
 }
 </management_trigger>
 </management_trigger_protocol>
@@ -1051,19 +1051,19 @@ export const COMBAT_NARRATOR_PROMPT = `
 export const usePromptStore = defineStore('prompt', () => {
   const blocks = ref<PromptBlock[]>(JSON.parse(JSON.stringify(DEFAULT_BLOCKS)));
 
-  // Load from LocalStorage for persistence (simple solution for now)
+  // 从本地存储读取持久化配置 (目前采用 LocalStorage 方案)喵~
   function load() {
     const saved = localStorage.getItem('prompt_blocks');
     if (saved) {
       try {
         const parsed: PromptBlock[] = JSON.parse(saved);
 
-        // Merge strategy:
-        // 1. Keep the order from 'parsed' (user's saved order)
-        // 2. Add any new blocks from DEFAULT_BLOCKS that are missing in 'parsed'
-        // 3. Update metadata (configurable, name, description) from DEFAULT_BLOCKS
-        // 4. Keep user's 'enabled' and 'content' (if content exists)
-        // 5. Update 'options' from DEFAULT_BLOCKS (so we can update option content via code), but keep 'selectedOptionId'
+        // 合并策略：
+        // 1. 保留用户的自定义排序 (来自存档)
+        // 2. 补全代码中新增但在存档中缺失的区块
+        // 3. 强制更新元数据 (如描述和编辑权限，以代码最新定义为准)
+        // 4. 保留用户的启用状态和自定义内容
+        // 5. 更新预设选项内容（允许通过代码更新文案），但保留选中的 ID
 
         const mergedBlocks: PromptBlock[] = [];
         const parsedIds = new Set(parsed.map((b) => b.id));
@@ -1072,41 +1072,40 @@ export const usePromptStore = defineStore('prompt', () => {
         for (const savedBlock of parsed) {
           const defaultBlock = DEFAULT_BLOCKS.find((b) => b.id === savedBlock.id);
           if (defaultBlock) {
-            // Exist in current code: Update metadata, keep user state
+            // 本地代码库中存在该区块：更新元数据，保留用户偏好状态
 
             // Merge options if they exist
             let mergedOptions = defaultBlock.options ? [...defaultBlock.options] : undefined;
             if (savedBlock.options && mergedOptions) {
-              // Update default options with saved content/name (to keep user edits)
+              // 用存档中的自定义内容/名称覆盖默认项 (保留用户对选项的编辑)
               mergedOptions = mergedOptions.map((opt) => {
                 const savedOpt = savedBlock.options!.find((o) => o.id === opt.id);
                 return savedOpt ? { ...opt, ...savedOpt } : opt;
               });
 
-              // Add custom options that don't exist in DEFAULT_BLOCKS
+              // 追加代码预设库中不存在的自定义选项子项
               const defaultOptionIds = new Set(defaultBlock.options!.map((o) => o.id));
               const customOptions = savedBlock.options.filter((o) => !defaultOptionIds.has(o.id));
               mergedOptions.push(...customOptions);
             }
 
             mergedBlocks.push({
-              ...defaultBlock, // Get latest metadata/options/content defaults
+              ...defaultBlock, // 获取最新的元数据/选项默认值
               enabled: savedBlock.enabled,
-              content: savedBlock.content ?? defaultBlock.content, // Use saved content if any, else default
-              metadata: { ...defaultBlock.metadata, ...savedBlock.metadata }, // Merge metadata
-              selectedOptionId: savedBlock.selectedOptionId ?? defaultBlock.selectedOptionId, // Keep selected option
+              content: savedBlock.content ?? defaultBlock.content, // 优先使用保存内容，无则回退至默认值
+              metadata: { ...defaultBlock.metadata, ...savedBlock.metadata }, // 合并元数据
+              selectedOptionId: savedBlock.selectedOptionId ?? defaultBlock.selectedOptionId, // 保留选定状态
               options: mergedOptions
             });
           } else {
-            // Deprecated block? Maybe keep it or drop it.
-            // For now, let's drop blocks that are no longer in DEFAULT_BLOCKS to avoid issues
+            // 已废弃的区块？目前选择直接丢弃以防造成逻辑冲突喵。
           }
         }
 
-        // 2. Add missing blocks (newly added features)
+        // 2. 补全缺失的区块 (新增的功能特性)
         // Insert them in specific positions relative to existing blocks if possible,
         // or just append to end (and let user reorder/reset).
-        // Since 'resetToDefault' exists, appending is safer than complex insertion logic here.
+        // 既然已经有“恢复默认值”按钮，采用“追加到末尾”策略比复杂的插入逻辑更安全稳健
         for (const defaultBlock of DEFAULT_BLOCKS) {
           if (!parsedIds.has(defaultBlock.id)) {
             mergedBlocks.push({ ...defaultBlock });
@@ -1115,8 +1114,8 @@ export const usePromptStore = defineStore('prompt', () => {
 
         blocks.value = mergedBlocks;
       } catch (e) {
-        console.error('Failed to load prompt blocks', e);
-        // Fallback to default
+        console.error('加载 Prompt 区块失败喵', e);
+        // 兜底方案：回退至全局默认配置库
         blocks.value = JSON.parse(JSON.stringify(DEFAULT_BLOCKS));
       }
     }
@@ -1193,7 +1192,7 @@ export const usePromptStore = defineStore('prompt', () => {
     save();
   }
 
-  // Auto-load on init
+  // 初始化时执行自动加载
   load();
 
   return {

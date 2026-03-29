@@ -24,7 +24,7 @@ type StartMode = 'preset' | 'custom';
 const mode = ref<StartMode>('preset');
 const isStoreStart = ref(false);
 
-// Custom Presets Management
+// 自定义开局预设持久化管理 (Custom Presets)
 const CUSTOM_ORIGINS_KEY = 'izakaya_custom_origins';
 const customOrigins = ref<any[]>([]);
 
@@ -110,7 +110,7 @@ const steps = computed(() => {
 const currentStepIdx = ref(0);
 const currentStep = computed(() => steps.value[currentStepIdx.value] || steps.value[0]!);
 
-// Form Data
+// 响应式表单状态存储 喵 (Reactive Form Data)
 const formData = reactive({
   difficulty: 'normal',
   name: '',
@@ -118,7 +118,7 @@ const formData = reactive({
   detailedSetting: '', // For detailed JSON-like setting
   originId: 'traveler',
   presetLocation: '博丽神社',
-  // Store Config
+  // 初始店铺经营配置 喵 (Store Config)
   store: {
     name: '',
     location: '人间之里',
@@ -128,7 +128,7 @@ const formData = reactive({
     staffBackstoryType: 'custom', // 'custom' | 'random'
     staffBackstory: ''
   },
-  // Custom stats
+  // 自定义开局的基础数值属性 喵 (RPG Stats)
   customStats: {
     money: 1000,
     hp: 100,
@@ -143,14 +143,14 @@ const formData = reactive({
   }
 });
 
-// Origins Configuration
+// 静态出身模板配置加载 喵 (Origins Config)
 const origins = PRESET_ORIGINS;
 
 const allOrigins = computed(() => [...origins, ...customOrigins.value]);
 
 const selectedOrigin = computed(() => allOrigins.value.find((o) => o.id === formData.originId)!);
 
-// Validation
+// 步骤合法性校验器喵
 const canProceed = computed(() => {
   if (currentStep.value.id === 'store_config') {
     return formData.store.name.trim().length > 0 && formData.store.description.trim().length > 0;
@@ -170,19 +170,17 @@ const canProceed = computed(() => {
     return formData.name.trim().length > 0;
   }
   if (currentStep.value.id === 'profile_custom') {
-    // Basic validation for custom profile
-    // Check if name is filled
+    // 针对完全自定义人设的严格校验逻辑 喵
+    // A. 校验姓名是否已填写喵
     if (formData.name.trim().length === 0) return false;
-    // Check if persona is filled
+    // B. 校验人设简述是否已填写喵
     if (formData.persona.trim().length === 0) return false;
-
-    // Check if detailedSetting is valid JSON (if filled)
-    // We allow empty string, but if filled, must be JSON
+    // C. 若填写了详细设定，则校验其是否符合标准的 JSON 格式语法喵
     if (formData.detailedSetting.trim().length > 0) {
       try {
         JSON.parse(formData.detailedSetting);
       } catch (e) {
-        return false; // Invalid JSON
+        return false; // 当前 JSON 语法有误喵
       }
     }
     return true;
@@ -214,7 +212,7 @@ function selectMode(m: StartMode) {
 function finish() {
   let finalStats: any = {};
 
-  // Construct initial message for store start
+  // 构造针对店铺开局模式的初始背景描述文本 喵 (Prompt Engineering)
   let initialMessage = '';
   if (isStoreStart.value) {
     initialMessage = `【店铺开局设定】
@@ -238,33 +236,24 @@ function finish() {
   if (mode.value === 'preset') {
     finalStats = {
       ...selectedOrigin.value.stats,
-      // Default mp/max_mp if not in origin stats (though we added them)
+      // 若预设模板中未显式定义灵力值，则回退至默认 100 喵 (Stat Fallbacks)
       max_hp: selectedOrigin.value.stats.hp,
       max_mp: (selectedOrigin.value.stats as any).mp || 100,
-      location: isStoreStart.value ? formData.store.location : formData.presetLocation // Override with selected location
+      location: isStoreStart.value ? formData.store.location : formData.presetLocation // 优先采用选定的出生地点喵
     };
 
-    // Combine origin setting with persona description if user added any
-    // If user added persona text, we can append it or just use the JSON as the main persona.
-    // The requirement says: "这些设定将会作为替换内容...自动替换掉占位符{{global_user_setting}}"
-    // And also "玩家人设" info needs to be synced.
-    // Let's store the JSON string in 'persona' field if it's a preset.
-    // If user added extra text, we can add it as a field "用户补充" inside the JSON or append it.
-
-    // Let's create a combined object
+    // 融合步骤：将预设背景的静态 JSON 与用户补充的动态人设进行深层合并 喵
     const finalPersonaObj = {
       ...(selectedOrigin.value as any).setting,
-      补充设定: formData.persona // User typed text
+      补充设定: formData.persona // 玩家手动补充的文字细节喵
     };
-
-    // If user typed nothing, remove that field
+    // 若补充内容为空，则剔除该辅助字段 喵
     if (!formData.persona.trim()) {
       delete finalPersonaObj['补充设定'];
     }
-
-    console.log('[NewGameWizard] Emitting complete (preset). isStoreStart:', isStoreStart.value);
-    console.log('[NewGameWizard] Store Description:', formData.store.description);
-    console.log('[NewGameWizard] Initial Message:', initialMessage);
+    console.log('[新游戏向导] 执行预设模式完成逻辑 喵. 店铺模式:', isStoreStart.value);
+    console.log('[新游戏向导] 店铺详细描述喵:', formData.store.description);
+    console.log('[新游戏向导] 初始剧情上下文喵:', initialMessage);
 
     emit('complete', {
       name: formData.name,
@@ -286,55 +275,25 @@ function finish() {
       finalStats.location = formData.store.location;
     }
 
-    // For custom mode, user types in 'detailedSetting' (JSON friendly)
-    // We should validate if it is valid JSON or just treat it as string.
-    // The user said: "我们可以在界面中，进行“json格式编写友好”的UI设计"
-    // For now, let's just assume formData.detailedSetting is the content.
-    // We need to implement the UI for this in the next step.
-
-    // In custom mode, 'persona' field in gameStore stores the detailedSetting JSON
-    // But we also have 'formData.persona' which is the text description.
-    // We need to decide where to store the text description.
-    // Previous logic was: persona: formData.detailedSetting || formData.persona
-
-    // But now we have BOTH.
-    // The PromptService uses 'player.persona' for {{global_user_setting}} injection if it's JSON?
-    // Wait, PromptService logic I wrote earlier:
-    // const userSetting = gameStore.state.player.persona || '无特殊设定';
-    // finalContent = finalContent.replace(/\{\{global_user_setting\}\}/g, userSetting);
-
-    // And for <user_persona>:
-    // if (p.persona && p.persona.trim()) { personaContent = ... p.persona ... }
-
-    // This creates a conflict. 'player.persona' is used for BOTH <user_persona> AND {{global_user_setting}}.
-    // If we store JSON in player.persona, then <user_persona> block will show raw JSON to LLM as persona description.
-    // This might be okay, but user wanted them separate.
-
-    // Ideally, we should update GameStore to have 'setting' field separate from 'persona'.
-    // BUT, I cannot change GameStore structure right now easily without migration.
-    // Let's stick to the pattern used in Preset Mode:
-    // Store JSON in 'persona', but include the text description INSIDE that JSON as a field.
-
+    // 在完全自定义模式下，用户直接操控 'detailedSetting' (JSON 友好输入) 喵
     let finalPersonaContent = formData.detailedSetting;
 
-    // If detailedSetting is empty, just use text persona
+    // A. 容错逻辑：若详细 JSON 为空，则回退采用基础文字人设 喵
     if (!finalPersonaContent.trim()) {
       finalPersonaContent = formData.persona;
     } else {
-      // If both exist, try to merge text persona into JSON
+      // B. 融合逻辑：尝试将散装的文字人设注入到 JSON 对象树中 喵
       try {
         const obj = JSON.parse(finalPersonaContent);
         obj['详细人设'] = formData.persona;
         finalPersonaContent = JSON.stringify(obj, null, 2);
       } catch (e) {
-        // If not valid JSON, just append
+        // C. 回退：若语法不合法，则执行简单的字符串物理拼接 喵
         finalPersonaContent = formData.persona + '\n\n' + formData.detailedSetting;
       }
     }
-
-    console.log('[NewGameWizard] Emitting complete (custom). isStoreStart:', isStoreStart.value);
-    console.log('[NewGameWizard] Store Description:', formData.store.description);
-    console.log('[NewGameWizard] Initial Message:', initialMessage);
+    console.log('[新游戏向导] 执行自定义模式完成逻辑 喵. 店铺模式:', isStoreStart.value);
+    console.log('[新游戏向导] 初始剧情上下文喵:', initialMessage);
 
     emit('complete', {
       name: formData.name,
@@ -356,10 +315,10 @@ function finish() {
     <div
       class="relative bg-[#fcfae8] dark:bg-stone-900 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] border-4 border-double border-izakaya-wood/30 dark:border-stone-700"
     >
-      <!-- Texture Overlay -->
-      <div class="absolute inset-0 pointer-events-none opacity-40 bg-texture-rice-paper z-0"></div>
+    <!-- 幻想乡风格装饰蒙层 喵 (Style Texture) -->
+    <div class="absolute inset-0 pointer-events-none opacity-40 bg-texture-rice-paper z-0"></div>
 
-      <!-- Header -->
+      <!-- 引导向导顶部标题栏 喵 (Wizard Header) -->
       <div
         class="relative z-10 bg-izakaya-wood/5 dark:bg-stone-800/50 p-6 border-b border-izakaya-wood/20 flex justify-between items-center backdrop-blur-sm"
       >
@@ -379,7 +338,7 @@ function finish() {
         </button>
       </div>
 
-      <!-- Progress Bar -->
+      <!-- 流程阶段进度条 喵 (Progress) -->
       <div class="relative z-10 h-1.5 bg-izakaya-wood/10 w-full">
         <div
           class="h-full bg-touhou-red transition-all duration-500 ease-out shadow-[0_0_10px_rgba(200,50,50,0.4)]"
@@ -387,7 +346,7 @@ function finish() {
         ></div>
       </div>
 
-      <!-- Content -->
+      <!-- 表单各步骤核心展示区 喵 (Step Content) -->
       <div class="relative z-10 flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
         <!-- Step: Difficulty Selection -->
         <div
@@ -807,7 +766,7 @@ function finish() {
                   <component :is="origin.icon" class="w-6 h-6" />
                 </div>
                 <div class="font-bold text-izakaya-wood dark:text-stone-200">{{ origin.name }}</div>
-                <!-- Delete button for custom origins -->
+                <!-- 该入口仅针对自定义保存的预设提供删除按钮 喵 (Custom Only) -->
                 <button
                   v-if="(origin as any).isCustom"
                   @click.stop="deleteCustomOrigin(origin.id)"
@@ -846,7 +805,7 @@ function finish() {
           </div>
         </div>
 
-        <!-- Step: Location (Preset) -->
+        <!-- 步骤：选择出生方位 喵 (Location Selection) -->
         <div
           v-if="currentStep.id === 'location_preset'"
           class="space-y-6 animate-in slide-in-from-right-4 duration-300"
@@ -878,7 +837,7 @@ function finish() {
           </div>
         </div>
 
-        <!-- Step: Profile (Preset) -->
+        <!-- 步骤：预设身份细节填充 喵 (Profile Setup) -->
         <div
           v-if="currentStep.id === 'profile_preset'"
           class="space-y-6 animate-in slide-in-from-right-4 duration-300"
@@ -914,7 +873,7 @@ function finish() {
 
         <!-- Custom Path -->
 
-        <!-- Step: Profile (Custom) -->
+        <!-- 步骤：全自定义人设背景构建 喵 (Custom Profile) -->
         <div
           v-if="currentStep.id === 'profile_custom'"
           class="space-y-6 animate-in slide-in-from-right-4 duration-300"
@@ -968,7 +927,7 @@ function finish() {
 }'
               ></textarea>
               <div class="absolute top-2 right-2">
-                <!-- Simple helper to insert template -->
+                <!-- 辅助功能：一键快速置入 JSON 格式骨架 喵 (Template Helper) -->
                 <button
                   @click="
                     formData.detailedSetting = JSON.stringify(
@@ -986,7 +945,7 @@ function finish() {
           </div>
         </div>
 
-        <!-- Step: Stats (Custom) -->
+        <!-- 步骤：全自定义数值属性调配 喵 (Custom Stats) -->
         <div
           v-if="currentStep.id === 'stats_custom'"
           class="space-y-6 animate-in slide-in-from-right-4 duration-300"
@@ -1081,7 +1040,7 @@ function finish() {
           </div>
         </div>
 
-        <!-- Step: Review (Common) -->
+        <!-- 步骤：档案最终审阅与确认 喵 (Review Stage) -->
         <div
           v-if="currentStep.id === 'review'"
           class="space-y-6 animate-in slide-in-from-right-4 duration-300"
@@ -1178,7 +1137,7 @@ function finish() {
         </div>
       </div>
 
-      <!-- Footer -->
+      <!-- 向导导航栏控制区 (Footer Controls) -->
       <div
         class="relative z-10 p-6 border-t border-izakaya-wood/20 dark:border-stone-700 flex justify-between bg-izakaya-wood/5 dark:bg-stone-800/50 backdrop-blur-sm"
       >

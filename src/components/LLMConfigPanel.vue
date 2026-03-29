@@ -2,7 +2,7 @@
   <div
     class="relative overflow-hidden space-y-4 border border-izakaya-wood/10 p-4 rounded-lg bg-white/40 backdrop-blur-sm shadow-sm transition-all hover:shadow-md hover:border-izakaya-wood/20 group/panel"
   >
-    <!-- Texture Overlay -->
+    <!-- 纹理装饰层 (Texture Overlay) 喵 -->
     <div class="absolute inset-0 pointer-events-none opacity-10 bg-texture-rice-paper z-0"></div>
 
     <div class="relative z-10 flex items-center justify-between">
@@ -24,7 +24,7 @@
       </label>
     </div>
 
-    <!-- Independent Provider Settings -->
+    <!-- 独立服务商设置区 (Independent Provider Settings) 喵 -->
     <div v-if="!config.useGlobal" class="relative z-10 space-y-3 animate-fade-in">
       <div>
         <label class="block text-xs font-bold text-izakaya-wood/60 mb-1 font-display"
@@ -76,7 +76,7 @@
             ></div>
           </button>
         </div>
-        <!-- Status Messages -->
+        <!-- 状态提示消息 (Status Messages) 喵 -->
         <div
           v-if="fetchError"
           class="mt-1 text-xs text-touhou-red flex items-center gap-1 font-medium"
@@ -97,7 +97,7 @@
       </div>
     </div>
 
-    <!-- Global Provider Settings -->
+    <!-- 全局服务商设置显示区 (Global Provider Settings) 喵 -->
     <div v-else class="relative z-10 space-y-3">
       <div>
         <label class="block text-xs font-bold text-izakaya-wood/60 mb-1 font-display">模型</label>
@@ -145,7 +145,7 @@
       </div>
     </div>
 
-    <!-- Max Context Tokens (Only for Chat) -->
+    <!-- 上下文最大 Token 数设置 (仅限对话模块) 喵 -->
     <div v-if="configKey === 'chat'" class="pt-2 border-t border-izakaya-wood/10">
       <label class="block text-xs font-bold text-izakaya-wood/60 mb-1 font-display"
         >上下文最大 Token 数</label
@@ -163,7 +163,7 @@
       </div>
     </div>
 
-    <!-- Word Count Settings (Only for Chat) -->
+    <!-- 自动回复字数控制 (仅限对话模块) 喵 -->
     <div v-if="configKey === 'chat'" class="pt-2 border-t border-izakaya-wood/10">
       <label class="block text-xs font-bold text-izakaya-wood/60 mb-1 font-display"
         >回复字数控制</label
@@ -188,7 +188,7 @@
       </div>
     </div>
 
-    <!-- Advanced Settings Toggle -->
+    <!-- 高级设置切换开关 (Advanced Settings Toggle) 喵 -->
     <div class="pt-2 border-t border-izakaya-wood/10">
       <button
         @click="showAdvanced = !showAdvanced"
@@ -204,9 +204,9 @@
     </div>
 
     <div v-if="showAdvanced" class="space-y-4 pt-2 pl-2 border-l-2 border-izakaya-wood/10 ml-1">
-      <!-- Stream & Timeout -->
+      <!-- 流式传输与超时设置 (Stream & Timeout) 喵 -->
       <div class="grid grid-cols-2 gap-4">
-        <!-- Stream -->
+        <!-- 流式开关 (Stream) 喵 -->
         <div class="flex items-center justify-between">
           <label class="text-xs font-medium text-izakaya-wood/70 font-display"
             >流式传输 (Stream)</label
@@ -218,7 +218,7 @@
             class="rounded text-touhou-red focus:ring-touhou-red border-izakaya-wood/30"
           />
         </div>
-        <!-- Timeout -->
+        <!-- 超时阈值 (Timeout) 喵 -->
         <div>
           <label class="block text-xs font-medium text-izakaya-wood/70 mb-1 font-display"
             >超时 (秒)</label
@@ -231,9 +231,9 @@
         </div>
       </div>
 
-      <!-- Parameters -->
+      <!-- 采样参数配置 (Parameters) 喵 -->
       <div class="grid grid-cols-2 gap-4">
-        <!-- Temperature -->
+        <!-- 温度系数 (Temperature) 喵 -->
         <div>
           <label class="block text-xs font-medium text-izakaya-wood/70 mb-1 font-display"
             >Temperature</label
@@ -247,7 +247,7 @@
             placeholder="0.7"
           />
         </div>
-        <!-- Top P -->
+        <!-- 核采样比例 (Top P) 喵 -->
         <div>
           <label class="block text-xs font-medium text-izakaya-wood/70 mb-1 font-display"
             >Top P</label
@@ -261,7 +261,7 @@
             placeholder="1.0"
           />
         </div>
-        <!-- Freq Penalty -->
+        <!-- 频率惩罚系数 (Freq Penalty) 喵 -->
         <div>
           <label class="block text-xs font-medium text-izakaya-wood/70 mb-1 font-display"
             >Frequency Penalty</label
@@ -275,7 +275,7 @@
             placeholder="0.0"
           />
         </div>
-        <!-- Presence Penalty -->
+        <!-- 存在惩罚系数 (Presence Penalty) 喵 -->
         <div>
           <label class="block text-xs font-medium text-izakaya-wood/70 mb-1 font-display"
             >Presence Penalty</label
@@ -291,7 +291,7 @@
         </div>
       </div>
 
-      <!-- Chat Specific: History Turns -->
+      <!-- 对话特有：上下文记忆轮次 (Chat Specific: History Turns) 喵 -->
       <div v-if="configKey === 'chat'" class="pt-2 border-t border-izakaya-wood/10 mt-2">
         <label class="block text-xs font-medium text-izakaya-wood/70 mb-1 font-display"
           >记忆轮次 (History Turns)</label
@@ -356,7 +356,7 @@ const effectiveApiKey = computed(() => {
   return config.value.provider?.apiKey || '';
 });
 
-// Debounced save function
+// 带防抖功能的保存函数 (Debounced save function) 喵
 let saveTimeout: NodeJS.Timeout | null = null;
 function debouncedSave() {
   if (saveTimeout) {
@@ -370,7 +370,7 @@ function debouncedSave() {
   }, 500);
 }
 
-// Fetch models when config changes
+// 当配置项发生变更时，自动重新抓取模型列表 (Fetch models when config changes) 喵
 watch(
   [effectiveBaseUrl, effectiveApiKey],
   async ([baseUrl, apiKey]) => {

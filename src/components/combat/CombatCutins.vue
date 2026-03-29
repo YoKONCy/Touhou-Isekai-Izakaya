@@ -1,18 +1,18 @@
 <template>
-  <!-- Ultimate Spell Cut-in Overlay -->
+  <!-- 奥义/终极符卡切入层 (Ultimate Spell Cut-in Overlay) -->
   <transition name="intro-fade">
     <div
       v-if="showUltimate"
       class="fixed inset-0 z-[200] overflow-hidden pointer-events-none flex items-center justify-center font-display"
     >
-      <!-- Background Flash/Speed Lines -->
+      <!-- 背景闪白与速度线 -->
       <div class="absolute inset-0 bg-black/80 animate-flash-fade z-0"></div>
-      <!-- Speed Lines Effect -->
+      <!-- 径向速度线特效 -->
       <div
         class="absolute inset-0 opacity-30 animate-pulse-fast mix-blend-overlay z-10 radial-speed-lines"
       ></div>
 
-      <!-- Character Portrait Slide-in -->
+      <!-- 角色立绘滑入动画 (Character Portrait Slide-in) -->
       <div
         class="absolute h-full w-full flex items-center z-20"
         :class="ultimateData.isPlayer ? 'justify-start' : 'justify-end'"
@@ -34,13 +34,13 @@
         </div>
       </div>
 
-      <!-- Spell Name Text -->
+      <!-- 符卡名称文本层 (Spell Name Text) -->
       <div class="absolute z-30 flex flex-col items-center justify-center w-full">
         <div
           class="text-6xl md:text-8xl font-black italic text-white drop-shadow-[0_0_20px_rgba(255,0,0,1)] tracking-tighter animate-slam font-display transform -rotate-6 border-y-8 border-yellow-400 py-4 bg-black/50 backdrop-blur-md px-20"
         >
           <span class="block text-3xl text-yellow-400 mb-2 tracking-[1em] text-center uppercase"
-            >Spell Card</span
+            >符卡发动</span
           >
           {{ ultimateData.spellName }}
         </div>
@@ -51,7 +51,7 @@
     </div>
   </transition>
 
-  <!-- Skill Cut-in (Simple) -->
+  <!-- 常规/特技技能切入 (Simple Skill Cut-in) -->
   <transition
     enter-active-class="transition duration-300 ease-out"
     enter-from-class="opacity-0"
@@ -75,7 +75,7 @@
               : 'bg-gradient-to-r from-purple-900/95 via-rose-900/90 to-transparent'
         ]"
       >
-        <!-- Sprite (masked) -->
+        <!-- 立绘遮罩区域 (Sprite masked) -->
         <div
           class="absolute top-[-50%] h-[200%] w-1/2 md:w-1/3 opacity-90 mix-blend-normal"
           :class="
@@ -108,13 +108,13 @@
     </div>
   </transition>
 
-  <!-- Combat Flow Animation Overlay -->
+  <!-- 战斗心流动效层 (Combat Flow Animation Overlay) -->
   <Teleport to="body">
     <div
       v-if="showCombatFlow"
       class="fixed inset-0 z-[200] flex items-center justify-center overflow-hidden pointer-events-none font-display"
     >
-      <!-- Background: Deep Void -->
+      <!-- 背景：深邃虚空 -->
       <div class="absolute inset-0 bg-black animate-fade-in duration-500"></div>
 
       <!-- Moving Purple Fog/Nebula -->
@@ -122,7 +122,7 @@
         class="absolute inset-0 bg-gradient-to-br from-purple-900/60 via-transparent to-black mix-blend-screen animate-pulse-slow"
       ></div>
 
-      <!-- Character Cut-in (Centered, Glowing) -->
+      <!-- 角色居中发光切入 (Character Cut-in) -->
       <div
         class="absolute inset-0 flex items-center justify-center z-10 transition-all duration-1000"
         :class="
@@ -145,13 +145,13 @@
         <h1
           class="text-8xl md:text-9xl font-black italic text-transparent bg-clip-text bg-gradient-to-t from-white to-purple-300 font-display animate-glitch-slam tracking-tighter drop-shadow-[0_0_20px_rgba(255,255,255,0.8)]"
         >
-          COMBAT FLOW
+          战斗心流
         </h1>
         <div class="h-1 w-0 bg-white animate-expand-width shadow-[0_0_10px_white]"></div>
         <p
           class="text-2xl md:text-3xl text-purple-200 font-mono tracking-[1em] animate-fade-in-up uppercase"
         >
-          Zone Activated
+          领域展开
         </p>
       </div>
 
@@ -286,4 +286,27 @@ defineProps<{
     transform: translateY(-20px);
   }
 }
+
+.animate-flash-fade { animation: flashFade 0.3s ease-out forwards; }
+.animate-pulse-fast { animation: pulse 0.1s infinite; }
+.animate-slide-in-left { animation: slideInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-slide-in-right { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-slam { animation: slam 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 1.2s backwards; }
+.animate-fade-in { animation: fadeIn 0.5s ease; }
+.animate-fade-in-up { animation: fadeInUp 0.5s ease-out forwards; }
+.animate-slide-in-fast { animation: slideInFast 0.3s ease-out forwards; }
+.mask-image-fade-bottom {
+  mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+}
+
+@keyframes flashFade { 0% { opacity: 1; filter: brightness(2); } 100% { opacity: 0; } }
+@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.05); } }
+@keyframes slideInLeft { from { transform: translateX(-50px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slideInRight { from { transform: translateX(50px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slam { 0% { transform: scale(3) rotate(-20deg); opacity: 0; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideInFast { from { transform: translateX(-10vw); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
 </style>

@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useGameStore } from '@/stores/game';
+import { useSettingsStore } from '@/stores/settings';
 import { useCharacterStore } from '@/stores/character';
 import { audioManager } from '@/services/audio';
 import { Users, X } from 'lucide-vue-next';
 import type { NPCStatus } from '@/types/game';
 import { findAvatarImage, resolveCharacterId } from '@/services/characterMapping';
 
-// Import avatar images
+// 批量导入角色头像资源 (资产映射 - Import avatar images)喵
 const avatarImages = import.meta.glob('@/assets/images/head/*.png', {
   eager: true,
   query: '?url',
@@ -15,47 +16,46 @@ const avatarImages = import.meta.glob('@/assets/images/head/*.png', {
 });
 
 const gameStore = useGameStore();
+const settingsStore = useSettingsStore();
 const characterStore = useCharacterStore();
 const systemState = computed(() => gameStore.state.system);
 const npcs = computed(() => gameStore.state.npcs);
 
 const currentSceneNPCs = computed(() => {
   return systemState.value.current_scene_npcs.map((id) => {
-    // 1. Resolve Canonical ID using new service
+    // 1. 利用解析服务获取规范化的角色唯一标识 (Canonical ID Resolution)喵
     const resolvedId = resolveCharacterId(id, characterStore.characters, npcs.value);
 
-    // 2. Try Runtime State using resolved ID
+    // 2. 基于解析后的 ID 检索实时运行状态 (Runtime State Search)喵
     let npc = npcs.value[resolvedId];
     if (!npc) {
-      // Fallback for cases where id is still not the resolved one in the store
+      // 容错处理：若 Store 中仍以原始 ID 存储，则执行回退检索喵
       npc = npcs.value[id];
     }
 
-    // 3. Try Static Data using resolved ID
+    // 3. 基于解析后的 ID 检索静态配置数据 (Static Data Search)喵
     const staticChar = characterStore.characters.find((c) => c.uuid === resolvedId);
 
-    // 4. Merge: Static Data first, then Runtime Data overrides
+    // 4. 数据合并策略：以静态数据为基底，由运行时数据执行动态覆盖 (Deep Merge Strategy)喵
     const displayNpc: any = {
-      id: resolvedId, // Use canonical ID
-      name: staticChar?.name || id, // Prefer static name
-      ...staticChar, // Base with static data
-      ...npc // Override with runtime data
+      id: resolvedId, // 统一使用规范化的唯一标识喵
+      name: staticChar?.name || id, // 优先采用静态配置中的雅名喵
+      ...staticChar, // 注入基础配置
+      ...npc // 注入最新运行状态
     };
 
-    // 5. Ensure Critical Fields & Defaults
+    // 5. 核心字段对齐与默认值填充 (Schema Guard & Defaults)喵
     if (!displayNpc.name) displayNpc.name = id;
-    if (!displayNpc.clothing) displayNpc.clothing = '未知';
+    if (!displayNpc.clothing) displayNpc.clothing = '普通衣着';
     if (!displayNpc.mood) displayNpc.mood = '平静';
-    if (!displayNpc.posture) displayNpc.posture = '站立';
+    if (!displayNpc.posture) displayNpc.posture = '标准姿态';
 
-    // Handle HP/MaxHP specific logic
-    // Static 'hp' usually implies MaxHP in character definitions
+    // 处理生命值/上限相关逻辑 (RPG Stats Logic)喵
+    // 在静态定义中，'hp' 字段通常隐喻其最大载荷 (MaxHP)
     if (displayNpc.max_hp === undefined && (staticChar as any)?.hp) {
       displayNpc.max_hp = (staticChar as any).hp;
     }
-    // If we still don't have max_hp, fallback to a standard value? Or keep undefined.
-
-    // Note: displayNpc.hp comes from npc.hp (runtime). If undefined, it remains undefined.
+    // 提示：displayNpc.hp 继承自运行时对象。若缺失则保持为空，交由 UI 层处理喵
 
     return displayNpc as NPCStatus;
   });
@@ -75,7 +75,7 @@ function handleCloseModal() {
 
 function getAvatarColor(name: string) {
   if (!name) return 'bg-gray-100 text-gray-500';
-  // Simple hash for color
+  // 为未配置头像的角色生成基于感官哈希的背景色 (Deterministic Color)喵
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -100,7 +100,7 @@ function getAvatarImage(name: string) {
   <div
     class="bg-izakaya-paper/60 backdrop-blur-md shadow-sm border border-izakaya-wood/10 rounded-lg p-4 flex-1 flex flex-col min-h-0 relative overflow-hidden"
   >
-    <!-- 装饰性纹理 -->
+    <!-- 区域背景装饰性纹理 喵 -->
     <div class="absolute inset-0 pointer-events-none opacity-5 bg-texture-rice-paper"></div>
 
     <h3
@@ -150,7 +150,7 @@ function getAvatarImage(name: string) {
             >
               {{ npc.name || '未知角色' }}
             </div>
-            <!-- Scrolling Status Ticker -->
+            <!-- 状态滚动跑马灯 (Status Ticker)喵 -->
             <div class="mt-0.5 overflow-hidden relative h-5 mask-fade-edges">
               <div
                 class="flex gap-4 whitespace-nowrap marquee-content"
@@ -171,7 +171,7 @@ function getAvatarImage(name: string) {
                     {{ npc.posture }}
                   </span>
                 </div>
-                <!-- Duplicate for seamless loop -->
+                <!-- 视觉补偿层：重复内容以实现无缝循环滚动 (Seamless Loop)喵 -->
                 <div v-if="npc.action || npc.posture" class="flex gap-2 items-center">
                   <span
                     v-if="npc.action"
@@ -194,7 +194,7 @@ function getAvatarImage(name: string) {
       </div>
     </div>
 
-    <!-- NPC Detail Modal -->
+    <!-- 角色详细信息模态框 (NPC Detail Modal)喵 -->
     <Teleport to="body">
       <div
         v-if="selectedNPC"
@@ -203,7 +203,7 @@ function getAvatarImage(name: string) {
         <div
           class="bg-izakaya-paper w-full max-w-md rounded-xl shadow-paper overflow-hidden flex flex-col max-h-[90vh] border border-izakaya-wood/10 relative"
         >
-          <!-- Modal Texture -->
+          <!-- 模态框装饰纹理喵 -->
           <div class="absolute inset-0 pointer-events-none opacity-10 bg-texture-rice-paper"></div>
 
           <div
@@ -245,7 +245,7 @@ function getAvatarImage(name: string) {
               </div>
             </div>
 
-            <!-- Basic Stats Grid -->
+            <!-- 核心属性概览网格 (Basic Stats Grid)喵 -->
             <div class="grid grid-cols-2 gap-3 text-sm">
               <div
                 class="p-3 bg-white/50 rounded-lg border border-izakaya-wood/5 hover:border-touhou-red/10 transition-colors"
@@ -284,7 +284,7 @@ function getAvatarImage(name: string) {
               </div>
             </div>
 
-            <!-- Appearance & State -->
+            <!-- 外观与即时状态描述 (Appearance & State)喵 -->
             <div class="space-y-3 text-sm">
               <h4
                 class="font-display font-bold text-izakaya-wood/80 text-xs uppercase tracking-wider border-b border-izakaya-wood/10 pb-1 flex items-center gap-2"
@@ -327,38 +327,40 @@ function getAvatarImage(name: string) {
                   <span class="text-xs text-izakaya-wood/50 w-8 shrink-0 font-serif">双手:</span>
                   <span class="font-medium">{{ selectedNPC.hands || '空闲' }}</span>
                 </div>
-                <div
-                  class="flex items-start gap-2"
-                  v-if="selectedNPC.chest || selectedNPC.gender === 'female'"
-                >
-                  <span class="text-xs text-izakaya-wood/50 w-8 shrink-0 font-serif">胸部:</span>
-                  <span class="font-medium">{{ selectedNPC.chest || '暂且未知' }}</span>
-                </div>
-                <div
-                  class="flex items-start gap-2"
-                  v-if="selectedNPC.buttocks || selectedNPC.gender === 'female'"
-                >
-                  <span class="text-xs text-izakaya-wood/50 w-8 shrink-0 font-serif">臀部:</span>
-                  <span class="font-medium">{{ selectedNPC.buttocks || '暂且未知' }}</span>
-                </div>
-                <div
-                  class="flex items-start gap-2"
-                  v-if="selectedNPC.vagina || selectedNPC.gender === 'female'"
-                >
-                  <span class="text-xs text-izakaya-wood/50 w-8 shrink-0 font-serif">小穴:</span>
-                  <span class="font-medium">{{ selectedNPC.vagina || '暂且未知' }}</span>
-                </div>
-                <div
-                  class="flex items-start gap-2"
-                  v-if="selectedNPC.anus || selectedNPC.gender === 'female'"
-                >
-                  <span class="text-xs text-izakaya-wood/50 w-8 shrink-0 font-serif">菊穴:</span>
-                  <span class="font-medium">{{ selectedNPC.anus || '暂且未知' }}</span>
-                </div>
+                <template v-if="settingsStore.showNsfwStats">
+                  <div
+                    class="flex items-start gap-2"
+                    v-if="selectedNPC.chest || selectedNPC.gender === 'female'"
+                  >
+                    <span class="text-xs text-izakaya-wood/50 w-8 shrink-0 font-serif">胸部:</span>
+                    <span class="font-medium">{{ selectedNPC.chest || '暂且未知' }}</span>
+                  </div>
+                  <div
+                    class="flex items-start gap-2"
+                    v-if="selectedNPC.buttocks || selectedNPC.gender === 'female'"
+                  >
+                    <span class="text-xs text-izakaya-wood/50 w-8 shrink-0 font-serif">臀部:</span>
+                    <span class="font-medium">{{ selectedNPC.buttocks || '暂且未知' }}</span>
+                  </div>
+                  <div
+                    class="flex items-start gap-2"
+                    v-if="selectedNPC.vagina || selectedNPC.gender === 'female'"
+                  >
+                    <span class="text-xs text-izakaya-wood/50 w-8 shrink-0 font-serif">小穴:</span>
+                    <span class="font-medium">{{ selectedNPC.vagina || '暂且未知' }}</span>
+                  </div>
+                  <div
+                    class="flex items-start gap-2"
+                    v-if="selectedNPC.anus || selectedNPC.gender === 'female'"
+                  >
+                    <span class="text-xs text-izakaya-wood/50 w-8 shrink-0 font-serif">菊穴:</span>
+                    <span class="font-medium">{{ selectedNPC.anus || '暂且未知' }}</span>
+                  </div>
+                </template>
               </div>
             </div>
 
-            <!-- Inner Thought -->
+            <!-- 角色内心独白 (GM 可见视角 - Inner Thought)喵 -->
             <div
               class="p-4 bg-marisa-gold/5 rounded-lg border border-marisa-gold/20"
               v-if="selectedNPC.inner_thought"

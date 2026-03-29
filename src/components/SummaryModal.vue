@@ -36,7 +36,7 @@ function handleApplyToPersona() {
   }, 1000);
 }
 
-// Update currentTurnCount when prop changes or on open
+// 当属性 props 变更或弹窗开启时，同步更新 currentTurnCount 并触发生成 喵
 watch(
   () => props.isOpen,
   (newVal) => {
@@ -44,10 +44,7 @@ watch(
       if (props.turnCount) {
         currentTurnCount.value = props.turnCount;
       }
-      // Only generate if we don't have a summary or if it's a fresh open (implied by logic)
-      // Actually, let's always regenerate on open to be safe/fresh,
-      // or we can make it manual.
-      // Given the flow "Configure -> Start", we should regenerate.
+      // 由于“配置 -> 开始”的流转逻辑，此处默认在开启时自动触发总结生成 喵
       generateSummary();
     }
   }
@@ -56,19 +53,19 @@ watch(
 function formatMemoryContent(content: string): string {
   try {
     const parsed = JSON.parse(content);
-    // If it's an object with specific fields, format it
+    // 若内容为包含特定字段的对象，执行格式化处理 喵
     if (typeof parsed === 'object' && parsed !== null) {
       if (parsed.name && parsed.content) {
         return `[${parsed.name}] ${parsed.content}`;
       }
-      // Fallback for other JSON structures
+      // 针对其他 JSON 结构的后备处理逻辑 喵
       return Object.entries(parsed)
         .map(([k, v]) => `${k}: ${v}`)
         .join(', ');
     }
     return content;
   } catch (e) {
-    // Not JSON, return as is
+    // 非 JSON 格式，按原样返回 喵
     return content;
   }
 }
@@ -81,7 +78,7 @@ async function generateSummary() {
   summary.value = '';
 
   try {
-    // 1. Fetch Recent Dialogues
+    // 步骤 A：精准提取近期对话记录作为上下文 喵 (Fetch History)
     const recentMessages = chatStore.messages.slice(-currentTurnCount.value);
     const dialogueText = recentMessages
       .map((m) => {
@@ -90,13 +87,12 @@ async function generateSummary() {
       })
       .join('\n');
 
-    // 2. Fetch Memories
+    // 步骤 B：从数据库检索核心存档记忆条目 喵 (Fetch Memories)
     if (!saveStore.currentSaveId) throw new Error('No active save');
 
     const memories = await dbService.getAllMemories(saveStore.currentSaveId);
 
-    // Sort memories by creation time or turn count if needed?
-    // Usually they are inserted in order.
+    // 记忆通常按插入顺序排列，此处暂不执行额外排序 喵
 
     const summaries = memories
       .filter((m) => m.type === 'summary')
@@ -118,7 +114,7 @@ async function generateSummary() {
       .map((m) => formatMemoryContent(m.content))
       .join('\n');
 
-    // 3. Construct Prompt
+    // 步骤 C：执行结构化 Prompt 指令构建 喵 (Prompt Engineering)
     const prompt = `
 请根据以下信息生成一份详细的故事大总结：
 
@@ -140,11 +136,11 @@ ${alliances || '暂无'}
 请生成纯文本的总结，涵盖剧情进展、人物关系变化、关键事件及当前局势。
     `.trim();
 
-    // 4. Call LLM
-    // Using modelType 'chat' as requested (LLM1)
+    // 步骤 D：发起 LLM 总结服务请求调用 喵 (Service Dispatch)
+    // 此处遵循架构约定，强制映射至 Chat 核心驱动 (LLM1) 喵
     const result = await generateCompletion({
       modelType: 'chat',
-      systemPrompt: '你是一个负责对故事进行全面总结的助手。请客观、全面地总结当前的故事状态。',
+      systemPrompt: '你是一个负责对故事进行全面总结的助手。请客观、全面地总结当前的故事状态。喵 🐾',
       messages: [{ role: 'user', content: prompt }]
     });
 
@@ -153,6 +149,7 @@ ${alliances || '暂无'}
     error.value = e.message || '生成总结失败';
     console.error(e);
   } finally {
+    // 释放加载锁，生命周期结束 喵
     loading.value = false;
   }
 }
@@ -170,7 +167,7 @@ function copyToClipboard() {
     <div
       class="bg-izakaya-paper w-full max-w-3xl h-[85vh] flex flex-col rounded-lg shadow-xl border-2 border-izakaya-wood/30 relative overflow-hidden"
     >
-      <!-- Header -->
+      <!-- 顶部标题栏 (Header) 喵 -->
       <div
         class="flex items-center justify-between p-4 border-b border-izakaya-wood/10 bg-white/50 relative z-10"
       >
@@ -185,9 +182,9 @@ function copyToClipboard() {
         </button>
       </div>
 
-      <!-- Content -->
+      <!-- 主体展示区域 (Content) 喵 -->
       <div class="flex-1 overflow-y-auto p-6 relative z-10 bg-white/30">
-        <!-- Paper Texture -->
+        <!-- 纸纹纹理蒙层 (Paper Texture) 喵 -->
         <div
           class="absolute inset-0 pointer-events-none opacity-20 bg-texture-rice-paper mix-blend-multiply"
         ></div>
@@ -221,7 +218,7 @@ function copyToClipboard() {
         </div>
       </div>
 
-      <!-- Footer -->
+      <!-- 底部操作栏 (Footer) 喵 -->
       <div
         class="p-4 border-t border-izakaya-wood/10 bg-white/50 flex justify-end items-center gap-3 relative z-10"
       >

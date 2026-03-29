@@ -7,11 +7,11 @@ let animationId: number;
 interface Petal {
   x: number;
   y: number;
-  z: number; // 用于视差
+  z: number; // 用于计算视差深度 喵
   vx: number;
   vy: number;
   rotation: number;
-  rotationSpeed: number;
+  rotationSpeed: number; // 随机旋转角速度 喵
   size: number;
   opacity: number;
 }
@@ -30,9 +30,9 @@ function createPetal(width: number, height: number, randomY = false): Petal {
   return {
     x: Math.random() * width,
     y: randomY ? Math.random() * height : -20,
-    z: Math.random() * 0.5 + 0.5, // 0.5 - 1.0
-    vx: (Math.random() - 0.5) * 1.5, // 左右漂移
-    vy: Math.random() * 1.5 + 0.8, // 下落速度
+    z: Math.random() * 0.5 + 0.5, // 定义 0.5 - 1.0 的深度层级 喵
+    vx: (Math.random() - 0.5) * 1.5, // 初始左右漂移分量 喵
+    vy: Math.random() * 1.5 + 0.8, // 恒定纵向下落速度 喵
     rotation: Math.random() * 360,
     rotationSpeed: (Math.random() - 0.5) * 2,
     size: Math.random() * 8 + 6,
@@ -46,17 +46,17 @@ function drawPetal(ctx: CanvasRenderingContext2D, p: Petal) {
   ctx.rotate((p.rotation * Math.PI) / 180);
   ctx.globalAlpha = p.opacity;
 
-  // 绘制樱花瓣形状
+  // 逐帧绘制樱花瓣的数学物理形状 喵
   ctx.beginPath();
   ctx.moveTo(0, 0);
-  // 使用贝塞尔曲线绘制花瓣
+  // 执行双向贝塞尔曲线指令以勾勒圆润的花瓣边缘 喵
   ctx.bezierCurveTo(p.size / 2, -p.size / 2, p.size, 0, 0, p.size);
   ctx.bezierCurveTo(-p.size, 0, -p.size / 2, -p.size / 2, 0, 0);
 
-  // 樱花粉色渐变
+  // 初始化樱花专属的透亮粉紫色线性渐变 喵
   const gradient = ctx.createLinearGradient(-p.size, -p.size, 0, p.size);
-  gradient.addColorStop(0, '#FFCDD2'); // touhou-red-light
-  gradient.addColorStop(1, '#E1BEE7'); // 淡紫色
+  gradient.addColorStop(0, '#FFCDD2'); // 东方红 Light 系列色阶 喵
+  gradient.addColorStop(1, '#E1BEE7'); // 柔和淡紫色高光 喵
 
   ctx.fillStyle = gradient;
   ctx.fill();
@@ -74,21 +74,21 @@ function animate() {
 
   ctx.clearRect(0, 0, width, height);
 
-  // Update and draw petals
+  // 更新并绘制每一片花瓣喵
   petals.forEach((p, index) => {
     p.x += p.vx * p.z;
     p.y += p.vy * p.z;
     p.rotation += p.rotationSpeed;
 
-    // 简单的风力扰动
+    // 添加模拟自然风压的随机横向扰动因子 喵
     p.vx += (Math.random() - 0.5) * 0.05;
-    // 限制最大水平速度
+    // 为防风速失控，强制限制最大水平飘移位移量 喵
     if (p.vx > 2) p.vx = 2;
     if (p.vx < -2) p.vx = -2;
 
     drawPetal(ctx, p);
 
-    // Reset if out of bounds
+    // 如果花瓣超出边界，则重置它喵
     if (p.y > height + 20 || p.x > width + 20 || p.x < -20) {
       petals[index] = createPetal(width, height);
     }

@@ -4,6 +4,7 @@ import { X, Info, CheckCircle, AlertTriangle, AlertOctagon } from 'lucide-vue-ne
 
 const toastStore = useToastStore();
 
+// 根据提示消息的语义类型（成功/警告/错误等）动态分发对应的 Lucide 图标 喵
 function getIcon(type: string) {
   switch (type) {
     case 'success':
@@ -17,8 +18,9 @@ function getIcon(type: string) {
   }
 }
 
+// 根据消息类型动态计算并返回对应的 CSS 样式类名数组 喵
 function getClasses(type: string) {
-  // Base classes for all toasts
+  // 所有提示框的基础样式类集 (Base classes for all toasts) 喵
   const base = 'bg-izakaya-paper relative overflow-hidden shadow-paper border backdrop-blur-sm';
 
   switch (type) {
@@ -33,6 +35,7 @@ function getClasses(type: string) {
   }
 }
 
+// 根据消息类型动态计算并返回对应的图标文本着色类 喵
 function getIconColor(type: string) {
   switch (type) {
     case 'success':
@@ -63,20 +66,20 @@ function getIconColor(type: string) {
         class="pointer-events-auto w-full max-w-sm rounded-lg flex items-start p-4 gap-3 group"
         :class="getClasses(toast.type)"
       >
-        <!-- Texture Overlay -->
+        <!-- 纸纹装饰层 (Texture Overlay) 喵 -->
         <div class="absolute inset-0 pointer-events-none opacity-10 bg-texture-rice-paper"></div>
 
-        <!-- Icon -->
+        <!-- 类型图标 (Icon) 喵 -->
         <div class="relative z-10 mt-0.5" :class="getIconColor(toast.type)">
           <component :is="getIcon(toast.type)" class="w-5 h-5" />
         </div>
 
-        <!-- Content -->
+        <!-- 提示消息正文 (Content) 喵 -->
         <div class="relative z-10 flex-1 min-w-0">
           <p class="text-sm font-medium font-display leading-tight">{{ toast.message }}</p>
         </div>
 
-        <!-- Close Button -->
+        <!-- 手动关闭按钮 (Close Button) 喵 -->
         <button
           @click="toastStore.removeToast(toast.id)"
           class="relative z-10 text-current opacity-40 hover:opacity-100 transition-opacity p-0.5 hover:bg-black/5 rounded"
@@ -84,7 +87,7 @@ function getIconColor(type: string) {
           <X class="w-4 h-4" />
         </button>
 
-        <!-- Decorative Side Bar -->
+        <!-- 装饰性侧边条 (Decorative Side Bar) 喵 -->
         <div
           class="absolute left-0 top-0 bottom-0 w-1"
           :class="{

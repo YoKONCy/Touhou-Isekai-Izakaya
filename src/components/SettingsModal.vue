@@ -17,7 +17,8 @@ import {
   AlertCircle,
   Check,
   Download,
-  Upload
+  Upload,
+  Sparkles
 } from 'lucide-vue-next';
 import LLMConfigPanel from './LLMConfigPanel.vue';
 import { fetchModels, type ModelInfo } from '@/services/llm';
@@ -105,7 +106,7 @@ const handleImport = async (event: Event) => {
   } catch (error) {
     toastStore.addToast({ message: '导入过程出错', type: 'error' });
   } finally {
-    // 复位文件输入控件 (Reset input)
+    // 复位文件输入控件 (Reset input) 喵
     target.value = '';
   }
 };
@@ -338,7 +339,7 @@ watch(
   }
 );
 
-// Auto-adjust parameters for NovelAI V4
+// 针对 NovelAI V4 系列模型自动对齐采样参数 (Auto-adjust) 喵
 watch(
   () => [settingsStore.drawingConfig.model, settingsStore.drawingConfig.providerType],
   ([newModel, newType]) => {
@@ -453,7 +454,7 @@ function handleVolumeChangeTest() {
           class="flex-1 p-4 md:p-6 overflow-y-auto custom-scrollbar min-h-0"
           style="-webkit-overflow-scrolling: touch"
         >
-          <!-- Global Settings -->
+          <!-- 全局通用设置面板 (Global Settings) 喵 -->
           <div v-show="activeTab === 'global'" class="space-y-6 animate-fade-in">
             <div>
               <h3
@@ -490,7 +491,7 @@ function handleVolumeChangeTest() {
                   />
                 </div>
 
-                <!-- Export/Import Buttons -->
+                <!-- 全局配置导出与恢复按钮 (Export/Import Buttons) 喵 -->
                 <div class="pt-4 border-t border-izakaya-wood/10 flex flex-wrap gap-3">
                   <button
                     @click="handleExport"
@@ -518,9 +519,9 @@ function handleVolumeChangeTest() {
             </div>
           </div>
 
-          <!-- Interface Settings -->
+          <!-- 界面视觉风格设置面板 (Interface Settings) 喵 -->
           <div v-show="activeTab === 'interface'" class="space-y-6 animate-fade-in">
-            <!-- Theme Selection -->
+            <!-- 幻想乡风格主题切换 (Theme Selection) 喵 -->
             <div class="space-y-4">
               <div
                 class="flex items-center gap-2 text-izakaya-wood border-b border-izakaya-wood/10 pb-2"
@@ -530,7 +531,7 @@ function handleVolumeChangeTest() {
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <!-- Light Theme -->
+                <!-- 博丽午后主题 (Light Theme) 喵 -->
                 <button
                   @click="settingsStore.theme = 'light'"
                   class="relative p-4 rounded-lg border-2 transition-all text-left flex flex-col gap-2 overflow-hidden group"
@@ -557,7 +558,7 @@ function handleVolumeChangeTest() {
                   </div>
                 </button>
 
-                <!-- Dark Theme -->
+                <!-- 永夜主题 (Dark Theme) 喵 -->
                 <button
                   @click="settingsStore.theme = 'dark'"
                   class="relative p-4 rounded-lg border-2 transition-all text-left flex flex-col gap-2 overflow-hidden group"
@@ -583,7 +584,7 @@ function handleVolumeChangeTest() {
                   </div>
                 </button>
 
-                <!-- Eye Protection Theme -->
+                <!-- 护眼文花帖主题 (Eye Protection Theme) 喵 -->
                 <button
                   @click="settingsStore.theme = 'eye-protection'"
                   class="relative p-4 rounded-lg border-2 transition-all text-left flex flex-col gap-2 overflow-hidden group"
@@ -745,7 +746,7 @@ function handleVolumeChangeTest() {
                   >
                 </label>
 
-                <!-- OpenAI System Prompt -->
+                <!-- OpenAI 架构专用提示词模板 (OpenAI System Prompt) 喵 -->
                 <textarea
                   v-if="
                     settingsStore.drawingConfig.providerType === 'openai' ||
@@ -757,7 +758,7 @@ function handleVolumeChangeTest() {
                   :placeholder="DEFAULT_DRAWING_PROMPT_SYSTEM"
                 ></textarea>
 
-                <!-- NovelAI System Prompt (V4/V4.5) -->
+                <!-- NovelAI V4/V4.5 架构专用提示词模板 (NovelAI Prompt) 喵 -->
                 <textarea
                   v-if="
                     settingsStore.drawingConfig.providerType === 'novelai' &&
@@ -769,7 +770,7 @@ function handleVolumeChangeTest() {
                   :placeholder="DEFAULT_NOVELAI_V4_PROMPT_SYSTEM"
                 ></textarea>
 
-                <!-- NovelAI System Prompt (V3/Legacy) -->
+                <!-- NovelAI V3/Legacy 架构属性标签模板 (NovelAI Legacy) 喵 -->
                 <textarea
                   v-else-if="settingsStore.drawingConfig.providerType === 'novelai'"
                   v-model="settingsStore.drawingConfig.systemPromptNovelAIV3"
@@ -785,7 +786,7 @@ function handleVolumeChangeTest() {
                 </p>
               </div>
 
-              <!-- Extra Prompts Config (NovelAI Only) -->
+              <!-- 附加正面/负面提示词扩展示例 (Extra Prompts - NovelAI Only) 喵 -->
               <div
                 v-if="settingsStore.drawingConfig.providerType === 'novelai'"
                 class="mt-4 grid grid-cols-2 gap-4"
@@ -828,12 +829,12 @@ function handleVolumeChangeTest() {
               </div>
             </div>
 
-            <!-- Image API Config -->
+            <!-- 步骤2：外部绘图执行 API 链路配置 (Image API Config) 喵 -->
             <div class="border-t border-izakaya-wood/10 pt-4">
               <h4 class="font-bold text-izakaya-wood font-display mb-4">步骤2：绘图 API 配置</h4>
 
               <div class="grid grid-cols-1 gap-4">
-                <!-- Provider Type Selection -->
+                <!-- 各路供应方类型快速切换 (Provider Type Selection) 喵 -->
                 <div class="space-y-1">
                   <label class="block text-sm font-bold text-izakaya-wood font-display"
                     >API 类型</label
@@ -947,7 +948,7 @@ function handleVolumeChangeTest() {
                       ></div>
                     </button>
                   </div>
-                  <!-- Status Messages -->
+                  <!-- 嗅探状态回馈消息集 (Status Messages) 喵 -->
                   <div
                     v-if="drawingFetchError"
                     class="mt-1 text-xs text-touhou-red flex items-center gap-1 font-medium"
@@ -1016,7 +1017,7 @@ function handleVolumeChangeTest() {
                       />
                     </div>
 
-                    <!-- Test Results -->
+                    <!-- 连通性测试实时反馈 (Test Results) 喵 -->
                     <div
                       v-if="novelAITestStatus === 'success'"
                       class="text-[10px] text-green-600 flex items-center gap-1 mt-1 font-bold"
@@ -1124,7 +1125,7 @@ function handleVolumeChangeTest() {
             </div>
           </div>
 
-          <!-- Audio Settings -->
+          <!-- 声音与听觉交互配置面板 (Audio Settings) 喵 -->
           <div v-show="activeTab === 'audio'" class="space-y-6 animate-fade-in">
             <div>
               <h3
@@ -1265,6 +1266,36 @@ function handleVolumeChangeTest() {
                   <p class="mt-2 text-xs text-izakaya-wood/60 font-serif">
                     强制触发经营小游戏模式。这将初始化经营状态并覆盖当前场景。
                   </p>
+                </div>
+
+                <!-- 神秘的特殊数据开关 (NSFW Display Switch - Mysterious Switch) 喵 -->
+                <div class="p-4 border border-izakaya-wood/10 rounded-lg bg-marisa-gold/5 relative overflow-hidden group/switch">
+                  <!-- Decorative sparkle -->
+                  <div class="absolute -right-2 -top-2 opacity-10 group-hover/switch:opacity-30 transition-opacity">
+                    <Sparkles class="w-12 h-12 text-marisa-gold" />
+                  </div>
+
+                  <div class="flex items-center justify-between relative z-10">
+                    <div>
+                      <div class="font-bold text-sm text-izakaya-wood font-display flex items-center gap-2">
+                        神秘的小开关
+                        <span class="text-[8px] px-1 bg-touhou-red text-white rounded">EXPERIMENTAL</span>
+                      </div>
+                      <div class="text-[10px] text-izakaya-wood/60 font-serif mt-1">
+                        ???
+                      </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        v-model="settingsStore.showNsfwStats"
+                        class="sr-only peer"
+                      />
+                      <div
+                        class="w-11 h-6 bg-izakaya-wood/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-marisa-gold-dim"
+                      ></div>
+                    </label>
+                  </div>
                 </div>
 
                 <div class="p-3 border border-izakaya-wood/10 rounded-lg bg-white/30">

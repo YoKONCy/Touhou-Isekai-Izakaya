@@ -1,17 +1,18 @@
 <template>
-  <!-- Combat Request Dialog -->
+  <!-- 战斗遭遇请求对话框 (Combat Request Dialog) -->
+  <!-- 战斗遭遇请求对话框 -->
   <div
     class="absolute inset-0 z-50 flex items-center justify-center bg-stone-900/80 backdrop-blur-sm"
   >
     <div
       class="relative max-w-md w-full rounded-xl overflow-hidden shadow-2xl animate-scale-in group"
     >
-      <!-- Background & Texture -->
+      <!-- 背景与纹理层 -->
       <div class="absolute inset-0 bg-stone-100 dark:bg-stone-900"></div>
       <div class="absolute inset-0 opacity-40 bg-texture-rice-paper"></div>
       <div class="absolute inset-0 opacity-10 bg-texture-stardust animate-pulse-slow"></div>
 
-      <!-- Content -->
+      <!-- 内容主体 -->
       <div class="relative z-10 p-8 text-center">
         <h2
           class="text-3xl font-bold font-display text-touhou-red mb-6 tracking-wider flex items-center justify-center gap-3"
@@ -31,7 +32,7 @@
           </p>
         </div>
 
-        <!-- Multiplayer Host Note -->
+        <!-- 联机房主提示语 -->
         <div
           v-if="isMultiplayer && !isHost"
           class="mb-4 p-2 bg-blue-50/10 border border-blue-500/30 rounded text-xs text-blue-300"
@@ -64,7 +65,7 @@
         </div>
       </div>
 
-      <!-- Decorative Borders -->
+      <!-- 装饰边框 -->
       <div
         class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-touhou-red to-transparent opacity-50"
       ></div>

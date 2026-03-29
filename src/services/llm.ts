@@ -132,7 +132,7 @@ export async function generateCompletion(options: CompletionOptions): Promise<st
     // 联机架构支持：广播者同步序列 (Broadcaster Sync)
     if (shouldStream) {
       for await (const chunk of response as any) {
-        if (options.signal?.aborted) throw new Error('Operation aborted by user');
+        if (options.signal?.aborted) throw new Error('操作已被用户中止喵');
         const token = chunk.choices[0]?.delta?.content || '';
         content += token;
 
@@ -172,7 +172,7 @@ export async function generateCompletion(options: CompletionOptions): Promise<st
 
       if (energyCost > 0) {
         console.log(
-          `[LLM] 联机能源结算扣减: ${energyCost} 点 (约消耗 ${totalTokens} 个 tokens)`
+          `[LLM] 联机能源结算扣减喵: ${energyCost} 点 (约消耗 ${totalTokens} 个 Tokens)`
         );
         mpService.updateEnergy(-energyCost);
       }
@@ -187,10 +187,10 @@ export async function generateCompletion(options: CompletionOptions): Promise<st
       const errorResponse = {
         error: true,
         message: error.message,
-        thinking: `LLM Request Failed: ${error.message}`,
+        thinking: `LLM 接口请求失败喵: ${error.message}`,
         actions: [],
         quick_replies: [],
-        summary: `[请求失败: ${error.message}]`
+        summary: `[外部接口异常: ${error.message}]`
       };
       return JSON.stringify(errorResponse);
     }
@@ -210,7 +210,7 @@ export async function fetchModels(baseUrl: string, apiKey: string): Promise<Mode
   }
 
   if (!apiKey) {
-    throw new Error('API Key is missing');
+    throw new Error('API 密钥 (API Key) 缺失喵');
   }
 
   try {
@@ -226,7 +226,7 @@ export async function fetchModels(baseUrl: string, apiKey: string): Promise<Mode
       owned_by: m.owned_by || ''
     }));
   } catch (error: any) {
-    console.error('Failed to fetch models:', error);
-    throw new Error(error.message || 'Failed to fetch models');
+    console.error('[LLM] 获取模型列表失败:', error);
+    throw new Error(error.message || '获取模型列表失败喵');
   }
 }

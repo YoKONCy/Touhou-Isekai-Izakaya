@@ -40,7 +40,7 @@ class AudioManager {
       try {
         await this.currentBgm.play();
       } catch (e) {
-        console.warn('Failed to resume BGM after interaction:', e);
+        console.warn('[音频服务] 用户点击后未能成功拉起 BGM 喵:', e);
       }
     }
   }

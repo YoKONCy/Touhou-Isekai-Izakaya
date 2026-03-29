@@ -4,19 +4,17 @@
 
     <div class="ui-overlay">
       <div class="header">
-        <span class="title">居酒屋经营模式 (Phase 2: Environment & Interaction)</span>
-        <button @click="closeGame" class="close-btn">关闭 (Debug)</button>
+        <span class="title">居酒屋经营模式 (第二阶段：环境与交互)</span>
+        <button @click="closeGame" class="close-btn">关闭 (调试)</button>
       </div>
 
-      <!-- Floor Switcher (Removed) -->
-
-      <!-- Money Display -->
+      <!-- 钱币显示 -->
       <div class="money-display">
         <div class="coin-icon">¥</div>
         <span class="amount">{{ revenue }}</span>
       </div>
 
-      <!-- Active Orders Stack -->
+      <!-- 待处理订单 -->
       <div class="orders-stack-container" v-if="activeOrders.length > 0">
         <h3 class="orders-title">待处理订单</h3>
         <div class="orders-stack">
@@ -54,7 +52,7 @@
         </div>
       </div>
 
-      <!-- Cooking Interface -->
+      <!-- 烹饪界面 -->
       <CookingInterface
         v-if="showCooking"
         :customerRequirement="activeCookingCustomer?.requirements"
@@ -62,7 +60,7 @@
         @close="handleCookingClose"
       />
 
-      <!-- Interaction Dialog Modal -->
+      <!-- 交互对话弹窗 -->
       <div v-if="showInteraction && currentInteraction" class="dialog-overlay animate-fade-in">
         <div class="dialog-box slide-in">
           <div class="dialog-header">
@@ -73,23 +71,23 @@
             <p class="dialog-text">"{{ currentInteraction.dialogue }}"</p>
           </div>
           <div class="dialog-actions">
-            <button class="action-btn chat-btn"><span>💬</span> Chat</button>
+            <button class="action-btn chat-btn"><span>💬</span> 对话</button>
             <button
               v-if="currentInteraction.isOrdering"
               class="action-btn confirm-btn"
               @click="handleAcceptOrder"
             >
-              <span>📝</span> Take Order
+              <span>📝</span> 接单
             </button>
           </div>
         </div>
       </div>
 
-      <!-- Evaluation Result Modal -->
+      <!-- 评价结果弹窗 -->
       <div v-if="showEvaluation && evaluationResult" class="dialog-overlay animate-fade-in">
         <div class="evaluation-box pop-in">
           <div class="eval-header">
-            <h2>Dish Evaluation</h2>
+            <h2>料理评价</h2>
             <div
               class="score-badge"
               :class="
@@ -109,17 +107,17 @@
 
             <div class="eval-stats">
               <div class="stat-row">
-                <span class="label">Deliciousness:</span>
+                <span class="label">美味度:</span>
                 <span class="value">{{
-                  evaluationResult.isDelicious ? 'Delicious! 😋' : 'Average 😐'
+                  evaluationResult.isDelicious ? '太好吃了! 😋' : '一般般 😐'
                 }}</span>
               </div>
               <div class="stat-row">
-                <span class="label">Payment:</span>
+                <span class="label">支付金额:</span>
                 <span class="value text-gold">¥{{ evaluationResult.payment }}</span>
               </div>
               <div class="stat-row">
-                <span class="label">Reputation:</span>
+                <span class="label">声望:</span>
                 <span
                   class="value"
                   :class="evaluationResult.reputation >= 0 ? 'text-green' : 'text-red'"
@@ -132,37 +130,37 @@
 
           <div class="eval-actions">
             <button class="action-btn confirm-btn full-width" @click="showEvaluation = false">
-              Excellent!
+              太棒了!
             </button>
           </div>
         </div>
       </div>
 
-      <!-- Hand Inventory -->
+      <!-- 手持物品栏 -->
       <div class="hand-inventory">
         <div class="hand-slot left-hand" :class="{ 'has-item': handInventory[0] }">
-          <span class="hand-label">L</span>
+          <span class="hand-label">左</span>
           <div v-if="handInventory[0]" class="item-icon">
             {{ handInventory[0].type === 'bowl' ? '🥣' : '🍲' }}
           </div>
           <span v-if="handInventory[0]" class="item-name">{{ handInventory[0].name }}</span>
-          <span v-else class="empty-text">Empty</span>
+          <span v-else class="empty-text">空</span>
         </div>
         <div class="hand-slot right-hand" :class="{ 'has-item': handInventory[1] }">
-          <span class="hand-label">R</span>
+          <span class="hand-label">右</span>
           <div v-if="handInventory[1]" class="item-icon">
             {{ handInventory[1].type === 'bowl' ? '🥣' : '🍲' }}
           </div>
           <span v-if="handInventory[1]" class="item-name">{{ handInventory[1].name }}</span>
-          <span v-else class="empty-text">Empty</span>
+          <span v-else class="empty-text">空</span>
         </div>
       </div>
 
       <div class="controls-hint hidden md:block">
-        WASD / Arrow Keys to Move | F / Space to Interact
+        WASD / 方向键 移动 | F / 空格 交互
       </div>
 
-      <!-- Virtual Controls for Mobile -->
+      <!-- 移动端虚拟摇杆 -->
       <VirtualControls @move="handleVirtualMove" @action="handleVirtualAction" />
     </div>
   </div>
@@ -183,7 +181,7 @@ const gameStore = useGameStore();
 const toastStore = useToastStore();
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
-// State for Interaction Modal
+// 交互弹窗状态
 const showInteraction = ref(false);
 const currentInteraction = ref<{
   customer: Customer;
@@ -203,7 +201,7 @@ let scene: IzakayaScene | null = null;
 const isGeneratingMap = ref(false);
 
 const revenue = ref(0);
-// Inventory State
+// 手持物品与厨房设施状态
 const handInventory = ref<(Item | null)[]>([null, null]);
 const kitchenPot = ref<{ hasFood: boolean; food: CookingSession | null }>({
   hasFood: false,
@@ -220,7 +218,7 @@ interface Order {
 const activeOrders = ref<Order[]>([]);
 const expandedOrderId = ref<string | null>(null);
 
-// Cooking State
+// 烹饪逻辑状态
 const showCooking = ref(false);
 const activeCookingCustomer = ref<{ id: string; name: string; requirements: string } | null>(null);
 
@@ -228,10 +226,10 @@ const emit = defineEmits(['close']);
 
 const getStackTransform = (index: number, id: string) => {
   if (expandedOrderId.value === id) {
-    // Expanded card pops up and centers slightly
+    // 展开后的卡片弹出并轻微居中
     return `translateY(-${index * 4}px) scale(1.02) translateY(-10px)`;
   }
-  // Stack effect: lower cards are pushed down and scaled down
+  // 堆叠效果：下面的卡片被向下推并缩小
   return `translateY(${index * 5}px) scale(${1 - index * 0.02})`;
 };
 
@@ -250,12 +248,12 @@ const handleCustomerInteract = async (event: Event) => {
     let dialogue = '请... 我饿了。';
 
     if (customer.isSpecial) {
-      // Use pre-generated or generate now
+      // 使用预生成的对话或立即生成
       if (customer.dialogue) {
         dialogue = customer.dialogue;
       } else {
         dialogue = await generateCustomerDialogue(customer.name, 'Ordering food at Izakaya');
-        customer.dialogue = dialogue; // Cache it
+        customer.dialogue = dialogue; // 缓存对话
       }
     } else {
       const commonLines = ['麻烦给个菜单！', '有什么推荐吗？', '饿死我啦！'];
@@ -287,12 +285,12 @@ const handleInteract = (e: Event) => {
   let type: 'info' | 'success' | 'warning' | 'error' = 'info';
 
   if (tileName === 'COOKING_POT') {
-    // Kitchen Interaction Logic
+    // 厨房交互逻辑
     if (kitchenPot.value.hasFood) {
-      // Plating Logic
+      // 装盘逻辑
       const bowlIndex = handInventory.value.findIndex((item) => item?.type === 'bowl');
       if (bowlIndex !== -1) {
-        // Found a bowl, plate the food
+        // 找到空碗，将料理装盘
         const food = kitchenPot.value.food!;
         handInventory.value[bowlIndex] = {
           id: `dish-${Date.now()}`,
@@ -309,26 +307,26 @@ const handleInteract = (e: Event) => {
         type = 'warning';
       }
     } else {
-      // Cooking Logic
-      // Check if hands are free (Prompt: "In player hand has items, cannot cook")
-      // Strict: If any item is held, cannot start cooking
+      // 烹饪逻辑
+      // 检查手是否空着（提示：“手里拿着东西无法烹饪”）
+      // 严格限制：如果手里拿着任何东西，都无法开始烹饪
       const hasItems = handInventory.value.some((item) => item !== null);
 
       if (hasItems) {
         message = '手里拿着东西无法烹饪 (需要空手)';
         type = 'warning';
       } else {
-        // Open Cooking UI
+        // 打开烹饪界面
         handleCookingInteract();
-        return; // Skip default toast
+        return; // 跳过默认的吐司提示
       }
     }
   } else if (tileName === 'BOWL_STACK') {
-    // Let's make it: If holding ONLY empty bowls, interact with BOWL_STACK puts them back.
+    // 交互逻辑：如果只拿着空碗，与碗堆交互会将其放回。
 
     const bowlIndex = handInventory.value.findIndex((item) => item?.type === 'bowl');
     if (bowlIndex !== -1) {
-      // Keep reference if needed for future logic
+      // 如果后续逻辑需要，保留引用
     }
 
     const hasOnlyBowls =
@@ -336,7 +334,7 @@ const handleInteract = (e: Event) => {
       handInventory.value.some((item) => item !== null);
 
     if (hasOnlyBowls) {
-      // Put back one bowl
+      // 放回一个空碗
       const slot = handInventory.value.findIndex((item) => item?.type === 'bowl');
       if (slot !== -1) {
         handInventory.value[slot] = null;
@@ -344,7 +342,7 @@ const handleInteract = (e: Event) => {
         type = 'info';
       }
     } else {
-      // Try to take bowl
+      // 尝试拿起一个空碗
       const emptySlotIndex = handInventory.value.findIndex((item) => item === null);
       if (emptySlotIndex !== -1) {
         handInventory.value[emptySlotIndex] = {
@@ -363,7 +361,7 @@ const handleInteract = (e: Event) => {
     const placedItem = scene?.getPlacedItem(x, y);
 
     if (placedItem) {
-      // Table has item, try to pick it up
+      // 桌子上有物品，尝试拿起
       const emptySlotIndex = handInventory.value.findIndex((item) => item === null);
       if (emptySlotIndex !== -1) {
         const item = scene?.pickItem(x, y);
@@ -377,8 +375,8 @@ const handleInteract = (e: Event) => {
         type = 'warning';
       }
     } else {
-      // Table is empty, try to place item
-      // Place the first item found in hand
+      // 桌子是空的，尝试放置物品
+      // 放置手里找到的第一个物品
       const slotIndex = handInventory.value.findIndex((item) => item !== null);
       if (slotIndex !== -1) {
         const itemToPlace = handInventory.value[slotIndex];
@@ -398,49 +396,48 @@ const handleInteract = (e: Event) => {
       }
     }
   } else if (tileName === 'CHAIR' || tileName === 'COUNTER') {
-    // Check if there is a customer
+    // 检查对应的位置是否有顾客
     const entity = (customEvent.detail as any).entity;
     if (entity && entity.type === 'customer') {
       const customer = entity;
-      // Check if customer is waiting for food
-      // Note: We need access to customer state. IzakayaScene exposes entity, but we need to know its state.
-      // Assuming entity object in event detail is the actual reference or copy with state.
+      // 检查顾客是否在等餐
+      // 注意：我们需要访问顾客状态。IzakayaScene 虽然暴露了实体，但我们需要获取其实时状态。
+      // 假设事件详情中的实体对象是包含状态的实际引用。
 
       if (customer.state === 'waiting_food') {
-        // Check if player has dish
+        // 检查玩家手中是否有料理
         const dishIndex = handInventory.value.findIndex((item) => item?.type === 'dish');
         if (dishIndex !== -1) {
           const dishItem = handInventory.value[dishIndex];
           const dishSession = dishItem?.data as CookingSession;
 
-          // Serve food
-          // Remove dish from hand
+          // 上菜逻辑
+          // 从手中移除料理
           handInventory.value[dishIndex] = null;
 
-          // Evaluation Logic
           if (customer.isSpecial && dishSession) {
-            // Trigger LLM Evaluation
+            // 触发大模型评价逻辑
             evaluateDish(customer, dishSession).then((result) => {
               evaluationResult.value = result;
               showEvaluation.value = true;
 
-              // Update Revenue and Reputation based on result
-              // Note: serveCustomer in scene just sets state to eating.
-              // We should override revenue calculation or handle it here?
-              // Scene calculates revenue on finish eating based on order price.
-              // We can update order price?
+              // 根据结果更新收入与声望
+              // 注意：场景中的 serveCustomer 仅将状态设置为正在进食。
+              // 我们是否应该在这里覆盖收入计算或处理它？
+              // 场景在顾客吃完后根据订单价格计算收入。
+              // 我们是否可以更新订单价格？
               if (customer.order) {
                 customer.order.price = result.payment;
               }
               gameStore.state.player.reputation += result.reputation;
             });
           } else {
-            // Simple logic for normal customers
-            // Maybe bonus if cooked well?
-            // For now, just standard price.
+            // 普通顾客的简单逻辑
+            // 如果做得好或许会有加成？
+            // 目前仅使用标准价格。
           }
 
-          // Tell scene to update customer
+          // 通知场景更新顾客状态
           if (scene) {
             scene.serveCustomer(customer.id);
           }
@@ -458,14 +455,14 @@ const handleInteract = (e: Event) => {
           });
         }
       } else {
-        // Just chatting or other states
-        // If seated and not ordering/waiting, maybe small talk?
-        // Let's stick to ordering interaction for now.
+        // 仅聊天或其他状态
+        // 如果已就座但未下单或等待，或许可以触发闲聊？
+        // 目前先保持下单交互。
       }
     }
     return;
   } else if (tileName === 'EXIT') {
-    message = '准备打烊? (End Day UI Placeholder)';
+    message = '准备打烊? (结算界面占位符)';
     type = 'warning';
   }
 
@@ -514,17 +511,12 @@ const handleRevenue = (e: Event) => {
 };
 
 const handleCookingInteract = () => {
-  // Check if we have an active order that needs cooking
-  // For now, we'll just open the cooking interface.
-  // In a real scenario, we might want to link it to a specific order if we want to show requirements.
-
-  // Find the oldest active order to serve as "current context" if available
   const order = activeOrders.value[0];
   if (order) {
     activeCookingCustomer.value = {
-      id: order.id, // Using order ID as link
+      id: order.id,
       name: order.customerName,
-      requirements: order.dishName // Using dish name as requirement for now
+      requirements: order.dishName
     };
   } else {
     activeCookingCustomer.value = null;
@@ -534,10 +526,8 @@ const handleCookingInteract = () => {
 };
 
 const handleCookingFinish = (result: CookingSession) => {
-  console.log('Cooking Finished:', result);
   showCooking.value = false;
 
-  // Store food in pot
   kitchenPot.value = {
     hasFood: true,
     food: result
@@ -557,11 +547,7 @@ const handleCookingClose = () => {
 const initScene = (mapData: any) => {
   if (!canvasRef.value) return;
 
-  console.log('[IzakayaGame] Initializing scene with map data:', mapData);
-
-  // Cleanup existing scene if any
   if (scene) {
-    console.log('[IzakayaGame] Stopping existing scene...');
     scene.stop();
     canvasRef.value.removeEventListener('izakaya-interact', handleInteract);
     canvasRef.value.removeEventListener('izakaya-customer-interact', handleCustomerInteract);
@@ -572,7 +558,6 @@ const initScene = (mapData: any) => {
   scene = new IzakayaScene(canvasRef.value, mapData?.layout);
 
   scene.start();
-  console.log('[IzakayaGame] Scene started.');
 
   canvasRef.value.addEventListener('izakaya-interact', handleInteract);
   canvasRef.value.addEventListener('izakaya-customer-interact', handleCustomerInteract);
@@ -580,14 +565,13 @@ const initScene = (mapData: any) => {
   canvasRef.value.addEventListener('izakaya-revenue', handleRevenue);
 };
 
-// Watch for map updates
 watch(
   () => gameStore.state.system.customMap,
   (newMap) => {
     if (newMap) {
-      console.log('Map updated, re-initializing scene...', newMap);
-      // Deep log to verify content
-      if (newMap.layout) console.log('New Layout Rows:', newMap.layout.length);
+      console.log('地图已更新，正在重新初始化场景...', newMap);
+      // 深度记录以验证内容
+      if (newMap.layout) console.log('新布局行数:', newMap.layout.length);
 
       initScene(newMap);
       toastStore.addToast({
@@ -602,35 +586,35 @@ watch(
 
 onMounted(async () => {
   if (canvasRef.value) {
-    // Check if we need to generate a map
-    // Access customMap from system state
+    // 检查是否需要生成初始地图
+    // 从系统状态访问 customMap
     if (!gameStore.state.system.customMap && !isGeneratingMap.value) {
       isGeneratingMap.value = true;
-      console.log('Generating initial map...');
+      console.log('正在生成初始地图...');
       try {
-        // Get context from system state if available
+        // 获取系统管理状态
         const managementState = gameStore.state.system.management;
-        // Combine storeDescription (layout) and context (story) if available
+        // 结合店铺描述（布局）和上下文（故事情节）
         const parts = [];
         if (managementState?.storeDescription) {
-          parts.push(`Layout Requirements: ${managementState.storeDescription}`);
+          parts.push(`布局要求: ${managementState.storeDescription}`);
         }
         if (managementState?.context) {
-          parts.push(`Story Context: ${managementState.context}`);
+          parts.push(`故事背景: ${managementState.context}`);
         }
         const context = parts.join('\n\n');
 
-        console.log('[IzakayaGame] Generating map with context length:', context.length);
-        console.log('[IzakayaGame] Using context for map:', context.substring(0, 50) + '...');
+        console.log('[IzakayaGame] 正在生成地图，上下文长度:', context.length);
+        console.log('[IzakayaGame] 地图生成上下文预览:', context.substring(0, 50) + '...');
 
-        // Check for previous map (Renovation context)
+        // 检查之前地图 (用于装修改造上下文)
         const previousMap = managementState?.previousMap;
         if (previousMap) {
-          console.log('[IzakayaGame] Renovation Mode: Using previous map as reference.');
+          console.log('[IzakayaGame] 装修改造模式: 使用之前地图作为参考。');
         }
 
         const mapData = await generateMap('New Izakaya', context, previousMap);
-        // Update state with correct structure
+        // 更新全局状态结构
         const newSystemState: any = {
           ...gameStore.state.system,
           customMap: mapData
@@ -639,7 +623,7 @@ onMounted(async () => {
         if (managementState) {
           newSystemState.management = {
             ...managementState,
-            previousMap: undefined // Clear previous map after usage to avoid stale refs
+            previousMap: undefined // 使用后清空前置地图以避免引用过时
           };
         }
 
@@ -647,13 +631,13 @@ onMounted(async () => {
           system: newSystemState
         });
       } catch (e) {
-        console.error('Map gen failed', e);
+        console.error('地图生成失败', e);
       } finally {
         isGeneratingMap.value = false;
       }
     }
 
-    // Initial Scene Setup
+    // 初始场景设置
     const mapData = gameStore.state.system.customMap;
     initScene(mapData);
   }
@@ -673,10 +657,10 @@ onUnmounted(() => {
 
 const closeGame = () => {
   emit('close');
-  // In real implementation, this would trigger the "End of Day" logic
+  // 在实际实现中，这里将触发“结束营业”的结算逻辑
 };
 
-// Virtual controls handlers for mobile
+// 移动端虚拟按键处理程序
 const handleVirtualMove = (direction: { x: number; y: number }) => {
   if (scene) {
     scene.setVirtualInput(direction.x, direction.y);
@@ -701,18 +685,18 @@ const handleVirtualAction = () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 2000; /* High z-index to cover everything */
+  z-index: 2000; /* 设置高 Z 轴索引以覆盖所有界面元素 */
   overflow: hidden;
 }
 
 canvas {
-  background: #1a1a1a; /* Match container to avoid color gaps */
+  background: #1a1a1a; /* 与容器颜色一致以避免颜色断层 */
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
   border-radius: 4px;
-  image-rendering: pixelated; /* Sharp pixels */
+  image-rendering: pixelated; /* 像素锐化处理 */
   image-rendering: crisp-edges;
 
-  /* Responsive scaling for mobile */
+  /* 适配移动端的响应式缩放 */
   max-width: 100vw;
   max-height: 100vh;
   width: auto;
@@ -726,7 +710,7 @@ canvas {
   left: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none; /* Let clicks pass through to canvas if needed, but here we capture button clicks */
+  pointer-events: none; /* 如果需要，允许点击穿透到画布，但此处我们捕获按钮点击 */
 }
 
 .header {
@@ -744,10 +728,10 @@ canvas {
   align-items: center;
 }
 
-/* Floor Switcher */
-/* Removed */
+/* 楼层切换器 */
+/* 已移除 */
 
-/* Money Display */
+/* 钱币显示 */
 .money-display {
   position: absolute;
   top: 20px;
@@ -778,16 +762,16 @@ canvas {
   font-size: 14px;
 }
 
-/* Orders Stack */
+/* 订单栈布局 */
 .orders-stack-container {
   position: absolute;
   bottom: 20px;
   left: 20px;
   width: 250px;
-  height: 300px; /* Fixed height area for stack */
+  height: 300px; /* 固定高度的堆叠区域 */
   display: flex;
   flex-direction: column;
-  pointer-events: none; /* Let clicks pass through, but children will catch them */
+  pointer-events: none; /* 允许点击穿透，但子元素将捕获点击事件 */
 }
 
 .orders-title {

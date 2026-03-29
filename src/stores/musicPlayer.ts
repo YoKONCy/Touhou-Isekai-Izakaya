@@ -17,7 +17,7 @@ const STORAGE_KEY = 'izakaya-music-player-state';
 export const useMusicPlayerStore = defineStore('musicPlayer', () => {
   const settings = useSettingsStore();
 
-  // State
+  // 状态管理 (State)喵~
   const isPlaying = ref(false);
   const playlist = ref<Track[]>([]);
   const currentIndex = ref(0);
@@ -26,10 +26,10 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
   const duration = ref(0);
   const showPlayer = ref(true);
 
-  // Internal Audio Element
+  // 内部音频对象 (Internal Audio Element)
   const audio = new Audio();
 
-  // Computed effective volume
+  // 计算生效音量 (Computed effective volume)
   const effectiveVolume = computed(() => {
     return settings.audioVolume * settings.bgmVolume;
   });
@@ -43,10 +43,10 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
     { immediate: true }
   );
 
-  // Getters
+  // 计算属性 (Getters)喵~
   const currentTrack = computed(() => playlist.value[currentIndex.value]);
 
-  // Persistence Helpers
+  // 持久化辅助函数 (Persistence Helpers)
   function saveState() {
     const state = {
       playlist: playlist.value,
@@ -70,7 +70,7 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
     }
   }
 
-  // Watchers for persistence
+  // 持久化监听器 (Watchers for persistence)喵~
   watch(
     [playlist, currentIndex, mode],
     () => {
@@ -97,14 +97,14 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
     });
     audio.addEventListener('error', (e) => {
       console.error('音频播放错误:', e);
-      next(); // Skip error track
+      next(); // 跳过播放失败的轨道
     });
 
     audio.volume = effectiveVolume.value;
   }
 
   function loadLocalMusic() {
-    // Glob import all audio files in src/assets/music
+    // 自动扫描导入 src/assets/music 目录下的所有音频文件喵！
     const modules = import.meta.glob('@/assets/music/**/*.{mp3,ogg,wav}', {
       eager: true,
       query: '?url',
@@ -163,10 +163,10 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
           isPlaying.value = true;
         })
         .catch((e) => {
-          console.error('Play failed', e);
+          console.error('[音乐播放器] 播放失败喵:', e);
         });
     } else {
-      // Handle iframe/external types (just mark as playing for UI)
+      // 处理 iframe/外部链接类型 (仅在 UI 上标记为正在播放)
       isPlaying.value = true;
     }
   }
@@ -189,7 +189,7 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
     if (mode.value === 'random') {
       nextIndex = Math.floor(Math.random() * playlist.value.length);
     } else if (nextIndex >= playlist.value.length) {
-      nextIndex = 0; // Loop back
+      nextIndex = 0; // 列表循环，回到第一首
     }
     play(nextIndex);
   }
@@ -218,7 +218,7 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
   }
 
   function setVolume(_val: number) {
-    // This is now handled by settings store
+    // 现在由 SettingsStore 统一管控全局音量设置喵
   }
 
   // Watch for external track additions
@@ -236,7 +236,7 @@ export const useMusicPlayerStore = defineStore('musicPlayer', () => {
         pause();
         currentIndex.value = 0;
       } else {
-        // play next (which is now at the same index)
+        // 播放下一首 (此时的索引实际上已经指向了下一首歌曲)喵
         if (isPlaying.value) play();
       }
     }

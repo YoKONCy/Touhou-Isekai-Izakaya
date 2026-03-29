@@ -83,7 +83,7 @@ function handleClose() {
   emit('close');
 }
 
-// Handle touch events for swipe to close
+// 处理滑动关闭的触摸事件喵 (Handle touch events for swipe to close)
 const touchStartX = ref(0);
 const touchCurrentX = ref(0);
 const isSwiping = ref(false);
@@ -115,7 +115,7 @@ function handleTouchEnd() {
 
 <template>
   <Teleport to="body">
-    <!-- Backdrop -->
+    <!-- 背景遮罩层喵 (Backdrop) -->
     <Transition name="fade">
       <div
         v-if="isOpen"
@@ -124,7 +124,7 @@ function handleTouchEnd() {
       ></div>
     </Transition>
 
-    <!-- Drawer Panel -->
+    <!-- 侧边抽屉面板喵 (Drawer Panel) -->
     <Transition name="slide">
       <div
         v-if="isOpen"
@@ -133,10 +133,10 @@ function handleTouchEnd() {
         @touchmove="handleTouchMove"
         @touchend="handleTouchEnd"
       >
-        <!-- Texture Overlay -->
+        <!-- 纸张纹理装饰层喵 (Texture Overlay) -->
         <div class="absolute inset-0 pointer-events-none opacity-20 bg-texture-rice-paper"></div>
 
-        <!-- Header -->
+        <!-- 顶部标题栏喵 (Header) -->
         <div
           class="relative z-10 flex items-center justify-between p-4 border-b border-izakaya-wood/10 bg-touhou-red/5"
         >
@@ -152,7 +152,7 @@ function handleTouchEnd() {
           </button>
         </div>
 
-        <!-- Menu Items -->
+        <!-- 菜单项目列表喵 (Menu Items) -->
         <div class="relative z-10 flex-1 overflow-y-auto py-2">
           <button
             v-for="item in menuItems"
@@ -184,7 +184,7 @@ function handleTouchEnd() {
           </button>
         </div>
 
-        <!-- Footer -->
+        <!-- 底部栏喵 (Footer) -->
         <div class="relative z-10 p-4 border-t border-izakaya-wood/10 bg-white/30">
           <div class="text-xs text-center text-izakaya-wood/40 font-display">
             东方异界食堂 <span class="text-touhou-red">Beta</span>
@@ -197,7 +197,7 @@ function handleTouchEnd() {
 </template>
 
 <style scoped>
-/* Fade transition for backdrop */
+/* 背景遮罩渐变动画喵 (Fade transition for backdrop) */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.2s ease;
@@ -208,7 +208,7 @@ function handleTouchEnd() {
   opacity: 0;
 }
 
-/* Slide transition for drawer */
+/* 侧边抽屉滑动动画喵 (Slide transition for drawer) */
 .slide-enter-active,
 .slide-leave-active {
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);

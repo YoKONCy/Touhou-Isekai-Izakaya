@@ -4,6 +4,7 @@ import { confirmState } from '@/utils/confirm';
 import { AlertTriangle, HelpCircle } from 'lucide-vue-next';
 import { audioManager } from '@/services/audio';
 
+// 监听全局确认框的开启状态变化，开启时自动触发音效逻辑
 watch(
   () => confirmState.value.isOpen,
   (newVal) => {
@@ -13,6 +14,7 @@ watch(
   }
 );
 
+// 用户执行“确认”操作时的核心逻辑：触发 Promise resolve 并关闭视图
 function handleConfirm() {
   audioManager.playClick();
   if (confirmState.value.resolve) {
@@ -21,6 +23,7 @@ function handleConfirm() {
   confirmState.value.isOpen = false;
 }
 
+// 用户执行“取消”操作时的逻辑：返回 false 并清理当前交互会话
 function handleCancel() {
   audioManager.playSoftClick();
   if (confirmState.value.resolve) {
@@ -39,11 +42,11 @@ function handleCancel() {
       <div
         class="relative bg-[#fcfae8] dark:bg-stone-900 w-full max-w-sm rounded-xl shadow-2xl overflow-hidden transform scale-100 transition-all border-2 border-izakaya-wood/30 dark:border-stone-600"
       >
-        <!-- Texture Overlay -->
+        <!-- 装饰性纸张纹理 -->
         <div class="absolute inset-0 pointer-events-none opacity-40 bg-texture-rice-paper"></div>
 
         <div class="relative z-10 p-6 text-center">
-          <!-- Icon -->
+          <!-- 提示图标 -->
           <div
             class="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 border-2 shadow-inner"
             :class="

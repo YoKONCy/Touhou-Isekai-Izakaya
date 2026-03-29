@@ -1,5 +1,5 @@
 <template>
-  <!-- Action Wheel (Bottom Right - Persona 5 Style) -->
+  <!-- 战斗行动轮盘 (右下角 - Persona 5 风格) -->
   <div
     class="absolute bottom-10 right-20 pointer-events-auto perspective-1000"
     :class="{
@@ -7,14 +7,14 @@
         selectionMode || isActing || phase !== 'player' || isGameOver
     }"
   >
-    <!-- Main Menu -->
+    <!-- 主菜单状态 -->
     <div
       v-if="currentMenu === 'main'"
       class="relative w-64 h-64 transition-all duration-500 transform-style-3d flex items-center justify-center"
       @mouseenter="isMenuOpen = true"
       @mouseleave="isMenuOpen = false"
     >
-      <!-- Center: Attack (Pentagon) -->
+      <!-- 中心区域：普通攻击 (五边形) -->
       <button
         @click="$emit('action', 'attack')"
         @mouseenter="$emit('hover-sound')"
@@ -25,11 +25,11 @@
         <span
           class="transform transition-transform drop-shadow-md"
           :class="isMenuOpen ? '-rotate-[360deg]' : ''"
-          >ATTACK</span
+          >攻击</span
         >
       </button>
 
-      <!-- 1. Spell (Top Right, 36deg) -->
+      <!-- 1. 符卡 (右上, 36deg) -->
       <button
         @click="$emit('switch-menu', 'spell')"
         @mouseenter="$emit('hover-sound')"
@@ -44,11 +44,11 @@
       >
         <span
           class="transform -rotate-[36deg] group-hover:scale-110 transition-transform text-xl block"
-          >SPELL</span
+          >符卡</span
         >
       </button>
 
-      <!-- 2. Item (Bottom Right, 108deg) -->
+      <!-- 2. 道具 (右下, 108deg) -->
       <button
         @click="$emit('switch-menu', 'item')"
         @mouseenter="$emit('hover-sound')"
@@ -63,11 +63,11 @@
       >
         <span
           class="transform -rotate-[108deg] group-hover:scale-110 transition-transform text-xl block"
-          >ITEM</span
+          >道具</span
         >
       </button>
 
-      <!-- 3. Special -->
+      <!-- 3. 特技 (正下, 180deg) -->
       <button
         @click="$emit('switch-menu', 'special')"
         @mouseenter="$emit('hover-sound')"
@@ -82,11 +82,11 @@
       >
         <span
           class="transform -rotate-[180deg] group-hover:scale-110 transition-transform text-xl block"
-          >SPECIAL</span
+          >特技</span
         >
       </button>
 
-      <!-- 4. Escape (Disabled) -->
+      <!-- 4. 撤退 (当前版本禁用) -->
       <button
         class="absolute z-20 w-32 h-32 -ml-16 -mt-16 bg-black border-2 border-gray-700 text-gray-700 font-bold text-lg font-display italic flex items-center justify-center clip-wedge transition-all duration-500 ease-out cursor-not-allowed"
         :style="{
@@ -96,10 +96,10 @@
           opacity: isMenuOpen ? 0.5 : 0
         }"
       >
-        <span class="transform -rotate-[252deg] text-xl block">ESCAPE</span>
+        <span class="transform -rotate-[252deg] text-xl block">撤退</span>
       </button>
 
-      <!-- 5. Talk -->
+      <!-- 5. 嘴遁 (左上, 324deg) -->
       <button
         @click="$emit('switch-menu', 'talk')"
         @mouseenter="$emit('hover-sound')"
@@ -114,18 +114,18 @@
       >
         <span
           class="transform -rotate-[324deg] group-hover:scale-110 transition-transform text-xl block"
-          >TALK</span
+          >嘴遁</span
         >
       </button>
     </div>
 
-    <!-- Sub Menu: Spells -->
+    <!-- 子菜单：符卡列表 -->
     <div
       v-else-if="currentMenu === 'spell'"
       class="relative w-80 min-h-[300px] flex flex-col gap-2 items-end animate-slide-in-right"
     >
       <div class="text-3xl font-black italic text-purple-400 mb-4 drop-shadow-glow font-display">
-        SPELL CARDS
+        待选符卡
       </div>
 
       <!-- Hover Info Panel -->
@@ -190,17 +190,17 @@
         @mouseenter="$emit('hover-sound')"
         class="mt-4 text-gray-400 hover:text-white font-bold italic transition-colors"
       >
-        BACK
+        返回
       </button>
     </div>
 
-    <!-- Sub Menu: Items -->
+    <!-- 子菜单：物品列表 -->
     <div
       v-else-if="currentMenu === 'item'"
       class="relative w-80 min-h-[300px] flex flex-col gap-2 items-end animate-slide-in-right"
     >
       <div class="text-3xl font-black italic text-blue-400 mb-4 drop-shadow-glow font-display">
-        ITEMS
+        持有道具
       </div>
 
       <button
@@ -223,11 +223,11 @@
         @mouseenter="$emit('hover-sound')"
         class="mt-4 text-gray-400 hover:text-white font-bold italic transition-colors"
       >
-        BACK
+        返回
       </button>
     </div>
 
-    <!-- Sub Menu: Talk -->
+    <!-- 子菜单：嘴遁系统 -->
     <div
       v-else-if="currentMenu === 'talk'"
       class="relative w-96 min-h-[300px] flex flex-col gap-2 items-end animate-slide-in-right"
@@ -236,7 +236,7 @@
         class="text-3xl font-black italic text-green-400 mb-4 drop-shadow-glow font-display flex items-center gap-2"
       >
         <MessageSquare class="w-8 h-8" />
-        PERSUASION
+        言语说服
       </div>
 
       <div class="w-full bg-black/80 border-2 border-green-500 p-4 relative">
@@ -269,7 +269,7 @@
           class="flex items-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold transition-colors clip-rect-left"
         >
           <Send class="w-4 h-4" />
-          SEND <span class="text-xs ml-1 opacity-90 font-mono">(15P)</span>
+          发送 <span class="text-xs ml-1 opacity-90 font-mono">(15P)</span>
         </button>
       </div>
 
@@ -278,17 +278,17 @@
         @mouseenter="$emit('hover-sound')"
         class="mt-4 text-gray-400 hover:text-white font-bold italic transition-colors"
       >
-        BACK
+        返回
       </button>
     </div>
 
-    <!-- Sub Menu: Special -->
+    <!-- 子菜单：特技系统 -->
     <div
       v-else-if="currentMenu === 'special'"
       class="relative w-80 min-h-[300px] flex flex-col gap-2 items-end animate-slide-in-right"
     >
       <div class="text-3xl font-black italic text-yellow-400 mb-4 drop-shadow-glow font-display">
-        SPECIAL
+        主角特技
       </div>
       <div class="w-full h-[300px] overflow-y-auto pr-2 custom-scrollbar flex flex-col gap-2">
         <button
@@ -379,7 +379,7 @@ const isMenuOpen = ref(false);
 const hoveredSpell = ref<SpellCard | null>(null);
 
 const talkInputModel = ref(props.talkInput);
-// Sync with parent
+// 与父级组件同步状态流
 import { watch } from 'vue';
 watch(
   () => props.talkInput,

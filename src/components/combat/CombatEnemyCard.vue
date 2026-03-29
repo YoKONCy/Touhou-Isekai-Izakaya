@@ -1,9 +1,9 @@
 <template>
-  <!-- Enemy Side (Top Right) -->
+  <!-- 敌方阵营展示区域 (右上) -->
   <div
     class="absolute top-0 right-0 w-[60%] h-[60%] flex flex-row justify-end items-start pr-10 pt-10 gap-8 pointer-events-none"
   >
-    <!-- Reserve Enemies (Compact Mode) -->
+    <!-- 后备敌人列表 (紧凑模式) -->
     <div
       v-if="reserveEnemies.length > 0"
       class="flex flex-col gap-2 pt-4 pointer-events-auto mr-4 animate-fade-in"
@@ -20,7 +20,7 @@
       >
         <div class="flex justify-between items-center mb-1">
           <span class="font-bold font-display text-white truncate text-sm">{{ en.name }}</span>
-          <span class="text-xs font-mono text-purple-300">WAITING</span>
+          <span class="text-xs font-mono text-purple-300">待场中</span>
         </div>
         <div class="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
           <div
@@ -37,7 +37,7 @@
       </div>
     </div>
 
-    <!-- Active Enemies (Full Card Mode) -->
+    <!-- 活跃敌人列表 (全卡片模式) -->
     <div
       v-for="(en, idx) in activeEnemies"
       :key="en.id"
@@ -56,9 +56,9 @@
         zIndex: hoveredEnemyId === en.id ? 50 : activeEnemies.length - idx
       }"
     >
-      <!-- Enemy Sprite / Card -->
+      <!-- 敌人立绘与背景描述卡片 -->
       <div class="relative w-full h-full flex items-start justify-center animate-float-delayed">
-        <!-- Alive State -->
+        <!-- 存活状态表现 (Alive State) -->
         <div
           v-if="en.hp > 0"
           class="w-full h-full relative group"
@@ -74,7 +74,7 @@
               :src="getSpriteUrl(en.name)"
               @error="(e) => ((e.target as HTMLImageElement).src = defaultSprite)"
               class="w-full h-full object-cover object-top drop-shadow-2xl transition-transform duration-500 group-hover:scale-[1.02]"
-              alt="Enemy"
+              alt="敌方单位"
             />
           </div>
           <div class="absolute inset-0 rounded-b-3xl overflow-hidden z-20 pointer-events-none">
@@ -89,7 +89,7 @@
           </div>
         </div>
 
-        <!-- Dead State (Shattered) -->
+        <!-- 死亡/战损状态表现 (Shattered / Dead State) -->
         <div v-else class="absolute inset-0 w-full h-full pointer-events-none">
           <div
             class="absolute inset-0 w-full h-full rounded-b-3xl backdrop-blur-sm border-t-4 border-purple-500 animate-shatter-1 overflow-hidden"
@@ -127,7 +127,7 @@
           </div>
         </div>
 
-        <!-- Damage Popup -->
+        <!-- 数值弹出窗口 (Damage/Heal Popup) -->
         <div
           v-for="p in en.popups"
           :key="p.id"
@@ -143,7 +143,7 @@
         </div>
       </div>
 
-      <!-- Enemy Status HUD -->
+      <!-- 敌方状态 HUD 条叠层 -->
       <div
         class="absolute -left-10 bottom-10 flex flex-col gap-2 transform skew-x-[10deg] items-end w-full transition-all duration-500"
         :class="
@@ -174,7 +174,7 @@
           </div>
         </div>
 
-        <!-- Buffs -->
+        <!-- 增益与减益状态图标集合 (Buffs/Debuffs) -->
         <div class="flex flex-wrap gap-1 justify-end max-w-[150px]">
           <div v-for="buff in en.buffs" :key="buff.id" class="relative group/buff">
             <div

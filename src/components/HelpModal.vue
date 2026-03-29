@@ -31,7 +31,7 @@ const filteredSections = computed(() => {
   );
 });
 
-// Sync activeSectionId with prop when modal opens
+// 当模态框开启时，同步注入初始激活的章节 ID 喵 (Sync section)
 watch(
   () => props.isOpen,
   (val) => {
@@ -41,7 +41,7 @@ watch(
         activeSectionId.value = props.initialSectionId;
       }
     } else if (val === false) {
-      // Only play close sound if it was actually open
+      // 仅在真实关闭动作发生时播放收回音效喵 (Close sound)
       audioManager.playWindowClose();
     }
   }
@@ -54,7 +54,7 @@ function handleSectionClick(id: string) {
 
 function handleContentClick(event: MouseEvent) {
   const target = event.target as HTMLElement;
-  // Check if clicked element is an anchor tag with special action
+  // 嗅探点击元素是否为带有特殊指令的锚点标签喵 (Action Link)
   const anchor = target.closest('a');
   if (anchor) {
     const href = anchor.getAttribute('href');
@@ -64,14 +64,13 @@ function handleContentClick(event: MouseEvent) {
       console.log('[HelpModal] Triggering action:', action);
 
       if (action === 'stay') {
-        // Do nothing for self-reference
+        // 自引用逻辑，保持当前状态不动喵 (Self-ref)
         return;
       }
 
       audioManager.playClick();
       emit('action', action);
-      // Close help modal for most actions to allow user to see the result
-      // But maybe we want to keep it open? Let's assume close for navigation actions.
+      // 执行动作后通常关闭引导框，以便用户观察交互反馈喵 (Assumption: close for flow)
       if (action !== 'stay') {
         emit('close');
       }
@@ -79,12 +78,11 @@ function handleContentClick(event: MouseEvent) {
   }
 }
 
-// Custom parser wrapper to inject custom styles for action links
+// 注入自定义渲染管道，为 Markdown 转化的 HTML 应用样式喵 (HTML Injector)
 const parsedContent = computed(() => {
   if (!activeSection.value) return '';
   let html = parseMarkdown(activeSection.value.content);
-  // We can enhance the HTML here if needed, e.g. adding icons to links
-  // But standard markdown parser output with simple <a> tags is enough if styled correctly
+  // 此处可对 HTML 进行二次增强逻辑，例如注入自定义图标等 喵
   return html;
 });
 </script>
@@ -103,22 +101,22 @@ const parsedContent = computed(() => {
       class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
       @click.self="emit('close')"
     >
-      <!-- Backdrop -->
+      <!-- 半透明背景遮罩 (Backdrop) 喵 -->
       <div
         class="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
         @click="emit('close')"
       ></div>
 
-      <!-- Modal Card -->
+      <!-- 引导框主体容器 (Modal Card) 喵 -->
       <div
         class="relative bg-izakaya-paper w-full max-w-5xl h-[80vh] rounded-xl shadow-2xl flex flex-col overflow-hidden border-2 border-izakaya-wood/20"
       >
-        <!-- Texture Overlay -->
+        <!-- 东方风格蒙层纹理 (Texture Overlay) 喵 -->
         <div
           class="absolute inset-0 pointer-events-none opacity-20 bg-texture-rice-paper mix-blend-multiply z-0"
         ></div>
 
-        <!-- Header -->
+        <!-- 顶部功能标题栏 (Header) 喵 -->
         <div
           class="relative z-10 flex items-center justify-between px-6 py-4 bg-izakaya-wood/5 border-b border-izakaya-wood/10"
         >
@@ -142,13 +140,13 @@ const parsedContent = computed(() => {
           </button>
         </div>
 
-        <!-- Body -->
+        <!-- 面板核心内容区 (Body Area) 喵 -->
         <div class="relative z-10 flex flex-col md:flex-row flex-1 min-h-0">
-          <!-- Sidebar (TOC) - Desktop: left sidebar, Mobile: top tabs -->
+          <!-- 导航侧边栏 (Sidebar/TOC)：桌面端侧置，移动端顶部切换 喵 -->
           <div
             class="md:w-64 bg-white/50 border-b md:border-b-0 md:border-r border-izakaya-wood/10 flex flex-col flex-shrink-0"
           >
-            <!-- Mobile: Horizontal scrollable tabs -->
+            <!-- 移动端专供：横向滚动视口 喵 -->
             <div
               class="md:hidden overflow-x-auto p-2 flex gap-2"
               style="-webkit-overflow-scrolling: touch"
@@ -168,7 +166,7 @@ const parsedContent = computed(() => {
               </button>
             </div>
 
-            <!-- Desktop: Vertical list -->
+            <!-- 桌面端专供：纵向章节列表 喵 -->
             <div class="hidden md:block flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
               <button
                 v-for="section in filteredSections"
@@ -187,7 +185,7 @@ const parsedContent = computed(() => {
             </div>
           </div>
 
-          <!-- Content Area -->
+          <!-- 文档正文渲染区 (Content Area) 喵 -->
           <div
             class="flex-1 overflow-y-auto bg-white/80 p-4 md:p-8 custom-scrollbar relative"
             style="-webkit-overflow-scrolling: touch"
@@ -195,11 +193,11 @@ const parsedContent = computed(() => {
             <div
               class="max-w-3xl mx-auto prose prose-stone prose-headings:font-display prose-headings:text-izakaya-wood prose-a:text-touhou-red prose-a:no-underline prose-a:font-bold prose-a:border-b-2 prose-a:border-touhou-red/20 hover:prose-a:border-touhou-red hover:prose-a:bg-touhou-red/5 prose-a:transition-all prose-a:px-1 prose-a:rounded-sm prose-img:rounded-xl prose-strong:text-touhou-red/80"
             >
-              <!-- Render Content -->
+              <!-- 渲染后的 Markdown 内容 喵 -->
               <div v-html="parsedContent" @click="handleContentClick"></div>
             </div>
 
-            <!-- Interaction Hint -->
+            <!-- 操作交互提示 (Interaction Hint) 喵 -->
             <div
               class="mt-12 pt-6 border-t border-izakaya-wood/10 text-center text-xs text-izakaya-wood/40 flex items-center justify-center gap-2"
             >
@@ -214,7 +212,7 @@ const parsedContent = computed(() => {
 </template>
 
 <style>
-/* Custom Scrollbar for this modal */
+/* 针对该模态框的自定义滚动条样式 喵 (Custom Scrollbar) */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }

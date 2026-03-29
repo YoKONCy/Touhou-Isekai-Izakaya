@@ -43,15 +43,15 @@ function dismiss() {
       v-if="isVisible && saveStore.isDefaultSave && chatStore.messages.length < 20"
       class="mx-4 mt-2 mb-4 relative group"
     >
-      <!-- Background with Glassmorphism and Touhou Theme -->
+      <!-- 东方主题风格的毛玻璃渐降背景 喵 (Glassmorphism Background) -->
       <div
         class="absolute inset-0 bg-touhou-red/5 backdrop-blur-md rounded-xl border-2 border-touhou-red/20 shadow-lg group-hover:shadow-touhou-red/10 transition-shadow duration-500"
       ></div>
 
-      <!-- Content Container -->
+      <!-- 核心功能内容承载容器 喵 (Content Container) -->
       <div class="relative px-5 py-4 flex items-center justify-between gap-4">
         <div class="flex items-center gap-4">
-          <!-- Animated Icon Box -->
+          <!-- 动态呼吸交互图标框 喵 (Animated Icon Box) -->
           <div
             class="w-10 h-10 rounded-full bg-touhou-red text-white flex items-center justify-center shadow-md animate-pulse-slow"
           >
@@ -65,7 +65,7 @@ function dismiss() {
               新玩家引导
               <span
                 class="px-1.5 py-0.5 bg-touhou-red/10 text-touhou-red text-[10px] rounded uppercase tracking-wider"
-                >Recommended</span
+                >推荐喵</span
               >
             </h3>
             <p class="text-xs md:text-sm text-izakaya-wood/70 font-serif">
@@ -78,7 +78,7 @@ function dismiss() {
         </div>
 
         <div class="flex items-center gap-2">
-          <!-- Secondary Action: Help -->
+          <!-- 次级操作：跳转至玩法说明手册 喵 (Secondary Help) -->
           <button
             @click="handleOpenHelp"
             class="hidden md:flex items-center gap-2 px-3 py-2 bg-white/50 hover:bg-white/80 text-izakaya-wood/70 hover:text-izakaya-wood rounded-lg text-xs font-bold border border-izakaya-wood/10 transition-all active:scale-95"
@@ -88,7 +88,7 @@ function dismiss() {
             <span>玩法说明</span>
           </button>
 
-          <!-- Primary Action -->
+          <!-- 主要操作：跳转至存档管理中心 喵 (Primary Save Action) -->
           <button
             @click="handleOpenSaveManager"
             class="flex items-center gap-2 px-4 py-2 bg-touhou-red hover:bg-touhou-red-dark text-white rounded-lg text-xs md:text-sm font-bold shadow-sm hover:shadow-md transition-all active:scale-95 group/btn"
@@ -98,7 +98,7 @@ function dismiss() {
             <ArrowRight class="w-3 h-3 group-hover/btn:translate-x-1 transition-transform" />
           </button>
 
-          <!-- Dismiss -->
+          <!-- 暂时搁置当前引导提示 喵 (Dismiss Guide) -->
           <button
             @click="dismiss"
             class="p-2 text-izakaya-wood/40 hover:text-izakaya-wood/80 hover:bg-white/50 rounded-full transition-all"
@@ -109,7 +109,7 @@ function dismiss() {
         </div>
       </div>
 
-      <!-- Decorative Texture Overlay -->
+      <!-- 静态星尘装饰性纹理 喵 (Decorative Texture) -->
       <div
         class="absolute inset-0 pointer-events-none opacity-[0.03] bg-texture-stardust rounded-xl"
       ></div>

@@ -566,8 +566,8 @@ ${allyDescriptions}
 }`;
 
   try {
-    console.log('[CombatLogic] Sending prompt to LLM4:', systemPrompt);
-    console.log('[CombatLogic] User input:', userInput);
+    console.log('[战斗逻辑] 正在将说服请求发送至杂项模型 (LLM4) 喵:', systemPrompt);
+    console.log('[战斗逻辑] 用户输入内容喵:', userInput);
 
     const response = await generateCompletion({
       modelType: 'misc', // Use LLM4
@@ -576,7 +576,7 @@ ${allyDescriptions}
       messages: [{ role: 'user', content: userInput }]
     });
 
-    console.log('[CombatLogic] Raw response from LLM4:', response);
+    console.log('[战斗逻辑] 收到来自杂项模型 (LLM4) 的原始响应喵:', response);
 
     // 预处理：清洗 Markdown 代码块标记及冗余的开场白
     let cleaned = response.trim();
@@ -595,10 +595,10 @@ ${allyDescriptions}
     }
 
     const result = JSON.parse(cleaned) as PersuasionResult;
-    console.log('[CombatLogic] Parsed PersuasionResult:', result);
+    console.log('[战斗逻辑] 解析后的说服判定结果喵:', result);
     return result;
   } catch (error) {
-    console.error('Persuasion LLM Error:', error);
+    console.error('[战斗逻辑] 说服模型调用异常喵:', error);
     return {
       narrative: '你的话语消散在风中，似乎没有什么效果……',
       effects: []

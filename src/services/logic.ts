@@ -359,8 +359,8 @@ const MULTIPLAYER_ACTION = `3. UPDATE_COMPANION: targetName (角色名称), fiel
  */
 export class LogicService {
   /**
-   * 数据清洗：在将玩家状态发送至逻辑模型前，剔除冗余或大体积字段以节省 Token (Context Sanitization)
-   */
+    * 数据清洗：在将玩家状态发送至逻辑模型前，剔除冗余或大体积字段以节省 Token (上下文脱敏与精简 - Context Sanitization)
+    */
   public sanitizePlayer(player: any) {
     if (!player) return player;
     const sanitized = { ...player };
@@ -394,8 +394,8 @@ export class LogicService {
     let lastError: any = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      if (signal?.aborted) throw new Error('Operation aborted by user');
-      try {
+       if (signal?.aborted) throw new Error('操作已被用户中止喵');
+       try {
         return await this._executeLogicRequest(userContent, storyContent, gameState, signal);
       } catch (e: any) {
         lastError = e;
@@ -448,12 +448,12 @@ export class LogicService {
     const config = settingsStore.getEffectiveConfig('logic');
 
     if (!config.apiKey) {
-      console.warn('逻辑模型 (Logic LLM) 未配置，跳过本轮处理。');
-      return { thinking: '', actions: [], quick_replies: [], summary: '' };
-    }
-
-    // 启发式扫描：在当前及近期剧情文本中检测 NPC 姓名，以便在上下文中动态注入对应的属性快照 (Entity Resolution)
-    // 此举确保当预设角色（如灵梦、魔理沙）登场时，逻辑模型能够获取其真实数值基础，而非凭空臆攒属性幻觉。
+       console.warn('逻辑模型 (Logic LLM) 未配置，跳过本轮处理。');
+       return { thinking: '', actions: [], quick_replies: [], summary: '' };
+     }
+ 
+     // 启发式扫描：在当前及近期剧情文本中检测 NPC 姓名，以便在上下文中动态注入对应的属性快照 (实体解析与对齐 - Entity Resolution)
+     // 此举确保当预设角色（如灵梦、魔理沙）登场时，逻辑模型能够获取其真实数值基础，而非凭空臆攒属性幻觉。
     // 增强扫描：覆盖前 2 轮对话 (约 4 条消息) + 当前用户意图 + 本轮叙事文本 + 系统预测的下一轮角色名单。
     const chatStore = useChatStore();
     const recentMessages = chatStore.messages.slice(-4);
@@ -480,13 +480,13 @@ export class LogicService {
 
     // 策略 B：检索静态设定库 (Lorebook)，寻找尚未实例化或信息不完整的隐藏角色
     for (const char of charStore.characters) {
-      if (
-        scanText.includes(char.name) ||
-        (char.tags && char.tags.some((tag) => scanText.includes(tag)))
-      ) {
-        if (!mentionedNpcMap.has(char.uuid)) {
-          // 数据优先级：若已存在运行时状态，则以该状态为准，严禁重置好感度/关系 (Persistence Guard)
-          const runtimeState = gameState.npcs && gameState.npcs[char.uuid];
+       if (
+         scanText.includes(char.name) ||
+         (char.tags && char.tags.some((tag) => scanText.includes(tag)))
+       ) {
+         if (!mentionedNpcMap.has(char.uuid)) {
+           // 数据优先级：若已存在运行时状态，则以该状态为准，严禁重置好感度/关系 (状态持久化守卫 - Persistence Guard)
+           const runtimeState = gameState.npcs && gameState.npcs[char.uuid];
           if (runtimeState) {
             mentionedNpcMap.set(char.uuid, runtimeState);
           } else {
@@ -530,11 +530,11 @@ export class LogicService {
           npcData = { id, name: id };
         }
       }
-      relevantNpcs.push(npcData);
-    }
-
-    // 场外对话注入：添加被剧情提及但并未身处当前地点的角色，作为隐式逻辑参考 (Background Reference)
-    for (const [id, npc] of mentionedNpcMap.entries()) {
+       relevantNpcs.push(npcData);
+     }
+ 
+     // 场外对话注入：添加被剧情提及但并未身处当前地点的角色，作为隐式逻辑参考 (背景逻辑参考 - Background Reference)
+     for (const [id, npc] of mentionedNpcMap.entries()) {
       if (!currentSceneIds.has(id)) {
         relevantNpcs.push(npc);
       }
@@ -626,7 +626,7 @@ export class LogicService {
         signal
       });
 
-      if (!content) throw new Error('Empty response from Logic LLM');
+      if (!content) throw new Error('逻辑模型 (Logic LLM) 返回了空响应喵');
 
       // 0. 思维链剥离 (Strip CoT): 移除类似 <think>...</think> 的内部推理原件
       // 此逻辑支持处理如 DeepSeek、Gemini Pro 等具备原生思维输出能力的高阶模型
@@ -715,12 +715,12 @@ export class LogicService {
 
       const sanitizedContent = sanitizeJson(content);
 
-      let result: LogicResult;
-      try {
-        result = JSON.parse(sanitizedContent) as LogicResult;
-      } catch (parseError) {
-        // 降级策略（容错）：若严苛解析失败，尝试最后一次放宽限制，对缺失引号的字典键进行正则补全 (Forgiving Parse)
-        // 采用上下文敏感的正则策略（前缀必须为 '{' 或 ','），防止误伤普通语义文本。
+       let result: LogicResult;
+       try {
+         result = JSON.parse(sanitizedContent) as LogicResult;
+       } catch (parseError) {
+         // 降级策略（容错）：若严苛解析失败，尝试最后一次放宽限制，对缺失引号的字典键进行正则补全 (容错性宽松解析 - Forgiving Parse)
+         // 采用上下文敏感的正则策略（前缀必须为 '{' 或 ','），防止误伤普通语义文本。
         try {
           const fixed = sanitizedContent.replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3');
           result = JSON.parse(fixed) as LogicResult;
@@ -765,16 +765,16 @@ export class LogicService {
         let playerGlobalSetting = '无特殊设定';
         const rawPersona = player.persona || '';
 
-        // 结构解包：若人设采用 JSON 协议存储，则根据 PromptBuilder 协议按需提取逻辑字段 (Flattening)
+        // 结构解包：若人设采用 JSON 协议存储，则根据 PromptBuilder 协议按需提取逻辑字段 (打平处理 - Flattening)
         try {
           const jsonObj = JSON.parse(rawPersona);
 
-          // 1. 提取核心文本描述 (Core Bio)
+          // 1. 提取核心文本描述 (核心传记描述 - Core Bio)
           if (jsonObj['详细人设']) playerDesc = jsonObj['详细人设'];
           else if (jsonObj['补充设定']) playerDesc = jsonObj['补充设定'];
           else playerDesc = '无特殊描述';
 
-          // 2. 剥离全局系统设定 (Global Lore Background)
+          // 2. 剥离全局系统设定 (全局世界观背景 - Global Lore Background)
           const settingObj = { ...jsonObj };
           if ('详细人设' in settingObj) delete settingObj['详细人设'];
           if ('补充设定' in settingObj) delete settingObj['补充设定'];
@@ -805,7 +805,7 @@ export class LogicService {
           const staticChar = charStore.characters.find((ch) => ch.uuid === resolvedId);
 
           const desc = staticChar?.description || '暂无详细设定';
-          // 属性修演：若描述过长则执行截断处理，防止 Token 膨胀 (Context Compression)
+          // 属性修演：若描述过长则执行截断处理，防止 Token 膨胀 (上下文压缩策略 - Context Compression)
           const safeDesc = desc.length > 300 ? desc.substring(0, 300) + '...' : desc;
 
           systemPrompt += `- **${c.name}**: ${safeDesc}\n`;
@@ -813,9 +813,8 @@ export class LogicService {
       }
 
       // 运行阶段 1：调用生成接口 (使用 LLM4 / Misc 辅助模型渲染文本)
-      // 注意：这里明确根据需求，使用辅助模型 (LLM4) 执行文本润色与叙事生成。
       console.log(
-        '[LogicService] 正在生成战斗战报。摘要:',
+        '[逻辑服务] 正在通过杂项模型生成战斗润色文本喵。内容摘要:',
         combatSummary.substring(0, 100) + '...'
       );
       const content = await generateCompletion({
@@ -827,17 +826,17 @@ export class LogicService {
         signal
       });
 
-      console.log('[LogicService] LLM4 Raw Output Length:', content?.length || 0);
+      console.log('[逻辑服务] 杂项模型 (LLM4) 原始输出长度喵:', content?.length || 0);
       const trimmedContent = (content || '').trim();
 
       if (!trimmedContent) {
         console.warn(
-          '[LogicService] LLM4 响应内容为空！自动回退为原始结算摘要。'
+          '[逻辑服务] 杂项模型 (LLM4) 响应内容为空喵！自动回退为原始结算摘要。'
         );
         return `(系统提示：战斗描写生成为空，以下是战斗结算信息)\n${combatSummary}`;
       }
 
-      console.log('[LogicService] Successfully generated narrative.');
+      console.log('[LogicService] 已成功生成战斗渲染叙事文本喵');
       return trimmedContent;
     } catch (e: any) {
       console.error('[LogicService] 战斗叙事生成失败:', e);

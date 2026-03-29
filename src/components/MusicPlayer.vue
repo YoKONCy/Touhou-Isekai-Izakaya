@@ -25,7 +25,7 @@ const showSettings = ref(false);
 const isHovered = ref(false);
 const isExpanded = ref(false); // Changed to false by default
 
-// Combat State Integration
+// 联动战斗状态：若进入战斗则自动静默背景音乐喵 (Combat Integration)
 const isCombatActive = computed(() => {
   const combat = gameStore.state.system.combat;
   return !!combat && (combat.isActive || combat.isPending);
@@ -33,7 +33,7 @@ const isCombatActive = computed(() => {
 
 const wasPlayingBeforeCombat = ref(false);
 
-// Auto-pause music when entering combat and resume when leaving
+// 战斗介入监听：进入战斗即暂停，战斗结束根据历史状态智能恢复喵
 watch(isCombatActive, (active) => {
   if (active) {
     if (store.isPlaying) {
@@ -52,7 +52,7 @@ watch(isCombatActive, (active) => {
   }
 });
 
-// Draggable logic
+// 面板随动拖拽逻辑计算 喵 (Draggable Logic)
 const getDefaultPosition = () => ({
   x: window.innerWidth - 300,
   y: window.innerHeight - 100
@@ -101,7 +101,7 @@ function stopDrag() {
   window.removeEventListener('touchend', stopDrag);
 }
 
-// Touch event handlers for mobile
+// 移动端专用触摸拖拽处理器 喵 (Touch Handlers)
 function startTouchDrag(e: TouchEvent) {
   if (showSettings.value) return;
   const touch = e.touches[0];
@@ -134,7 +134,7 @@ onUnmounted(() => {
 onMounted(() => {
   store.init();
   window.addEventListener('resize', handleResize);
-  // Ensure we start at default position every time the component mounts (page entry)
+  // 确保每次挂载组件（如重新进入页面）时均重置到默认右上角位置喵
   position.value = getDefaultPosition();
 });
 
@@ -164,7 +164,7 @@ function handleAddTrack() {
       type: 'local' // Treat as direct audio
     });
   } else if (newTrackType.value === 'netease') {
-    // Input should be ID
+    // 此处输入应为网易云音轨的纯数字 ID 喵
     const id = newTrackInput.value;
     store.addTrack({
       id: `netease-${id}`,
@@ -198,7 +198,7 @@ function toggleExpand() {
     @mouseenter="isHovered = true"
     @mouseleave="isHovered = false"
   >
-    <!-- Settings/Playlist Panel -->
+    <!-- 播放列表与核心设置面板面层 喵 (Settings Panel) -->
     <Transition
       enter-active-class="transition duration-200 ease-out"
       enter-from-class="opacity-0 translate-y-4 scale-95"
@@ -211,7 +211,7 @@ function toggleExpand() {
         v-if="showSettings"
         class="bg-izakaya-paper border-2 border-izakaya-wood/30 rounded-lg shadow-xl w-80 overflow-hidden mb-2 absolute bottom-full right-0"
       >
-        <!-- Header -->
+        <!-- 面板头部标题栏 (Header) 喵 -->
         <div
           class="bg-izakaya-wood/10 px-4 py-2 flex items-center justify-between border-b border-izakaya-wood/10"
         >
@@ -241,7 +241,7 @@ function toggleExpand() {
           </div>
         </div>
 
-        <!-- Add Track -->
+        <!-- 外部音源快捷添加区 (Add Track Form) 喵 -->
         <div class="p-3 border-b border-izakaya-wood/10 bg-white/50">
           <div class="flex gap-2 mb-2 text-xs">
             <button
@@ -287,7 +287,7 @@ function toggleExpand() {
           </div>
         </div>
 
-        <!-- Playlist -->
+        <!-- 实时音轨播放队列 (Playlist View) 喵 -->
         <div class="max-h-60 overflow-y-auto p-1 custom-scrollbar">
           <div
             v-for="(track, index) in store.playlist"
@@ -330,14 +330,14 @@ function toggleExpand() {
       </div>
     </Transition>
 
-    <!-- Main Player UI -->
+    <!-- 播放器主体交互界面 (Player Main UI) 喵 -->
     <div
       class="bg-izakaya-paper border-2 border-izakaya-wood/30 rounded-xl shadow-lg flex items-center overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
       :class="isExpanded ? 'w-64 flex-col' : 'w-auto px-2 py-1.5'"
     >
       <div class="absolute inset-0 bg-texture-rice-paper opacity-50 pointer-events-none"></div>
 
-      <!-- Drag Handle & Header -->
+      <!-- 拖拽手柄与展开/收起控制器 喵 (Drag & Toggle) -->
       <div
         @mousedown="startDrag"
         @touchstart="startTouchDrag"
@@ -371,7 +371,7 @@ function toggleExpand() {
         leave-from-class="opacity-100 scale-100"
         leave-to-class="opacity-0 scale-95"
       >
-        <!-- Mini Mode Content -->
+        <!-- 极简模式：仅显示核心控制按钮 喵 (Mini Mode) -->
         <div v-if="!isExpanded" class="flex items-center gap-2 relative z-10 pl-4">
           <button
             @click="store.prev"
@@ -405,11 +405,11 @@ function toggleExpand() {
           </button>
         </div>
 
-        <!-- Expanded Mode Content -->
+        <!-- 完整视图：显示曲目信息与进度条 喵 (Expanded Mode) -->
         <div v-else class="relative z-10 p-3 w-full">
-          <!-- Native Player UI -->
+          <!-- 原生音频驱动驱动界面 喵 (Native Audio UI) -->
           <div v-if="store.currentTrack?.type !== 'iframe'">
-            <!-- Info -->
+            <!-- 曲目元数据展示 (Track Info) 喵 -->
             <div class="flex items-start justify-between mb-3">
               <div class="flex items-center gap-3 overflow-hidden">
                 <div
@@ -436,7 +436,7 @@ function toggleExpand() {
               </div>
             </div>
 
-            <!-- Progress -->
+            <!-- 播放进度监听与控制 (Progress Bar) 喵 -->
             <div class="mb-2">
               <div class="flex justify-between text-[10px] text-izakaya-wood/50 mb-1 font-mono">
                 <span>{{ formatTime(store.currentTime) }}</span>
@@ -451,7 +451,7 @@ function toggleExpand() {
               />
             </div>
 
-            <!-- Controls -->
+            <!-- 音轨切换与播放交互按钮组 (Playback Controls) 喵 -->
             <div class="flex items-center justify-between">
               <button
                 @click="store.prev"
@@ -477,7 +477,7 @@ function toggleExpand() {
             </div>
           </div>
 
-          <!-- Iframe Player UI -->
+          <!-- 第三方 Iframe 嵌入式播放器界面 喵 (iframe Support) -->
           <div
             v-else
             class="relative z-10 bg-white -mx-3 -mb-3 rounded-b-xl overflow-hidden border-t border-izakaya-wood/10"
@@ -543,7 +543,7 @@ function toggleExpand() {
   }
 }
 
-/* Custom Scrollbar */
+/* 针对播放列表的自定义滚动条样式 喵 (Custom Scrollbar) */
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }

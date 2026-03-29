@@ -227,7 +227,7 @@ const bgmFiles = import.meta.glob(
   { query: '?url', import: 'default', eager: true }
 ) as Record<string, string>;
 
-// --- 战斗背景图管理模块 ---
+// --- 战斗背景图管理模块 喵 ---
 const backgroundImages = import.meta.glob('/src/assets/images/battle_bg/*.{jpg,png,webp}', {
   query: '?url',
   import: 'default',
@@ -235,25 +235,25 @@ const backgroundImages = import.meta.glob('/src/assets/images/battle_bg/*.{jpg,p
 }) as Record<string, string>;
 
 const currentBackground = computed(() => {
-  // 尝试匹配玩家当前地点
+  // 尝试匹配获取玩家当前地理位置对应的战场背景素材 喵
   const location = gameStore.state.player?.location;
   console.log('[战斗界面] 背景检查 - 位置:', location);
 
   if (location) {
-    // 优先尝试精确匹配 (忽略扩展名)
+    // 优先级 1：执行文件 ID 级精确匹配（剔除文件后缀干扰项）喵
     const exactMatch = Object.keys(backgroundImages).find((path) => {
       const filename = path.split('/').pop()?.split('.')[0];
       return filename === location;
     });
     if (exactMatch) {
-      console.log('[战斗界面] 找到匹配背景:', exactMatch);
+      console.log('[战斗界面] 找到完美契合的背景喵:', exactMatch);
       return backgroundImages[exactMatch];
     }
   }
 
-  // 降级回退方案：博丽神社
+  // 优先级 2：若无匹配则执行降级回退方案，默认博丽神社喵
   const fallback = Object.keys(backgroundImages).find((path) => path.includes('博丽神社'));
-  console.log('[战斗界面] 回退至背景:', fallback);
+  console.log('[战斗界面] 无法精准匹配，回退至神社背景喵:', fallback);
   return fallback ? backgroundImages[fallback] : '';
 });
 
@@ -262,10 +262,10 @@ function playCombatBgm() {
 
   const styleKey = combatState.value.bgm_suggestion;
 
-  // 策略 1: 直接匹配关键字 (如 "常规", "激战")
+  // 匹配策略 A：基于 BGM 风格锚点关键字执行硬匹配（如 "常规"、"激战"）喵
   let matchingFiles = Object.keys(bgmFiles).filter((path) => path.includes(styleKey));
 
-  // 策略 2: 若直接匹配失败，采用模糊关键字匹配
+  // 匹配策略 B：若硬匹配失效，则执行模糊语义关键字的层次化探测 喵
   if (matchingFiles.length === 0) {
     if (styleKey.includes('轻快')) {
       matchingFiles = Object.keys(bgmFiles).filter((path) => path.includes('轻快'));
@@ -289,8 +289,8 @@ function playCombatBgm() {
       }
     }
   } else {
-    console.warn('[战斗界面] 未找到对应风格的 BGM:', styleKey);
-    // 若未找到指定风格，则默认回退到 '常规' 风格
+    console.warn('[战斗界面] 风格曲库未命中喵:', styleKey);
+    // 最终兜底：非指定常规风格时，强制回退至默认战斗曲目 喵
     if (styleKey !== '常规') {
       const fallbackFiles = Object.keys(bgmFiles).filter((path) => path.includes('常规'));
       if (fallbackFiles.length > 0) {
@@ -333,7 +333,7 @@ function handleRemoteLLMToken(e: CustomEvent) {
   const { token } = e.detail;
   if (token) {
     streamingNarrative.value += token;
-    // 如果右侧作战日志未展开，自动将其弹出以便查阅正在输出的文本
+    // 视觉反馈优化：当检测到词句流式输出时，自动展开日志面板以便实时查阅 喵
     if (!isLogExpanded.value) isLogExpanded.value = true;
   }
 }
@@ -356,13 +356,13 @@ async function handleRemoteEffect(e: CustomEvent) {
   } else if (data.type === 'combat_flow') {
     playCombatFlowAnimation(true);
   } else if (data.type === 'ultimate_anim') {
-    // 为动画播报功能组装的模拟对象 (Mock Object)
+    // 为动画播报功能组装的模拟对象 (幻影实体 - Mock Object)喵
     const mockCombatant = {
       id: data.actorId,
       name: data.charName,
       isPlayer: data.isPlayer,
       team: data.isPlayer ? 'player' : 'enemy'
-      // ... minimal required props
+      // 满足动画分发器所需的最小属性集喵
     } as any;
     playUltimateAnimation(mockCombatant, data.spellName, true);
   } else if (data.type === 'skill_anim') {
@@ -398,14 +398,14 @@ async function handleRemoteAction(e: CustomEvent) {
   const { senderId, type, payload, targetId } = e.detail;
   console.log('[战斗界面] 收到远程行动:', type, payload);
 
-  // 定位行动发起者 (Actor)
+  // 定位行动发起者 (主角或敌方单位 - Actor)喵
   const actor = combatState.value?.combatants.find((c) => c.ownerId === senderId);
   if (!actor) {
     console.warn('[战斗界面] 未找到发送者的角色:', senderId);
     return;
   }
 
-  // 定位受击目标实体 (如果有)
+  // 在当前参战对阵名单中定位具体的受击目标实体 喵
   let target: UICombatant | undefined;
   if (targetId) {
     const found = combatState.value?.combatants.find((c) => c.id === targetId);
@@ -414,8 +414,8 @@ async function handleRemoteAction(e: CustomEvent) {
     }
   }
 
-  // 开启执行链路
-  // 我们需要将角色类型向下隐式断言合并为 UICombatant 以喂给内部处理逻辑
+  // 激活底层的逻辑执行流水线 (Execution Pipe) 喵
+  // 将行动者类型隐式断言并合并为 UICombatant 视觉实体以便分发 喵
   const uiActor = { ...actor, popups: getPopups(actor.id) } as UICombatant;
 
   await executeCombatLogic(uiActor, type, payload, target);
@@ -438,7 +438,7 @@ async function executeCombatLogic(
 
     await executeAction(actor, target);
 
-    // 扣减行动点 (AP)
+    // 计算并后置扣减该次动作涉及的行动点 (AP) 存量 喵
     const currentAP = actor.actionPoints !== undefined ? actor.actionPoints : 2;
     updateCombatantState(actor.id, { actionPoints: Math.max(0, currentAP - 2) });
 
@@ -461,11 +461,11 @@ async function executeCombatLogic(
       await sleep(800);
     }
 
-    // 步入数值计算闭环
+    // 步入数值计算闭环：覆盖伤害推演、护盾消耗与增益回写 喵
     const rect = document.body.getBoundingClientRect();
 
     if (spell.scope === 'aoe') {
-      // 群体范围打击 (AOE) 路线
+      // 执行全场范围覆盖物理打击 (AOE) 结算逻辑 喵
       if (spell.isUltimate) {
         audioManager.playSpellCastAoE();
         triggerEffect('ultimate_impact', rect.width * 0.5, rect.height * 0.5);
@@ -508,7 +508,7 @@ async function executeCombatLogic(
             addPopup(t, spell.damage, 'heal');
           }
         }
-        addLog(`${actor.name} 释放了 ${spell.name}，支援了全员！`);
+        addLog(`${actor.name} 释放了 ${spell.name}，温暖的光芒包围了大家喵！`);
       } else {
         for (const enemy of enemies.value) {
           if (enemy.hp > 0) {
@@ -530,7 +530,7 @@ async function executeCombatLogic(
             if (spell.buffDetails) applyBuff(enemy, spell.buffDetails, 'debuff');
           }
         }
-        addLog(`${actor.name} 释放了 ${spell.name}，攻击了所有敌人！`);
+        addLog(`${actor.name} 释放了 ${spell.name}，对所有敌人降下了神罚喵！`);
       }
 
       await sleep(1500);
@@ -557,14 +557,14 @@ async function executeCombatLogic(
 
       if (spell.type === 'shield' || spell.type === 'heal' || spell.type === 'buff') {
         if (spell.buffDetails) applyBuff(finalTarget, spell.buffDetails, 'buff');
-        addLog(`${actor.name} 释放了 ${spell.name}！`);
+        addLog(`${actor.name} 释放了 ${spell.name}，感觉力量涌上来了喵！`);
       } else {
-        // 常规打击结算模块
+        // 逻辑降级回退方案：执行常规定向打击结算模块 喵
         await executeAction(actor, finalTarget, 'spell', spell);
       }
     }
 
-    // 追加扣除符卡动作的专属 AP 消耗点数
+    // 实时分发由此动作产生的所有成长项与数值结算存量 喵
     const currentAP = actor.actionPoints !== undefined ? actor.actionPoints : 2;
     updateCombatantState(actor.id, { actionPoints: Math.max(0, currentAP - 2) });
 
@@ -622,7 +622,7 @@ async function executeCombatLogic(
     playSkillAnimation(actor, skill.name, true);
     await sleep(800);
 
-    // 主角专有特技流处理阀门
+    // 路由处理主角专有的特技/战法流执行引擎 喵
     const baseDmg = getBaseDamage(actor.power);
 
     if (skill.id === 'active_defense') {
@@ -700,9 +700,9 @@ async function executeCombatLogic(
       target.buffs.push(buff);
       updateCombatantState(target.id, { buffs: target.buffs });
       addPopup(target, '内伤', 'debuff');
-      addLog(`${actor.name} 对 ${target.name} 施加了【内伤】！`);
+      addLog(`${actor.name} 对 ${target.name} 施加了【内伤】喵！`);
     }
-    // ... 预留的后续其余特技槽位处理
+    // 槽位预留：后续用于动态扩展其余特技类型的判定逻辑 喵
     await sleep(1000);
   }
 
@@ -722,7 +722,7 @@ const showOverlay = computed(() => {
   return false;
 });
 
-// --- 前端 UI 数据接口防腐层层 (Interfaces) ---
+// --- 前端 UI 数据接口防腐层 (Interfaces) --- 喵
 interface CombatLog {
   id: number;
   turn: number;
@@ -739,7 +739,7 @@ interface UICombatant extends Combatant {
   popups: Popup[];
 }
 
-// --- 前端独立持有的视效缓存状态集 ---
+// --- 前端主进程持有的瞬时视效与动效缓存状态分量 喵 ---
 const popupMap = reactive<Record<string, Popup[]>>({});
 
 const getPopups = (id: string) => {
@@ -763,15 +763,15 @@ const player = computed(() => {
 
   if (gameStore.multiplayer.isMultiplayer) {
     const myId = multiplayerService.identityKey;
-    // 1. Try to find My Character (Owner ID match)
-    p = combatState.value.combatants.find((c) => c.ownerId === myId);
+    // 1. 尝试匹配由当前客户端掌控的角色身份 (Owner ID match)喵
+    p = combatState.value.combatants.find((c) => c.id === myId || c.ownerId === myId);
 
-    // 2. Fallback for Host: Control the main "Player" if no specific owner assigned
+    // 2. 主机回退策略：若未分配显式拥有权，则默认接管主“玩家”实体 (Host Control Fallback)喵
     if (!p && gameStore.multiplayer.isHost) {
       p = combatState.value.combatants.find((c) => c.isPlayer && !c.ownerId);
     }
   } else {
-    // Single Player
+    // 纯洁单机模式：直接获取系统主角色喵
     p = combatState.value.combatants.find((c) => c.isPlayer);
   }
 
@@ -788,7 +788,7 @@ const player = computed(() => {
 });
 
 const allies = computed(() => {
-  // Allies are anyone on 'player' team who is NOT 'player' (the current user's character)
+  // 盟友系统：定位所有处于玩家阵营，且逻辑标识不等于当前受控角色的实体 喵
   const myId = player.value?.id;
   return (
     combatState.value?.combatants.filter((c) => c.team === 'player' && c.id !== myId) || []
@@ -798,10 +798,10 @@ const allies = computed(() => {
   })) as UICombatant[];
 });
 
-// --- 队友队列堆叠管理 ---
+// --- 参战队友阵列堆叠与活跃状态管理模块 喵 ---
 const activeAllyId = ref<string | null>(null);
 
-// 监听队友列表，维护有效的当前活跃队友 ID，并在指定队友阵亡时处理自动切换逻辑
+// 动态监控参战队友列表，维护有效的活跃指针，并在队友阵亡时实现自动补位流转 喵
 watch(
   allies,
   (newAllies) => {
@@ -932,7 +932,7 @@ const combatLogs = ref<CombatLog[]>([]);
 const isLogExpanded = ref(false);
 const streamingNarrative = ref('');
 
-// --- 敌人候补/出场队列系统 ---
+// --- 非玩家单位的预备驻留池与战线补给系统 喵 ---
 const exitedEnemyIds = ref<string[]>([]);
 
 const visibleEnemies = computed(() => {
@@ -942,7 +942,7 @@ const visibleEnemies = computed(() => {
 const activeEnemies = computed(() => visibleEnemies.value.slice(0, 3));
 const reserveEnemies = computed(() => visibleEnemies.value.slice(3));
 
-// 监听死亡事件以触发退场动画流程
+// 实时监测生命体征：触发对应的像素破碎退场与后备力量递补动画 喵
 watch(
   enemies,
   (newEnemies) => {
@@ -970,7 +970,7 @@ const ultimateCutinData = ref({
   spriteUrl: ''
 });
 
-// 常规/奥义技能切入动画状态数据
+// 常规型战技与奥义切入动画的瞬时状态寄存器 喵
 const showSkillCutin = ref(false);
 const showCombatFlowAnim = ref(false);
 const combatFlowPhase = ref('start'); // 'start', 'impact', 'end'
@@ -982,7 +982,7 @@ const skillCutinData = ref({
   spriteUrl: ''
 });
 
-// 状态监听器 (Watchers)
+// 战斗系统全局状态生命周期侦听器群 (Watchers) 喵
 watch(isActive, (val) => {
   if (val) {
     // 战斗开启时重置上下文状态分量
@@ -1335,7 +1335,7 @@ async function triggerEffect(
   isRemote: boolean = false
 ) {
   if (!isRemote && gameStore.multiplayer.isHost && gameStore.multiplayer.isMultiplayer) {
-    // Normalize coordinates
+    // 坐标系归一化处理：确保在不同分辨率屏幕下特效位置对齐 (Coordinate Normalization)喵
     const rect = document.body.getBoundingClientRect();
     multiplayerService.sendCombatEffect({
       type: 'effect',
@@ -1364,7 +1364,7 @@ async function triggerEffect(
 
 function startCombat() {
   if (combatState.value) {
-    // 首先触发战斗开场 sequence 动画流程
+    // 首先启动全屏战斗开场演出序列 (Intro Animation Sequence)喵
     showIntro.value = true;
     playIntroSequence();
 
@@ -1427,7 +1427,7 @@ function skipCombat() {
   emit('close');
 }
 
-// --- 战斗全局状态同步与持久化辅助组件 (Sync Helpers) ---
+// --- 战斗全局状态同步与存档持久化辅助 (Sync & Persistence Helpers) ---喵
 function updateCombatantState(id: string, updates: Partial<Combatant>) {
   // 入参校验：严防 NaN 脏数据对数值系统造成连锁污染
   if (updates.hp !== undefined) {
@@ -1464,8 +1464,8 @@ function updateCombatantState(id: string, updates: Partial<Combatant>) {
     }
   }
 
-  // 2. Update Global State (Player or NPC)
-  // Find if it's player
+  // 2. 将变更同步至全局状态仓库以便持久化 (Player or NPC Persistence)喵
+  // 判定当前实体是否为主玩家喵
   if (gameStore.state.player && id === 'player') {
     if (updates.hp !== undefined) {
       gameStore.applyAction({
@@ -1604,7 +1604,7 @@ async function executeAction(
       addPopup(defender, result.heal, 'heal');
       addLog(`${attacker.name} ${actionName}，恢复了 ${result.heal} 点HP！`);
     } else if (result.damage <= 0) {
-      // 处理未击中 (Miss) 或 0 伤害的情况 (仅当既无伤害也无治疗时)
+      // 处理闪避 (Miss) 或 0 点伤害的边缘情况 (仅在无伤害且无治疗时触发)喵
       if (result.isHit && spell && spell.buffDetails) {
         addPopup(defender, spell.buffDetails.name, 'buff');
         addLog(result.description);
@@ -1614,18 +1614,18 @@ async function executeAction(
       } else {
         addPopup(defender, 'MISS', 'damage');
         addLog(
-          result.description || `${attacker.name} 的${actionName}对 ${defender.name} 未命中！`
+          result.description || `${attacker.name} 的${actionName}对 ${defender.name} 擦身而过喵！`
         );
       }
     }
 
-    // P 点 (灵力槽) 增长逻辑 (仅限玩家普通攻击)
+    // P 点 (灵力获取) 增长逻辑：仅限玩家发起的普通打击喵
     if ((attacker.isPlayer || attacker.team === 'player') && !spell) {
-      // 即使未击中也能获得少量 P 点 (未击中时获取率为 60%)
+      // 即使被闪避，也能通过“战斗意志”获得少量 P 点补给 (未击中补偿率为 60%)喵
       let pGain = calculatePPointGain(attacker, result.damage);
 
       if (!result.isHit) {
-        pGain *= 0.6; // 未击中导致的 40% 衰减惩罚
+        pGain *= 0.6; // 未能命中的话，获取效率会打折喵
       }
 
       if (pGain > 0) {
@@ -1660,7 +1660,7 @@ function applyBuff(target: UICombatant, buffDetails: any, type: 'buff' | 'debuff
           addPopup(target, val, 'buff');
         }
       } else if (effect.type === 'heal' && buffDetails.duration === 1) {
-        // 结算瞬时治疗 (Instant Heal)
+        // 结算并应用瞬时治疗 (即时生效 - Instant Heal)喵
         const val = Number(effect.value);
         if (val > 0) {
           const newHp = Math.min(target.maxHp, target.hp + val);
@@ -1838,17 +1838,17 @@ async function handleSpecialAction(skill: any) {
   const p = player.value;
   if (!p) return;
 
-  // Cost Check
+  // 资源消耗预检 (Cost & Requirement Check)喵
   const currentP = p.pPoints || 0;
   const currentAP = p.actionPoints !== undefined ? p.actionPoints : 2;
 
   if (currentP < skill.costP) {
-    addPopup(p, 'P点不足', 'damage');
-    audioManager.playSoftClick(); // Or error sound
+    addPopup(p, 'P点不足喵', 'damage');
+    audioManager.playSoftClick();
     return;
   }
   if (currentAP < skill.costAP) {
-    addPopup(p, 'AP不足', 'damage');
+    addPopup(p, 'AP不足喵', 'damage');
     audioManager.playSoftClick();
     return;
   }
@@ -1882,7 +1882,7 @@ async function handleSpecialAction(skill: any) {
   isActing.value = true;
   currentMenu.value = 'main';
 
-  // Play Skill Animation
+  // 触发特技专属切入动画 (Play Skill Animation)喵
   playSkillAnimation(player.value, skill.name, true);
   await sleep(800);
 
@@ -1895,10 +1895,10 @@ async function handleSpecialAction(skill: any) {
       updateCombatantState(player.value.id, { shield: player.value.shield });
 
       const rect = document.body.getBoundingClientRect();
-      triggerEffect('spell', rect.width * 0.25, rect.height * 0.6); // Visual
+      triggerEffect('spell', rect.width * 0.25, rect.height * 0.6); // 视觉反馈喵
 
       addPopup(player.value, shieldVal, 'buff');
-      addLog(`${player.value.name} 发动【主动防御】，获得了 ${shieldVal} 点护盾！`);
+      addLog(`${player.value.name} 发动【主动防御】，获得了 ${shieldVal} 点护盾喵！`);
       audioManager.playHeal();
 
       await sleep(1000);
@@ -1909,7 +1909,7 @@ async function handleSpecialAction(skill: any) {
       player.value.hp = newHp;
       updateCombatantState(player.value.id, { hp: newHp });
 
-      // Buff: 60% Damage Reduction for 2 turns
+      // 状态：2回合内受到的伤害降低 60%喵
       const buff: Buff = {
         id: `buff_will_${Date.now()}`,
         name: '不屈意志',
@@ -1925,16 +1925,16 @@ async function handleSpecialAction(skill: any) {
       updateCombatantState(player.value.id, { buffs: player.value.buffs });
 
       const rect = document.body.getBoundingClientRect();
-      triggerEffect('spell', rect.width * 0.25, rect.height * 0.6); // Visual
+      triggerEffect('spell', rect.width * 0.25, rect.height * 0.6); // 视觉反馈喵
 
       addPopup(player.value, healVal, 'heal');
-      addLog(`${player.value.name} 发动【不屈意志】，恢复了 ${healVal} 点生命并获得了伤害减免！`);
+      addLog(`${player.value.name} 发动【不屈意志】，恢复了 ${healVal} 点生命并获得了高额减伤喵！`);
       audioManager.playHeal();
 
       await sleep(1000);
       checkTurnEnd();
     } else if (skill.id === 'combat_flow') {
-      // Play Animation
+      // 触发战斗心流过场动画喵
       await playCombatFlowAnimation();
 
       const buff: Buff = {
@@ -2218,11 +2218,11 @@ async function handleTalk() {
               };
             })
           };
-          console.log('[HandleTalk] Adding Buff to Player:', newBuff);
+          console.log('[嘴遁] 正在为主角注入增益状态喵:', newBuff);
           player.value.buffs.push(newBuff);
           updateCombatantState(player.value.id, { buffs: player.value.buffs });
           addPopup(player.value, newBuff.name, 'buff');
-          addLog(`${player.value.name} 获得了状态：${newBuff.name}！`);
+          addLog(`${player.value.name} 获得了状态：${newBuff.name}喵！`);
         } else if (effect.type === 'escape') {
           gameResult.value = 'escape';
           isGameOver.value = true;
@@ -2246,8 +2246,8 @@ async function handleTalk() {
 
     checkTurnEnd();
   } catch (error) {
-    console.error('Talk failed', error);
-    addLog('嘴遁失败，由于未知的力量干扰...');
+    console.error('[嘴遁] 处理流程出现逻辑崩溃喵:', error);
+    addLog('嘴遁失败，由于未知的位面力量干扰，逻辑闭环断裂了喵...');
   } finally {
     isProcessingTalk.value = false;
     talkInput.value = '';
@@ -2255,7 +2255,7 @@ async function handleTalk() {
   }
 }
 
-// 目标选取完成后的执行回调 (Target Selection & Execution)
+// 目标选取完成后的执行回调 (目标选取与执行)
 async function selectTarget(target: UICombatant) {
   if (!selectionMode.value || !pendingAction.value || isActing.value || phase.value !== 'player')
     return;
@@ -2318,7 +2318,7 @@ function checkTurnEnd() {
   }
 }
 
-// 回合步进与生命周期管理 (Turn Management)
+// --- 战斗流推进与阵营生命周期管理 (回合与阶段管理) ---喵
 function processTurnStart() {
   if (!combatState.value) return;
 
@@ -2415,7 +2415,7 @@ function processTurnStart() {
   checkWinLoss();
 }
 
-// 盟友回合自动化逻辑 (Ally Turn Automation)
+// --- 盟友回合自动化决策逻辑 (Ally Turn Automation) ---喵
 async function processAllyTurn() {
   if (phase.value !== 'ally') return;
 
@@ -2429,18 +2429,18 @@ async function processAllyTurn() {
     for (const ally of aliveAllies) {
       if (isGameOver.value) break;
 
-      // 定义敌对势力范围 (Enemies)
+      // 搜寻当前活跃的敌对目标 (Enemies Filter)喵
       const opponents = enemies.value.filter((e) => e.hp > 0);
       if (opponents.length === 0) break;
 
-      // 定义友方势力范围 (Player + Other Allies)
+      // 搜寻当前可用的友方支援目标 (包含主角与其他盟友 - Allies & Player)喵
       const friends: UICombatant[] = [];
       if (player.value && player.value.hp > 0) friends.push(player.value);
       friends.push(...allies.value.filter((a) => a.id !== ally.id && a.hp > 0));
       // 将自身加入友方列表，以支持对自己施加增益性符卡 (Self-Buffs)
       friends.push(ally);
 
-      // 盟友 AI 决策权重逻辑 (AI Logic)
+      // 盟友 AI 决策权重演算心核 (Combat Decision Heart - AI Logic)喵
       let action: 'attack' | 'spell' = 'attack';
       let selectedSpell: SpellCard | undefined;
       let isUltimateTrigger = false;
@@ -2476,7 +2476,7 @@ async function processAllyTurn() {
         }
       }
 
-      // 3. 目标选取策略 (Target Selection)
+      // 3. 智能目标锁定策略 (智能选取最优目标 - Target Selection)喵
       let targets: UICombatant[] = [];
 
       if (action === 'spell' && selectedSpell) {
@@ -2520,7 +2520,7 @@ async function processAllyTurn() {
         if (isAoE) audioManager.playSpellCastAoE();
         else audioManager.playSpellCastSingle();
 
-        // 渲染对应的视觉特效表现层 (Visuals)
+        // 渲染对应的视觉特效表现层 (视觉动效分发 - Visuals Distribution)喵
         if (isUltimateTrigger || isAoE) {
           if (isSupport) {
             // 锚定在己方阵营中心 (左侧半场)
@@ -2557,7 +2557,7 @@ async function processAllyTurn() {
           }
         }
 
-        // Apply to all targets
+        // 对所有命中的目标执行数值结算核算逻辑喵
         for (const target of targets) {
           await executeAction(ally, target, selectedSpell.name, selectedSpell);
         }
@@ -2593,7 +2593,7 @@ async function processAllyTurn() {
   }
 }
 
-// 敌人回合自动化逻辑 (Enemy Turn Automation)
+// --- 敌人回合自动化执行引擎 (Enemy Turn Automation Engine) ---喵
 async function processEnemyTurn() {
   if (phase.value !== 'enemy') return;
 
@@ -2619,7 +2619,7 @@ async function processEnemyTurn() {
         // 定义队友互助池 (Self + Other Enemies)
         const friends = [enemy, ...enemies.value.filter((e) => e.id !== enemy.id && e.hp > 0)];
 
-        // 敌人 AI 决策倾向引擎 (AI Logic)
+        // 敌人 AI 决策倾向演算引擎 (Enemy Logic Heart)喵
         let action: 'attack' | 'spell' = 'attack';
         let selectedSpell: SpellCard | undefined;
         let isUltimateTrigger = false;
@@ -2633,7 +2633,7 @@ async function processEnemyTurn() {
           );
         }
 
-        // 1. BOSS/精英怪 终极奥义生命阈值检测 (HP < 40%)
+        // 1. 【精英/头目专属】终极奥义生命阈值自动感应 (HP < 40% 触发)喵
         if (enemy.hp < enemy.maxHp * 0.4 && !enemy.hasUsedUltimate) {
           const ult = enemy.spellCards?.find((s) => s.isUltimate);
           if (ult) {
@@ -2654,7 +2654,7 @@ async function processEnemyTurn() {
           }
         }
 
-        // 3. 目标锁定策略引擎 (Target Selection)
+        // 3. 敌方目标锁定策略引擎 (仇恨与目标映射 - Target Selection)喵
         let targets: UICombatant[] = [];
 
         if (action === 'spell' && selectedSpell) {
@@ -2679,7 +2679,7 @@ async function processEnemyTurn() {
 
         if (targets.length === 0) continue;
 
-        // 4. 正式逻辑下发与执行 (Execution)
+        // 4. 正式物理/法术逻辑下发与指令集执行 (Logic Execution)喵
         if (action === 'spell' && selectedSpell) {
           addLog(`${enemy.name} 发动了符卡：${selectedSpell.name}！`);
 
@@ -2692,7 +2692,7 @@ async function processEnemyTurn() {
 
           if (isUltimateTrigger) audioManager.playSpellCast();
 
-          // 渲染敌人侧视效分层 (Visuals)
+          // 渲染敌人侧特有的视效分层 (Enemy Side Visuals)喵
           const isSupport = ['heal', 'buff', 'shield'].includes(selectedSpell.type || '');
           const rect = document.body.getBoundingClientRect();
 
@@ -2717,7 +2717,7 @@ async function processEnemyTurn() {
             await executeAction(enemy, target, selectedSpell.name, selectedSpell);
           }
         } else {
-          // 普通物理撕咬/打击分支 (Regular Attack)
+          // 普通物理撕咬/暴力打击执行分支 (Regular Physical Attack)喵
           const target = targets[0];
           if (!target) continue;
 
@@ -2783,12 +2783,12 @@ function closeCombat() {
 
   audioManager.stopBgm();
 
-  // 1. 玩家侧数值写回与成长核算 (Sync Player)
+  // 1. 玩家侧核心数值回写与战后成长核算 (Player Stats Sync & Growth)喵
   if (player.value) {
     let expGain = 0;
     let logMsg = '';
 
-    // 计算并下发参战符卡的熟练度经验 (Spell Card EXP)
+    // 实时计算并分发参战符卡的熟练度经验值 (Spell Card Proficiency Growth)喵
     if (gameResult.value === 'win' && player.value.spellCards) {
       let levelUpMsg = '';
       player.value.spellCards.forEach((spell) => {
@@ -2834,7 +2834,7 @@ function closeCombat() {
     });
   }
 
-  // 2. 敌方单位状态持久化同步 (Sync Enemies)
+  // 2. 敌方单位状态持久化同步 (NPC Database Persistence Sync)喵
   for (const enemy of enemies.value) {
     if (enemy.id && gameStore.state.npcs[enemy.id]) {
       gameStore.applyAction({
@@ -2847,7 +2847,7 @@ function closeCombat() {
     }
   }
 
-  // 3. 生成战斗回顾简报，为后续流程提供上下文参考 (Generate Summary)
+  // 3. 凝练战斗回顾简报，为叙事驱动引擎提供上下文锚点 (Combat Summary Generation)喵
   const logsText =
     combatState.value?.logs.map((l) => `[第${l.turn}回合] ${l.description}`).join('\n') ||
     '（无战斗记录）';
@@ -3400,7 +3400,7 @@ function closeCombat() {
   }
   100% {
     opacity: 1;
-  } /* Wait, this is overlay on top? */
+  } /* 逻辑校验：此处应确保遮罩层最终处于全白状态以衔接后续转场喵 */
 }
 /* 
    逻辑修正：Flash 遮罩层应当以全白（不透明度 1）起始，随后立即向透明过渡。
@@ -3409,8 +3409,8 @@ function closeCombat() {
    2. VS 画面动画播放中。
    3. 战斗正式切入 -> 屏幕全白 -> 逐渐显现 3D/2D 战斗环境。
    
-   简易方案：
-   Flash Out (起始点): 白色 -> 透明
+   简易演化方案：
+   Flash Out (起始点逻辑): 全白 -> 完全透明喵
 */
 @keyframes flashOut {
   0% {
@@ -3456,7 +3456,7 @@ function closeCombat() {
   border-radius: 3px;
 }
 
-/* 战斗日志条目进场/退场过渡 (Log Transitions) */
+/* 战斗日志条目进场/退场过渡 (日志流转 - Log Transitions)喵 */
 .log-fade-enter-active,
 .log-fade-leave-active {
   transition: all 0.5s ease;
@@ -3662,7 +3662,7 @@ function closeCombat() {
   }
 }
 
-/* 4. 受击火花 (Hit Spark) 原子动效 */
+/* 4. 受击火花反馈 (击中火星 - Hit Spark) 原子动效喵 */
 .animate-hit-spark {
   animation: hitSpark 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

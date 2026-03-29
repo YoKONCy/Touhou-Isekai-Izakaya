@@ -19,8 +19,8 @@ import { generateCompletion } from '@/services/llm';
 interface LocationInfo {
   id: string;
   name: string;
-  x: number; // 0-100 percentage
-  y: number; // 0-100 percentage
+  x: number; // 地图横向坐标百分比 (0-100) 喵
+  y: number; // 地图纵向坐标百分比 (0-100) 喵
   description: string;
   characters: string[];
   subLocations?: string[];
@@ -548,7 +548,7 @@ function stopDrag() {
   isDragging.value = false;
 }
 
-// Touch event handlers for mobile
+// 针对移动端触摸设备的交互处理器 喵 (Touch Handlers)
 const touchId = ref<number | null>(null);
 
 function handleTouchStart(e: TouchEvent) {
@@ -579,14 +579,14 @@ function handleTouchEnd() {
 <template>
   <Transition name="fade">
     <div v-if="isOpen" class="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8">
-      <!-- Backdrop -->
+      <!-- 半透明背景遮罩 (Backdrop) 喵 -->
       <div class="absolute inset-0 bg-izakaya-wood/80 backdrop-blur-sm" @click="handleClose"></div>
 
-      <!-- Content Container (fullscreen with padding) -->
+      <!-- 全屏内容容器 (Content Container) 喵 -->
       <div
         class="relative w-full h-full max-w-[95vw] max-h-[90vh] bg-stone-950 rounded-lg shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-white/10"
       >
-        <!-- Map Viewer (Full Surface) -->
+        <!-- 地图视口层 (Map Viewer) 喵 -->
         <div
           class="relative w-full h-full overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing touch-none"
           @mousedown="startDrag"
@@ -603,7 +603,7 @@ function handleTouchEnd() {
               transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`
             }"
           >
-            <!-- Image container with relative positioning for markers -->
+            <!-- 图片挂载容器：用于锚定标记点的相对定位 喵 (Anchor Container) -->
             <div class="relative">
               <img
                 src="@/assets/images/map/幻想乡地图.webp"
@@ -611,7 +611,7 @@ function handleTouchEnd() {
                 class="block pointer-events-none select-none max-w-none h-[90vh]"
               />
 
-              <!-- Location Markers (positioned relative to image) -->
+              <!-- 地点交互标记点阵 (Location Markers) 喵 -->
               <div
                 v-for="loc in locations"
                 :key="loc.id"
@@ -623,7 +623,7 @@ function handleTouchEnd() {
                 }"
                 @click.stop="handleLocationClick(loc)"
               >
-                <!-- Ripple Effect -->
+                <!-- 灵气波纹动效 (Ripple Effect) 喵 -->
                 <div
                   class="absolute inset-0 w-10 h-10 -m-5 border-2 border-white/30 rounded-full animate-ripple"
                 ></div>
@@ -632,21 +632,21 @@ function handleTouchEnd() {
                   style="animation-delay: 1.5s"
                 ></div>
 
-                <!-- Marker Icon (Spirit Orb Style) -->
+                <!-- 标记点实体图标 (Spirit Orb Style) 喵 -->
                 <div
                   class="relative w-5 h-5 bg-white/20 backdrop-blur-[2px] border border-white/40 rounded-full shadow-[0_0_15px_rgba(255,255,255,0.3)] transition-all duration-300 group-hover/marker:scale-125 group-hover/marker:bg-white/40 group-hover/marker:border-white/60 flex items-center justify-center overflow-hidden"
                 >
-                  <!-- Inner Core -->
+                  <!-- 灵核中心 (Inner Core) 喵 -->
                   <div
                     class="w-2 h-2 bg-white/60 rounded-full animate-pulse shadow-[0_0_8px_white]"
                   ></div>
-                  <!-- Shimmer Effect -->
+                  <!-- 流光闪烁效果 (Shimmer Effect) 喵 -->
                   <div
                     class="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent -translate-x-full group-hover/marker:translate-x-full transition-transform duration-1000"
                   ></div>
                 </div>
 
-                <!-- Label -->
+                <!-- 地名悬浮标签 (Label) 喵 -->
                 <div
                   class="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-0.5 bg-black/60 backdrop-blur-sm rounded text-[10px] text-white whitespace-nowrap opacity-0 group-hover/marker:opacity-100 transition-opacity pointer-events-none"
                 >
@@ -656,7 +656,7 @@ function handleTouchEnd() {
             </div>
           </div>
 
-          <!-- Location Detail Card (Overlay on the whole container) -->
+          <!-- 地点详细信息卡片覆盖层 (Location Detail Card) 喵 -->
           <Transition name="slide-fade">
             <div
               v-if="selectedLocation"
@@ -668,12 +668,12 @@ function handleTouchEnd() {
               <div
                 class="h-full bg-izakaya-paper/95 backdrop-blur-xl rounded-2xl shadow-2xl border-2 border-izakaya-wood/20 overflow-hidden flex flex-col relative"
               >
-                <!-- Card Texture -->
+                <!-- 卡片纸张纹理 (Card Texture) 喵 -->
                 <div
                   class="absolute inset-0 pointer-events-none opacity-20 bg-texture-rice-paper mix-blend-multiply"
                 ></div>
 
-                <!-- Close Button -->
+                <!-- 关闭操作按钮 (Close Button) 喵 -->
                 <button
                   @click="selectedLocation = null"
                   class="absolute top-4 right-4 p-1.5 hover:bg-touhou-red/10 rounded-full transition-colors text-izakaya-wood/40 hover:text-touhou-red z-20"
@@ -681,7 +681,7 @@ function handleTouchEnd() {
                   <X class="w-4 h-4" />
                 </button>
 
-                <!-- Back Button (for sub-locations) -->
+                <!-- 返回上一级视图按钮 (Back Button) 喵 -->
                 <button
                   v-if="selectedSubLocationName"
                   @click="backToLocation"
@@ -691,17 +691,17 @@ function handleTouchEnd() {
                   <span>返回</span>
                 </button>
 
-                <!-- Card Content -->
+                <!-- 卡片内容滚动区 (Card Content) 喵 -->
                 <div
                   class="relative z-0 pt-14 px-6 pb-6 flex-1 overflow-y-auto custom-scrollbar space-y-6 overscroll-contain"
                   style="-webkit-overflow-scrolling: touch"
                 >
-                  <!-- Main Location Content -->
+                  <!-- 地点主视图详情 (Main Location Content) 喵 -->
                   <div
                     v-if="!selectedSubLocationName"
                     class="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300"
                   >
-                    <!-- Header -->
+                    <!-- 地点头部标题 (Header) 喵 -->
                     <div>
                       <div
                         class="text-[10px] font-bold text-touhou-red/60 uppercase tracking-widest mb-1"
@@ -714,7 +714,7 @@ function handleTouchEnd() {
                       <div class="h-1 w-12 bg-touhou-red mt-2"></div>
                     </div>
 
-                    <!-- Description -->
+                    <!-- 地理描述 (Description) 喵 -->
                     <div class="space-y-2">
                       <div class="flex items-center gap-2 text-izakaya-wood/40 text-xs">
                         <Info class="w-3 h-3" />
@@ -725,7 +725,7 @@ function handleTouchEnd() {
                       </p>
                     </div>
 
-                    <!-- Characters -->
+                    <!-- 相关常驻人物 (Characters) 喵 -->
                     <div class="space-y-3">
                       <div class="flex items-center gap-2 text-izakaya-wood/40 text-xs">
                         <Users class="w-3 h-3" />
@@ -742,7 +742,7 @@ function handleTouchEnd() {
                       </div>
                     </div>
 
-                    <!-- Sub-locations -->
+                    <!-- 内部主要区域 (Sub-locations) 喵 -->
                     <div v-if="selectedLocation.subLocations" class="space-y-3">
                       <div class="flex items-center gap-2 text-izakaya-wood/40 text-xs">
                         <MapPin class="w-3 h-3" />
@@ -763,7 +763,7 @@ function handleTouchEnd() {
                       </div>
                     </div>
 
-                    <!-- Collab Characters -->
+                    <!-- 跨界乱入角色 (Collab Characters) 喵 -->
                     <div v-if="selectedLocation.collabCharacters" class="space-y-3 mt-6">
                       <div class="flex items-center gap-2 text-izakaya-wood/40 text-xs">
                         <Users class="w-3 h-3" />
@@ -788,7 +788,7 @@ function handleTouchEnd() {
                     </div>
                   </div>
 
-                  <!-- Sub-Location Detail Content -->
+                  <!-- 子地点/角色详细说明面层 (Sub-Detail Content) 喵 -->
                   <div
                     v-else
                     class="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300"
@@ -835,7 +835,7 @@ function handleTouchEnd() {
                   </div>
                 </div>
 
-                <!-- Footer Action -->
+                <!-- 卡片底部快捷操作桩 (Footer Action) 喵 -->
                 <div class="p-4 bg-izakaya-wood/5 border-t border-izakaya-wood/10 relative z-10">
                   <button
                     @click="handleAIAssistantClick"
@@ -846,13 +846,13 @@ function handleTouchEnd() {
                   </button>
                 </div>
 
-                <!-- AI Chat Overlay -->
+                <!-- 求闻笔录 AI 对话覆盖层 (AI Chat Overlay) 喵 -->
                 <Transition name="fade">
                   <div
                     v-if="isChatOpen"
                     class="absolute inset-0 z-50 bg-izakaya-paper flex flex-col"
                   >
-                    <!-- Chat Header -->
+                    <!-- 对话框顶部状态栏 (Chat Header) 喵 -->
                     <div
                       class="p-4 border-b border-izakaya-wood/10 flex flex-col gap-3 bg-izakaya-wood/5"
                     >
@@ -875,7 +875,7 @@ function handleTouchEnd() {
                         </button>
                       </div>
 
-                      <!-- Model Selector -->
+                      <!-- 智核模型切换器 (Model Selector) 喵 -->
                       <div class="flex items-center gap-2">
                         <span
                           class="text-[10px] text-izakaya-wood/40 font-bold uppercase tracking-tighter"
@@ -892,7 +892,7 @@ function handleTouchEnd() {
                       </div>
                     </div>
 
-                    <!-- Chat Messages -->
+                    <!-- 历史笔录消息滚动区 (Chat Messages) 喵 -->
                     <div
                       ref="chatScrollContainer"
                       class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar"
@@ -924,7 +924,7 @@ function handleTouchEnd() {
                       </div>
                     </div>
 
-                    <!-- Chat Input -->
+                    <!-- 问答输入交互区 (Chat Input) 喵 -->
                     <div class="p-4 border-t border-izakaya-wood/10 bg-white/40">
                       <div class="relative flex items-center">
                         <input
@@ -949,7 +949,7 @@ function handleTouchEnd() {
             </div>
           </Transition>
 
-          <!-- Floating Header (Overlay on top of map) -->
+          <!-- 悬浮顶部导航栏 (Floating Header) 喵 -->
           <div
             class="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-6 bg-gradient-to-b from-black/60 to-transparent pointer-events-none"
           >
@@ -970,7 +970,7 @@ function handleTouchEnd() {
             </div>
 
             <div class="flex items-center gap-3 pointer-events-auto">
-              <!-- Glassmorphism Controls -->
+              <!-- 毛玻璃风格交互控件 (Glassmorphism Controls) 喵 -->
               <div
                 class="flex items-center bg-black/40 backdrop-blur-md rounded-full border border-white/20 p-1 px-2 shadow-xl"
               >
@@ -1008,7 +1008,7 @@ function handleTouchEnd() {
             </div>
           </div>
 
-          <!-- Floating Helper Text -->
+          <!-- 系统操作实时引导文字 (Floating Helper Text) 喵 -->
           <div
             class="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-20 pointer-events-none"
           >

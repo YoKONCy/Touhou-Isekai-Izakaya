@@ -18,11 +18,11 @@ export interface LLMConfig {
     apiKey: string;
   };
   model: string;
-  maxContextTokens?: number; // Optional context window limit
-
-  // Advanced Settings
-  stream?: boolean; // Default true
-  timeout?: number; // Default 300000ms (5min)
+  maxContextTokens?: number; // 可选的上下文窗口限制 (Tokens 数)
+  
+  // 进阶设置 (Advanced Settings)
+  stream?: boolean; // 默认为 true
+  timeout?: number; // 默认 300000ms (5分钟)
   temperature?: number;
   top_p?: number;
   frequency_penalty?: number;
@@ -78,7 +78,7 @@ const DEFAULT_LLM_CONFIGS: Record<string, LLMConfig> = {
     useGlobal: true,
     provider: { baseUrl: '', apiKey: '' },
     model: '',
-    stream: false, // Logic usually works better non-streaming for JSON parsing (though we parse chunk by chunk, full response is safer)
+    stream: false, // 逻辑模型通常在非流式模式下处理 JSON 解析更稳定
     timeout: 300000,
     temperature: 0.1
   },
@@ -128,17 +128,18 @@ export const useSettingsStore = defineStore('settings', () => {
   const enableMemoryRefinement = ref(false); // 默认执行禁用状态
   const enableManagementSystem = ref(false); // 居酒屋经营系统开关
   const useDefaultTilemap = ref(false); // 调试：强制使用静态瓦片地图，而非 LLM 动态生成的地图数据
+  const showNsfwStats = ref(false); // 神秘小开关：是否显示敏感属性 (NSFW fields Display Switch)
 
   const theme = ref<'light' | 'dark' | 'eye-protection'>('light');
   const currentSaveSlotId = ref<number | undefined>(undefined);
 
-  // Audio Settings
-  const audioVolume = ref(0.25); // Master volume
+  // 音频设置 (Audio Settings)
+  const audioVolume = ref(0.25); // 主音量 (Master volume)
   const enableAudio = ref(true);
   const bgmVolume = ref(1.0);
   const sfxVolume = ref(1.0);
 
-  // Drawing Settings (Image Generation API)
+  // 绘图设置 (Drawing Settings - 图像生成 API)
   const drawingConfig = ref<DrawingConfig>({
     enabled: false,
     providerType: 'novelai',
@@ -173,7 +174,7 @@ export const useSettingsStore = defineStore('settings', () => {
     if (settings) {
       if (settings.globalProvider) globalProvider.value = settings.globalProvider;
       if (settings.llmConfigs) {
-        // 将持久化配置与默认模版执行合并，确保新字段 (如 maxContextTokens) 合法存在 (Metadata Sync)
+        // 元数据同步 (Metadata Sync)：将持久化配置与默认模板执行合并，确保新字段 (如 maxContextTokens) 合法存在
         const savedConfigs = settings.llmConfigs;
         for (const key in DEFAULT_LLM_CONFIGS) {
           if (savedConfigs[key]) {
@@ -187,7 +188,7 @@ export const useSettingsStore = defineStore('settings', () => {
               savedConfigs[key].maxContextTokens = defaultConfig.maxContextTokens;
             }
           } else {
-            // 版本平滑演变：若由于系统升级新增了模型槽位 (如 LLM #4)，则同步从默认模版加载初值
+            // 版本平滑演进：若由于系统升级新增了模型槽位 (如 LLM #4)，则同步从默认模版加载初值
             savedConfigs[key] = _.cloneDeep(DEFAULT_LLM_CONFIGS[key]);
           }
         }
@@ -202,6 +203,9 @@ export const useSettingsStore = defineStore('settings', () => {
       if (settings.useDefaultTilemap !== undefined) {
         useDefaultTilemap.value = settings.useDefaultTilemap;
       }
+      if (settings.showNsfwStats !== undefined) {
+        showNsfwStats.value = settings.showNsfwStats;
+      }
       if (settings.audioVolume !== undefined) audioVolume.value = settings.audioVolume;
       if (settings.enableAudio !== undefined) enableAudio.value = settings.enableAudio;
       if (settings.bgmVolume !== undefined) bgmVolume.value = settings.bgmVolume;
@@ -210,7 +214,7 @@ export const useSettingsStore = defineStore('settings', () => {
       if (settings.drawingConfig) {
         const mergedConfig = { ...drawingConfig.value, ...settings.drawingConfig };
 
-        // 迁移策略：执行模型 ID 规范化清洗 (Migration: Model ID cleanup)
+        // 迁移策略 (Migration)：执行模型 ID 规范化清洗 (Model ID cleanup)
         const modelMap: Record<string, string> = {
           'NovelAI Diffusion V4.5 Full': 'nai-diffusion-4-5-full',
           'NovelAI Diffusion V4.5 Curated': 'nai-diffusion-4-5-curated',
@@ -258,6 +262,7 @@ export const useSettingsStore = defineStore('settings', () => {
       enableAudio: enableAudio.value,
       bgmVolume: bgmVolume.value,
       sfxVolume: sfxVolume.value,
+      showNsfwStats: showNsfwStats.value,
       drawingConfig: JSON.parse(JSON.stringify(drawingConfig.value))
     };
 
@@ -293,7 +298,7 @@ export const useSettingsStore = defineStore('settings', () => {
         config.customOrigins = JSON.parse(savedOrigins);
       }
     } catch (e) {
-      console.error('Failed to export custom origins:', e);
+      console.error('[设置中心] 导出自定义起源配置失败喵:', e);
     }
 
     const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
@@ -309,7 +314,7 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       const config = JSON.parse(jsonStr);
 
-      // 合规性校验：在执行前确保文件包含有效的版本标识或核心数据分片 (Sanity Check)
+      // 合规性校验 (Sanity Check)：在执行前确保文件包含有效的版本标识或核心数据分片
       if (!config.version || (!config.globalProvider && !config.gameData)) {
         throw new Error('无效的备份文件：缺少版本号或必要数据');
       }
@@ -340,23 +345,23 @@ export const useSettingsStore = defineStore('settings', () => {
       // 2. 引导导入游戏业务数据 (若存在存档分片)
       if (config.gameData) {
         await dbService.importGlobalData(config.gameData);
-        console.log('Game data imported successfully (Version:', config.version, ')');
+        console.log('[设置中心] 游戏数据导入成功喵！(数据版本:', config.version, ')');
       }
 
       await saveSettings();
       return true;
     } catch (e) {
-      console.error('Failed to import config/data:', e);
+      console.error('[设置中心] 导入配置或数据失败喵:', e);
       return false;
     }
   }
 
-  // Helper to get effective config for a specific LLM
+  // 辅助函数：获取特定 LLM 模块的生效配置 (Helper to get effective config)
   function getEffectiveConfig(type: 'chat' | 'logic' | 'memory' | 'misc' | 'drawing') {
     const config = llmConfigs.value[type];
     const defaultConfig = DEFAULT_LLM_CONFIGS[type];
 
-    // Merge with defaults to ensure all fields exist
+    // 与默认值合并以确保所有字段存在 (Merge with defaults)
     const mergedConfig = { ...defaultConfig, ...config };
 
     if (mergedConfig.useGlobal) {
@@ -365,7 +370,7 @@ export const useSettingsStore = defineStore('settings', () => {
         apiKey: globalProvider.value.apiKey,
         model: mergedConfig.model,
         maxContextTokens: mergedConfig.maxContextTokens,
-        // Include all advanced settings with defaults
+        // 包含所有带默认值的进阶设置 (Include advanced settings)
         stream: mergedConfig.stream,
         timeout: mergedConfig.timeout,
         temperature: mergedConfig.temperature,
@@ -385,7 +390,7 @@ export const useSettingsStore = defineStore('settings', () => {
       apiKey: mergedConfig.provider?.apiKey || '',
       model: mergedConfig.model,
       maxContextTokens: mergedConfig.maxContextTokens,
-      // Include all advanced settings with defaults
+      // 包含所有带默认值的进阶设置 (Include advanced settings)
       stream: mergedConfig.stream,
       timeout: mergedConfig.timeout,
       temperature: mergedConfig.temperature,
@@ -406,13 +411,13 @@ export const useSettingsStore = defineStore('settings', () => {
     newConfig: Partial<LLMConfig>
   ) {
     const currentConfig = llmConfigs.value[type] || DEFAULT_LLM_CONFIGS[type];
-    if (!currentConfig) return; // Should not happen given defaults
+    if (!currentConfig) return; // 有默认值保证，理论上不会发生 (Safety fallback)
 
-    // Explicitly cast to LLMConfig to ensure type safety, preserving ID and other required fields
+    // 显式断言为 LLMConfig 类型以确保类型安全，同时保留 ID 等核心标识字段喵
     llmConfigs.value[type] = {
       ...currentConfig,
       ...newConfig,
-      id: currentConfig.id // 确保 ID 指针始终有效不为空 (Identity Guard)
+      id: currentConfig.id // 确保 ID 指针始终有效不为空喵 (Identity Guard)
     } as LLMConfig;
     saveSettings();
   }
@@ -429,6 +434,7 @@ export const useSettingsStore = defineStore('settings', () => {
     enableAudio,
     bgmVolume,
     sfxVolume,
+    showNsfwStats,
     drawingConfig,
     loadSettings,
     saveSettings,

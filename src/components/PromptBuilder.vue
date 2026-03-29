@@ -30,14 +30,14 @@ const emit = defineEmits<{
 const promptStore = usePromptStore();
 const { confirm } = useConfirm();
 const isDebuggerOpen = ref(false);
-const isDebugMode = ref(false); // Controls drag-and-drop and other debug features
+const isDebugMode = ref(false); // 控制拖拽功能及其他调试特性的开关 (Debug mode) 喵
 
-// Edit mode state
+// 积木编辑模式下的临时状态 (Edit mode state) 喵
 const editingBlock = ref<PromptBlock | null>(null);
 const editingOptionId = ref<string | null>(null);
 const editContent = ref('');
 const editMetadata = ref<any>({});
-const mobileShowEditor = ref(false); // Mobile: show editor panel
+const mobileShowEditor = ref(false); // 移动端：是否展示编辑器全屏面板 喵
 
 function handleEdit(block: PromptBlock, optionId?: string) {
   editingBlock.value = block;
@@ -51,7 +51,7 @@ function handleEdit(block: PromptBlock, optionId?: string) {
   }
 
   editMetadata.value = block.metadata ? { ...block.metadata } : {};
-  mobileShowEditor.value = true; // Mobile: show editor
+  mobileShowEditor.value = true; // 移动端：显示编辑器 喵
 }
 
 function handleMobileBack() {
@@ -93,7 +93,7 @@ async function handleReset() {
   }
 }
 
-// Drag options
+// 拖拽组件配置项 (Drag options) 喵
 const dragOptions = computed(() => ({
   animation: 200,
   group: 'description',
@@ -110,10 +110,10 @@ const dragOptions = computed(() => ({
     <div
       class="bg-izakaya-paper w-full max-w-4xl h-[85vh] rounded-xl shadow-paper flex flex-col overflow-hidden border border-izakaya-wood/10 relative"
     >
-      <!-- Texture -->
+      <!-- 背景纹理 (Texture) 喵 -->
       <div class="absolute inset-0 pointer-events-none opacity-10 bg-texture-rice-paper"></div>
 
-      <!-- Header -->
+      <!-- 顶部标题栏 (Header) 喵 -->
       <div
         class="flex items-center justify-between p-4 border-b border-izakaya-wood/10 bg-white/40 relative z-10"
       >
@@ -157,9 +157,9 @@ const dragOptions = computed(() => ({
         </div>
       </div>
 
-      <!-- Content -->
+      <!-- 主体内容区域 (Content) 喵 -->
       <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative z-10">
-        <!-- Left: Builder (Draggable List) - hidden on mobile when editing -->
+        <!-- 左侧：积木搭建区 (Builder) - 移动端编辑时隐藏 喵 -->
         <div
           class="flex-1 p-4 md:p-6 overflow-y-auto bg-izakaya-wood/5 custom-scrollbar"
           :class="{ 'hidden md:block': mobileShowEditor }"
@@ -186,7 +186,7 @@ const dragOptions = computed(() => ({
                 }"
               >
                 <div class="flex items-center gap-3">
-                  <!-- Drag Handle -->
+                  <!-- 拖拽手柄 (Drag Handle) 喵 -->
                   <div
                     class="drag-handle p-1 transition-colors rounded hover:bg-izakaya-wood/5"
                     :class="
@@ -198,7 +198,7 @@ const dragOptions = computed(() => ({
                     <GripVertical class="w-5 h-5" />
                   </div>
 
-                  <!-- Info -->
+                  <!-- 积木信息 (Info) 喵 -->
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2">
                       <h3 class="font-bold text-izakaya-wood font-display text-sm">
@@ -220,7 +220,7 @@ const dragOptions = computed(() => ({
                     </p>
                   </div>
 
-                  <!-- Actions -->
+                  <!-- 操作按钮 (Actions) 喵 -->
                   <div
                     class="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity"
                   >
@@ -253,7 +253,7 @@ const dragOptions = computed(() => ({
                   </div>
                 </div>
 
-                <!-- Sub-options for blocks like Narrative Perspective -->
+                <!-- 积木子选项（如叙述视角、文风等） 喵 -->
                 <div v-if="element.options && element.enabled" class="pl-9 pr-1 pb-1">
                   <div
                     class="flex flex-wrap gap-2 p-2 bg-izakaya-wood/5 rounded-lg border border-izakaya-wood/5"
@@ -275,7 +275,7 @@ const dragOptions = computed(() => ({
                         {{ opt.name }}
                       </button>
 
-                      <!-- Option Edit/Delete (Debug Mode only for Writing Style and System Root) -->
+                      <!-- 选项编辑/删除按钮 (仅限调试模式且针对特定积木) 喵 -->
                       <div
                         v-if="
                           isDebugMode &&
@@ -304,7 +304,7 @@ const dragOptions = computed(() => ({
                       </div>
                     </div>
 
-                    <!-- Add Option Button (Debug Mode only for Writing Style) -->
+                    <!-- 添加自定义选项按钮 (仅限调试模式针对文风) 喵 -->
                     <button
                       v-if="isDebugMode && element.id === 'writing_style'"
                       @click="handleAddOption(element.id)"
@@ -320,7 +320,7 @@ const dragOptions = computed(() => ({
           </draggable>
         </div>
 
-        <!-- Right: Editor (Context) - fullscreen on mobile when editing -->
+        <!-- 右侧：编辑器面板 (Editor) - 移动端全屏展示 喵 -->
         <div
           class="md:w-1/3 bg-white/60 md:border-l border-izakaya-wood/10 flex flex-col backdrop-blur-sm"
           :class="{
@@ -332,7 +332,7 @@ const dragOptions = computed(() => ({
             <div
               class="p-3 md:p-4 border-b border-izakaya-wood/10 bg-white/40 flex justify-between items-center gap-2"
             >
-              <!-- Mobile back button -->
+              <!-- 移动端返回按钮 喵 -->
               <button
                 @click="handleMobileBack"
                 class="md:hidden p-2 -ml-2 hover:bg-stone-200 rounded-lg transition-colors"
@@ -353,7 +353,7 @@ const dragOptions = computed(() => ({
               </button>
             </div>
             <div class="flex-1 p-3 md:p-4 overflow-hidden flex flex-col">
-              <!-- Special UI for User Persona Metadata -->
+              <!-- 用户人设元数据的特殊 UI 可选位置 喵 -->
 
               <textarea
                 v-model="editContent"
@@ -379,7 +379,7 @@ const dragOptions = computed(() => ({
       </div>
     </div>
 
-    <!-- Nested Debugger -->
+    <!-- 嵌套的 Prompt 调试器 (Nested Debugger) 喵 -->
     <PromptDebugger :is-open="isDebuggerOpen" @close="isDebuggerOpen = false" />
   </div>
 </template>

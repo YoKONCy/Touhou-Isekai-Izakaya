@@ -182,7 +182,7 @@ function handleAvatarFile(e: Event) {
   };
   reader.readAsDataURL(file);
 
-  // Reset input
+  // 任务完成后重置 input 状态以支持重复上传同名文件 喵
   if (fileInput.value) fileInput.value.value = '';
 }
 
@@ -196,7 +196,7 @@ function handleMouseDown(e: MouseEvent) {
 function clampState() {
   if (!cropperImage.value) return;
   const img = cropperImage.value;
-  const targetSize = 200; // The size of our circular crop area
+  const targetSize = 200; // 设定目标圆形裁剪区域的直径像素值 喵
 
   // 1. 安全比例校验：确保图像始终能覆盖 200px 裁剪圆形区，不露出背景白边。
   const minScale = Math.max(targetSize / img.naturalWidth, targetSize / img.naturalHeight);
@@ -323,7 +323,7 @@ async function handleCropConfirm() {
       <div
         class="w-full max-w-2xl bg-[#fdf6e3] dark:bg-stone-900 rounded-xl shadow-2xl border-2 border-izakaya-wood overflow-hidden flex flex-col max-h-[90vh]"
       >
-        <!-- 弹窗页眉 -->
+        <!-- 弹窗页眉标题栏 喵 (Modal Header) -->
         <div
           class="flex items-center justify-between p-4 border-b border-izakaya-wood/20 bg-izakaya-wood/5 dark:bg-stone-800"
         >
@@ -341,12 +341,12 @@ async function handleCropConfirm() {
           </button>
         </div>
 
-        <!-- 核心配置内容区 -->
+        <!-- 核心配置交互内容区 喵 (Config Content) -->
         <div
           class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 custom-scrollbar overscroll-contain"
           style="-webkit-overflow-scrolling: touch"
         >
-          <!-- 头像上传与基本属性 -->
+          <!-- 头像上传控制与基础个人资料项 喵 (Avatar & Bio) -->
           <div class="flex flex-col sm:flex-row gap-6 items-start">
             <div class="flex-shrink-0 flex flex-col items-center gap-3">
               <div
@@ -424,7 +424,7 @@ async function handleCropConfirm() {
             </div>
           </div>
 
-          <!-- 核心人设设定区 (System Meta) -->
+          <!-- 核心人设设定展示区 喵 (System Meta) -->
           <div class="space-y-2">
             <div class="flex items-center justify-between">
               <label
@@ -434,7 +434,7 @@ async function handleCropConfirm() {
                 详细人设
               </label>
               <span class="text-xs text-izakaya-wood/50 bg-izakaya-wood/5 px-2 py-0.5 rounded"
-                >Prompt 注入内容</span
+                >Prompt 指令注入点喵</span
               >
             </div>
             <p class="text-xs text-izakaya-wood/60 dark:text-stone-500">
@@ -448,7 +448,7 @@ async function handleCropConfirm() {
             ></textarea>
           </div>
 
-          <!-- 故事大总结区块 (Long-term Story Summary) -->
+          <!-- 故事阶段总结同步模块 喵 (Long-term Story Summary) -->
           <div class="space-y-4 pt-4 border-t border-izakaya-wood/10">
             <div class="flex items-center justify-between">
               <div class="space-y-1">
@@ -465,7 +465,7 @@ async function handleCropConfirm() {
               <div class="flex items-center gap-3">
                 <div class="flex flex-col items-end gap-1">
                   <span class="text-[10px] text-izakaya-wood/40 uppercase font-bold"
-                    >回顾轮数: {{ summaryTurnCount }}</span
+                    >记忆回顾轮数喵: {{ summaryTurnCount }}</span
                   >
                   <input
                     type="range"
@@ -495,7 +495,7 @@ async function handleCropConfirm() {
           </div>
         </div>
 
-        <!-- 操作底栏 -->
+        <!-- 全局操作导航底栏 喵 (Action Footer) -->
         <div
           class="p-4 border-t border-izakaya-wood/10 bg-white/50 dark:bg-stone-800/50 flex justify-end gap-3"
         >

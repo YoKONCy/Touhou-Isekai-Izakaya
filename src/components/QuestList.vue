@@ -2,18 +2,18 @@
   <div
     class="flex flex-col h-full bg-izakaya-paper shadow-floating rounded-none border-x-4 border-y border-x-izakaya-wood/20 border-y-izakaya-wood/10 overflow-hidden relative"
   >
-    <!-- Texture Overlay -->
+    <!-- 纸纹纹理蒙层 (Texture Overlay) 喵 -->
     <div
       class="absolute inset-0 pointer-events-none opacity-30 bg-texture-rice-paper mix-blend-multiply z-0"
     ></div>
 
-    <!-- Main Category Switcher (Quest vs Promise) -->
+    <!-- 主分类切换器：任务 vs 约定 (Main Category Switcher) 喵 -->
     <div class="border-b border-izakaya-wood/20 bg-izakaya-wood/5 relative z-10">
       <button
         @click="viewMode = viewMode === 'quests' ? 'promises' : 'quests'"
         class="w-full py-2.5 flex items-center justify-center gap-3 text-sm font-bold font-display tracking-wider transition-all duration-300 group hover:bg-white/40 text-izakaya-wood relative overflow-hidden"
       >
-        <!-- Quests Label -->
+        <!-- 任务栏标签 (Quests Label) 喵 -->
         <span
           class="transition-all duration-300 relative z-10"
           :class="
@@ -22,12 +22,12 @@
           >任务栏</span
         >
 
-        <!-- Switch Icon -->
+        <!-- 切换图标 (Switch Icon) 喵 -->
         <span class="text-xs opacity-30 group-hover:opacity-60 transition-opacity relative z-10"
           >⇄</span
         >
 
-        <!-- Promises Label -->
+        <!-- 约定栏标签 (Promises Label) 喵 -->
         <span
           class="transition-all duration-300 relative z-10"
           :class="
@@ -36,7 +36,7 @@
           >约定栏</span
         >
 
-        <!-- Sliding Indicator Background -->
+        <!-- 滑动指示器背景 (Sliding Indicator Background) 喵 -->
         <div
           class="absolute bottom-0 h-0.5 transition-all duration-500 ease-out z-0"
           :class="
@@ -46,7 +46,7 @@
       </button>
     </div>
 
-    <!-- Status Tabs (Active vs Completed) -->
+    <!-- 状态页签：进行中 vs 已结束 (Status Tabs) 喵 -->
     <div class="flex border-b border-izakaya-wood/10 bg-white/20 relative z-10">
       <button
         @click="switchTab('active')"
@@ -80,14 +80,14 @@
       </button>
     </div>
 
-    <!-- Content Area -->
+    <!-- 内容滚动区域 (Content Area) 喵 -->
     <div
       class="flex-1 overflow-y-auto min-h-0 space-y-2 p-2 custom-scrollbar relative z-10 overscroll-contain"
       style="-webkit-overflow-scrolling: touch"
     >
-      <!-- QUESTS VIEW -->
+      <!-- 任务视图 (QUESTS VIEW) 喵 -->
       <template v-if="viewMode === 'quests'">
-        <!-- Active Quests -->
+        <!-- 进行中的任务 (Active Quests) 喵 -->
         <template v-if="currentTab === 'active'">
           <div
             v-if="activeQuests.length === 0"
@@ -120,7 +120,7 @@
           </div>
         </template>
 
-        <!-- Completed Quests -->
+        <!-- 已完成的任务 (Completed Quests) 喵 -->
         <template v-else>
           <div
             v-if="completedQuests.length === 0"
@@ -159,9 +159,9 @@
         </template>
       </template>
 
-      <!-- PROMISES VIEW -->
+      <!-- 约定视图 (PROMISES VIEW) 喵 -->
       <template v-else>
-        <!-- Active Promises -->
+        <!-- 进行中的约定 (Active Promises) 喵 -->
         <template v-if="currentTab === 'active'">
           <div
             v-if="activePromises.length === 0"
@@ -199,7 +199,7 @@
           </div>
         </template>
 
-        <!-- Completed Promises -->
+        <!-- 已完成的约定 (Completed Promises) 喵 -->
         <template v-else>
           <div
             v-if="completedPromises.length === 0"
@@ -240,7 +240,7 @@
       </template>
     </div>
 
-    <!-- Details Modal (Quests Only) -->
+    <!-- 任务详情模态框 (Details Modal - Quests) 喵 -->
     <div
       v-if="selectedQuest"
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-izakaya-wood/20 backdrop-blur-sm animate-fade-in"
@@ -249,7 +249,7 @@
       <div
         class="bg-izakaya-paper w-full max-w-md rounded-xl shadow-paper border border-izakaya-wood/10 relative overflow-hidden flex flex-col max-h-[80vh]"
       >
-        <!-- Texture -->
+        <!-- 背景纹理 (Texture) 喵 -->
         <div class="absolute inset-0 pointer-events-none opacity-10 bg-texture-rice-paper"></div>
 
         <div
@@ -320,7 +320,7 @@
             </div>
           </div>
 
-          <!-- Quest Logs Timeline -->
+          <!-- 任务日志时间轴 (Quest Logs Timeline) 喵 -->
           <div v-if="selectedQuest.logs && selectedQuest.logs.length > 0">
             <div
               class="font-bold font-display text-izakaya-wood mb-3 border-b border-izakaya-wood/10 pb-1 text-xs opacity-70"
@@ -387,7 +387,7 @@
       </div>
     </div>
 
-    <!-- Details Modal (Promises) -->
+    <!-- 约定详情模态框 (Details Modal - Promises) 喵 -->
     <div
       v-if="selectedPromise"
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-izakaya-wood/20 backdrop-blur-sm animate-fade-in"
@@ -396,7 +396,7 @@
       <div
         class="bg-izakaya-paper w-full max-w-md rounded-xl shadow-paper border border-izakaya-wood/10 relative overflow-hidden flex flex-col max-h-[80vh]"
       >
-        <!-- Texture -->
+        <!-- 背景纹理 (Texture) 喵 -->
         <div class="absolute inset-0 pointer-events-none opacity-10 bg-texture-rice-paper"></div>
 
         <div
@@ -483,7 +483,7 @@ const activeQuests = computed(() => {
 const completedQuests = computed(() => {
   return (gameStore.state.system.quests || [])
     .filter((q) => q.status === 'completed' || q.status === 'failed')
-    .sort((a, b) => (b.completedTurn || 0) - (a.completedTurn || 0)); // Newest first
+    .sort((a, b) => (b.completedTurn || 0) - (a.completedTurn || 0)); // 按结算轮次降序排列，最新优先 喵
 });
 
 const activePromises = computed(() => {

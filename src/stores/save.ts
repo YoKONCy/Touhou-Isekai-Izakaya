@@ -7,8 +7,8 @@ import { useGameStore } from './game';
 
 import { gameLoop } from '@/services/gameLoop';
 
-// Define SaveSlot interface locally or import if available
-// Assuming DatabaseService returns objects matching this structure
+// 在本地定义存档槽位 (SaveSlot) 接口
+// 确保 DatabaseService 返回的对象结构与此一致喵
 export interface SaveSlot {
   id: number;
   name: string;
@@ -74,7 +74,7 @@ export const useSaveStore = defineStore('save', () => {
     // 1. 更新当前内存中的活跃存档 ID 指针
     currentSaveId.value = id;
   
-    // 2. 将存档 ID 变更持久化至本地全局配置 (Persistence)
+    // 2. 将存档 ID 变更持久化至本地全局配置 (执行持久化保存)喵
     settingsStore.currentSaveSlotId = id;
     await settingsStore.saveSettings();
   
@@ -82,7 +82,7 @@ export const useSaveStore = defineStore('save', () => {
     await dbService.updateSaveSlot(id, { lastPlayed: Date.now() });
     await loadSaves();
 
-    // 4. 重载游戏核心历史数据与全局状态机 (State Reload)
+    // 4. 重载游戏核心历史数据与全局状态机 (执行状态重载)喵
     const chatStore = useChatStore();
     await chatStore.loadHistory();
 
@@ -111,15 +111,15 @@ export const useSaveStore = defineStore('save', () => {
 
     // 5. 巡检是否为新游戏（检测历史对话记录是否为空）
     if (chatStore.messages.length === 0) {
-      // 巡检是否已存在初始游戏状态快照 (Snapshot Check)
+      // 巡检是否已存在初始游戏状态快照 (检查是否存在初始快照)喵
       const latestSnapshot = await dbService.getLatestSnapshot(id);
 
       if (!latestSnapshot) {
-        console.log('[SaveStore] 检测到新/空存档。正在初始化世界状态...');
+        console.log('[存档系统] 检测到新/空存档喵。正在初始化世界状态...');
         await gameLoop.initializeNewGame();
         await chatStore.createInitialSnapshot();
       } else {
-        console.log('[SaveStore] 历史记录为空但存在快照。跳过初始化。');
+        console.log('[存档系统] 历史记录为空但存在快照喵。跳过初始化流程。');
       }
     }
   }
@@ -132,7 +132,7 @@ export const useSaveStore = defineStore('save', () => {
   async function deleteSave(id: number) {
     if (!id) return;
 
-    // Delete all related data (Cascading handled by DB Service / Schema)
+    // 清理所有关联数据 (级联物理删除已由数据库底层或 Service 处理)喵
     await dbService.deleteSaveSlot(id);
 
     if (currentSaveId.value === id) {
@@ -158,7 +158,7 @@ export const useSaveStore = defineStore('save', () => {
     const history = await dbService.getAllChatHistory(id);
     const gameStore = useGameStore();
 
-    // 尝试通过多维渠道检索玩家名称 (Name Retrieval)
+    // 尝试多维度检索玩家姓名 (获取玩家称谓)喵
     let playerName = '玩家';
 
     if (id === currentSaveId.value) {
@@ -174,7 +174,7 @@ export const useSaveStore = defineStore('save', () => {
           }
         }
       } catch (e) {
-        console.warn('[SaveStore] Failed to load player name for export', e);
+        console.warn('[存档系统] 导出存档时加载玩家姓名失败喵:', e);
       }
     }
 
@@ -207,7 +207,7 @@ export const useSaveStore = defineStore('save', () => {
       await dbService.importSave(fileContent);
       await loadSaves();
     } catch (e) {
-      console.error('Import failed:', e);
+      console.error('[存档系统] 导入存档失败喵:', e);
       throw e;
     }
   }

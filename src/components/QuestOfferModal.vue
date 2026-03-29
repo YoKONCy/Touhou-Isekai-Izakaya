@@ -6,10 +6,10 @@
     <div
       class="group relative bg-stone-50 dark:bg-stone-900 rounded-xl max-w-lg w-full shadow-2xl overflow-hidden transform transition-all border-2 border-izakaya-wood/30"
     >
-      <!-- Texture -->
+      <!-- 背景纹理 (Texture) 喵 -->
       <div class="absolute inset-0 pointer-events-none opacity-40 bg-texture-rice-paper z-0"></div>
 
-      <!-- Header -->
+      <!-- 顶部标题栏 (Header) 喵 -->
       <div
         class="relative z-10 bg-touhou-red text-white p-5 flex justify-between items-center shadow-md"
       >
@@ -20,7 +20,7 @@
         </div>
       </div>
 
-      <!-- Content -->
+      <!-- 委托内容详情 (Content) 喵 -->
       <div class="p-8 space-y-6 relative z-10">
         <div class="text-center mb-4">
           <h2 class="text-3xl font-bold font-display text-izakaya-wood dark:text-stone-200 mb-2">
@@ -85,7 +85,7 @@
               <div
                 class="w-10 h-10 flex items-center justify-center bg-marisa-gold/10 text-marisa-gold rounded-full border border-marisa-gold/20 group-hover/reward:scale-110 transition-transform"
               >
-                <!-- Icon based on type could go here -->
+                <!-- 此处可根据奖励类型动态展示对应图标 喵 -->
                 <span class="text-lg">{{ getRewardTypeIcon(reward.type) }}</span>
               </div>
               <div class="flex-1">
@@ -106,7 +106,7 @@
         </div>
       </div>
 
-      <!-- Actions -->
+      <!-- 操作按钮（接受/拒绝） (Actions) 喵 -->
       <div
         class="p-6 bg-stone-100/50 dark:bg-stone-800/50 border-t border-izakaya-wood/10 dark:border-stone-700 flex justify-end gap-4 relative z-10"
       >
@@ -168,12 +168,12 @@ function getRewardTypeIcon(type: string) {
 function formatRewardValue(reward: any) {
   if (!reward.value) return '';
 
-  // If it's an item with "Name,Type" format, only show Name
+  // 针对“名称,类型”格式的物品，仅截取显示名称 喵
   if (reward.type === 'item' && typeof reward.value === 'string' && reward.value.includes(',')) {
     return reward.value.split(',')[0];
   }
 
-  // For money or other simple values, show as is (numbers will be converted to string)
+  // 针对金钱或其他简单数值，按原样展示 喵 (数值会被自动转为字符串)
   return reward.value;
 }
 
