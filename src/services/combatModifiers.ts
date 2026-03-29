@@ -1,14 +1,14 @@
 import type { Combatant, SpellCard, Buff } from '@/types/combat';
 import { TALENT_MODIFIERS } from './talentModifiers';
 
-// --- Modifier Hook Types ---
+// --- 修正器钩子类型定义 ---
 
 export interface CombatContext {
   attacker: Combatant;
   defender?: Combatant;
-  spell?: Combatant | SpellCard; // Use union for flexibility
+  spell?: Combatant | SpellCard; // 使用联合类型以提升扩展灵活性
   turn?: number;
-  damage?: number; // For post-damage hooks
+  damage?: number; // 用于执行伤害发生后的回调钩子
   actionType?: 'attack' | 'spell' | 'ultimate' | 'item' | 'talk';
   spellType?: 'normal' | 'ultimate' | 'buff' | 'heal' | 'shield';
   onLog?: (msg: string) => void;
@@ -26,43 +26,43 @@ export interface CombatContext {
   addLog?: (msg: string) => void;
 }
 
-// 1. Stat Calculation Hooks (Attacker/Defender Stats)
+// 1. 基础属性计算钩子（作用于攻击者/防御者属性）
 export type StatModifier = (value: number, context: CombatContext) => number;
 
-// 2. Damage Calculation Hooks
+// 2. 伤害推导计算钩子
 export type DamageModifier = (damage: number, context: CombatContext) => number;
 
-// 3. Mechanic Hooks (Boolean flags or special logic)
+// 3. 机制判定钩子（返回布尔标识或特殊执行逻辑）
 export type MechanicCheck = (context: CombatContext) => boolean;
 
-// 4. Resource Hooks (Cost/Gain)
+// 4. 资源变动钩子（消耗/获取）
 export type ResourceModifier = (amount: number, context: CombatContext) => number;
 
 export interface CombatModifier {
   id: string;
   name: string;
   source: 'talent' | 'buff' | 'equipment' | 'system';
-  priority: number; // Lower executes first (Base add), Higher executes last (Multipliers).
+  priority: number; // 优先级：低数值优先执行（基础加成），高数值最后执行（倍数修正）。
 
   // --- Hooks ---
 
   // Stats
   onCalculateMaxHp?: StatModifier;
   onCalculateMaxMp?: StatModifier;
-  onCalculateAtk?: StatModifier; // Attack Multiplier
-  onCalculateDef?: StatModifier; // Defense Multiplier
-  onCalculateDodge?: StatModifier; // Flat Dodge Rate Add
-  onCalculateHit?: StatModifier; // Flat Hit Rate Add
-  onCalculateCritRate?: StatModifier; // Flat Crit Rate Add
-  onCalculateCritDmg?: StatModifier; // Crit Dmg Multiplier Add
+  onCalculateAtk?: StatModifier; // 攻击力倍数修正
+  onCalculateDef?: StatModifier; // 防御力倍数修正
+  onCalculateDodge?: StatModifier; // 基础闪避率加成
+  onCalculateHit?: StatModifier; // 基础命中率加成
+  onCalculateCritRate?: StatModifier; // 基础暴击率加成
+  onCalculateCritDmg?: StatModifier; // 暴击伤害倍数加成
 
   // Combat Flow - Damage
-  onCalculateBaseDamage?: DamageModifier; // Modify Base Damage (Pre-mitigation)
-  onCalculateFinalDamage?: DamageModifier; // Modify Final Damage (Post-mitigation)
-  onCalculateIncomingDamage?: DamageModifier; // Modify Damage Taken (Defender side)
-  onCalculateFlatDamage?: DamageModifier; // Add flat damage (e.g. 力量训练)
-  onCalculateSpellLevel?: StatModifier; // Modify effective spell level
-  onCalculateCritDmgTaken?: StatModifier; // Modify crit damage taken multiplier
+  onCalculateBaseDamage?: DamageModifier; // 修正基础伤害（减伤前）
+  onCalculateFinalDamage?: DamageModifier; // 修正最终伤害（减伤后）
+  onCalculateIncomingDamage?: DamageModifier; // 修正受到的伤害（防御侧）
+  onCalculateFlatDamage?: DamageModifier; // 增加固定额度伤害（如：力量训练奖励）
+  onCalculateSpellLevel?: StatModifier; // 修正符卡有效等级权重
+  onCalculateCritDmgTaken?: StatModifier; // 修正受到的暴击伤害权重
   onCalculateDoubleAttackChance?: StatModifier; // 连击几率
 
   // Combat Flow - Costs/Gains
@@ -74,7 +74,7 @@ export interface CombatModifier {
   shouldIgnoreDefense?: MechanicCheck;
   shouldIgnoreSuppression?: MechanicCheck;
   shouldAutoCrit?: MechanicCheck;
-  shouldAutoDodge?: MechanicCheck; // e.g. "Mind Eye"
+  shouldAutoDodge?: MechanicCheck; // 强制闪避判定（如：“心眼”效果）
   shouldResistDebuff?: MechanicCheck; // 抵抗负面状态
 
   // Lifecycle
@@ -85,12 +85,12 @@ export interface CombatModifier {
   onAfterDamageDealt?: (combatant: Combatant, damage: number, context: CombatContext) => void;
 }
 
-// --- Registry ---
+// --- 注册中心 ---
 
 const activeModifiers: CombatModifier[] = [];
 
 export function registerModifier(modifier: CombatModifier) {
-  // Avoid duplicates
+  // 幂等性守卫：避免重复注册同一修正器
   if (activeModifiers.find((m) => m.id === modifier.id)) return;
   activeModifiers.push(modifier);
   activeModifiers.sort((a, b) => a.priority - b.priority);
@@ -103,17 +103,17 @@ export function unregisterModifier(id: string) {
   }
 }
 
-// --- Helper: Convert Buff to Modifier ---
+// --- 辅助工具：将 Buff 动态转换为修正器实体 ---
 function convertBuffToModifier(buff: Buff): CombatModifier {
   const mod: CombatModifier = {
     id: buff.id,
     name: buff.name,
     source: 'buff',
-    priority: 20 // Buffs usually apply after base stats (Talents)
+    priority: 20 // 权重策略：Buff 通常在天赋（基础属性）之后执行
   };
 
   buff.effects.forEach((effect) => {
-    // 1. Stat Mods
+    // 1. 属性类修正 (Stat Mods)
     if (effect.type === 'stat_mod') {
       const val = Number(effect.value);
 
@@ -129,29 +129,29 @@ function convertBuffToModifier(buff: Buff): CombatModifier {
         mod.onCalculateMpCost = (cost) => Math.max(0, cost * (1 - val));
       }
     }
-    // 2. MP Regen
+    // 2. 灵力回复 (MP Regen)
     else if (effect.type === 'heal_mp') {
       mod.onTurnStart = (combatant) => {
         const val = Number(effect.value);
         combatant.mp = Math.min(combatant.maxMp, combatant.mp + val);
       };
     }
-    // 3. Dodge Mod
+    // 3. 闪避修正 (Dodge Mod)
     else if (effect.type === 'dodge_mod') {
       mod.onCalculateDodge = (current) => current + Number(effect.value);
     }
-    // 3. Damage Reduction
+    // 3. 伤害减免 (Damage Reduction)
     else if (effect.type === 'damage_reduction') {
-      // Reduce damage taken. Similar to 'defense'.
+      // 降低受到的伤害（逻辑上类似于增加动态防御值）
       mod.onCalculateDef = (current) => current - Number(effect.value);
     }
-    // 4. Shield (Flat or Pct)
+    // 4. 护盾逻辑 (Shield - 固定值或百分比)
     else if (effect.type === 'shield') {
-      // Buffs that grant shields usually apply them once.
+      // 注意：提供护盾的 Buff 通常在赋予时即刻生效，无需持续挂钩
     }
     // 5. DOT/Heal
     else if (effect.type === 'damage_over_time' || effect.type === 'heal') {
-      // Add lifecycle hook for turn-based effects
+      // 注入生命周期钩子以驱动回合制效果
       const originalOnTurnStart = mod.onTurnStart;
       mod.onTurnStart = (combatant, context) => {
         if (originalOnTurnStart) originalOnTurnStart(combatant, context);
@@ -205,20 +205,20 @@ export function applyLifecycleHook(
 }
 
 export function getActiveModifiers(combatant: Combatant): CombatModifier[] {
-  // Filter modifiers that apply to this combatant
-  // For now, we assume global registration but logic checks context.
-  // Ideally, modifiers should be attached to the combatant object or derived dynamically.
+  // 筛选并提取当前单位身上生效的所有修正器
+  // 当前阶段：基于全局注册表进行语境合法性校验
+  // 演进建议：后续应将修正器直接挂载至单位对象实体，或采用动态组合模式推导
 
-  // REFACTOR STRATEGY:
-  // Instead of a global list, we dynamically generate the list based on:
-  // 1. Combatant's Talents (if Player)
-  // 2. Combatant's Buffs
-  // 3. System Base Rules (Proficiency, etc.)
+  // --- 重构演进策略 ---
+  // 弃用全局清单，改用基于以下维度的动态工厂模式生成：
+  // 1. 单位持有的天赋列表 (针对玩家端)
+  // 2. 单位当前挂接的 Buff 状态池
+  // 3. 系统底层规则（如：熟练度加成等）
 
   const modifiers: CombatModifier[] = [];
 
-  // 1. System Modifiers (Always active or checked internally)
-  // (We might keep system logic in core functions for performance, or move here)
+  // 1. 系统级修正器（常驻激活或执行内部隐式检查）
+  // (出于性能考量，核心系统逻辑可能仍保留在原生函数中，或在此处封装)
 
   // 2. Talent Modifiers
   if (combatant.isPlayer && combatant.unlockedTalents) {

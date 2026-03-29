@@ -53,8 +53,8 @@ export class DatabaseService {
   }
 
   /**
-   * Helper to sanitize data before sending to Worker.
-   * This removes Vue Proxies and ensures the object is clonable by postMessage.
+   * 辅助方法：在将数据发送至 Worker 前执行序列化清理。
+   * 此操作旨在剥离 Vue 的响应式代理 (Proxies)，并确保对象满足 postMessage 的结构化克隆要求。
    */
   private sanitize<T>(data: T): T {
     if (data === undefined || data === null) return data;
@@ -117,10 +117,10 @@ export class DatabaseService {
   }
 
   // =================================================================
-  //  Data Access Methods (DAL) - Replacing Dexie Operations
+  //  数据访问层 (DAL) - 替换原有的 Dexie 操作集 (IndexedDB -> SQLite)
   // =================================================================
 
-  // --- Save Slots ---
+  // --- 存档槽位管理 (Save Slots) ---
 
   async getSaveSlots(): Promise<any[]> {
     const rows = await this.exec('SELECT * FROM save_slots ORDER BY lastPlayed DESC');
@@ -141,7 +141,7 @@ export class DatabaseService {
       'INSERT INTO save_slots (name, summary, lastPlayed, location, playTime, isMultiplayer) VALUES (?, ?, ?, ?, ?, ?)',
       [name, summary, now, location, 0, isMultiplayer ? 1 : 0]
     );
-    // Get the ID of the last inserted row
+    // 获取最后一次插入操作生成的物理 RowID
     const res = await this.exec('SELECT last_insert_rowid() as id');
     return res[0].id;
   }
@@ -157,14 +157,14 @@ export class DatabaseService {
   }
 
   async deleteSaveSlot(id: number): Promise<void> {
-    // ON DELETE CASCADE is enabled in schema, so this deletes related chats, memories, snapshots
+    // 级联处理：由于 Schema 已启用 ON DELETE CASCADE，此操作将同步清理相关的聊天、记忆与快照。
     await this.exec('DELETE FROM save_slots WHERE id = ?', [id]);
   }
 
-  // --- Chats ---
+  // --- 聊天记录管理 (Chats) ---
 
   async getChatHistory(saveSlotId: number, limit: number = 50, offset: number = 0): Promise<any[]> {
-    // Note: We might need to reverse the order in UI or SQL depending on requirement
+    // 注意：后续可根据 UI 展示需求或 SQL 性能优化目标调整排序方向。
     return this.exec(
       'SELECT * FROM chats WHERE saveSlotId = ? ORDER BY timestamp ASC LIMIT ? OFFSET ?',
       [saveSlotId, limit, offset]
@@ -200,14 +200,12 @@ export class DatabaseService {
   async deleteChatMessagesBySnapshotIds(snapshotIds: number[]): Promise<void> {
     if (snapshotIds.length === 0) return;
     const placeholders = snapshotIds.map(() => '?').join(',');
-    // Also delete the snapshot itself?
-    // Usually we delete snapshot -> chat references it.
-    // Or we delete chat -> snapshot is deleted?
-    // Logic in ChatStore: "Delete snapshots referenced by these messages"
+    // 逻辑考量：是否需要同步销毁快照文件？
+    // 当前逻辑采用由 ChatStore 触发的“清理这些消息引用的快照记录”方案。
     await this.exec(`DELETE FROM snapshots WHERE id IN (${placeholders})`, snapshotIds);
   }
 
-  // --- Snapshots ---
+  // --- 状态快照管理 (Snapshots) ---
 
   async getSnapshot(id: number): Promise<any | null> {
     return new Promise((resolve, reject) => {
@@ -261,7 +259,7 @@ export class DatabaseService {
     });
   }
 
-  // --- Memory Relations ---
+  // --- 记忆关联图谱 (Memory Relations) ---
 
   async addMemoryRelation(
     sourceId: number,
@@ -283,7 +281,7 @@ export class DatabaseService {
   }
 
   async getAllMemoryRelations(saveSlotId: number): Promise<any[]> {
-    // Join with memories to filter by saveSlotId
+    // 联表查询：通过 memories 表进行存档槽位 (saveSlotId) 过滤。
     return this.exec(
       `SELECT mr.* 
        FROM memory_relations mr
@@ -293,19 +291,19 @@ export class DatabaseService {
     );
   }
 
-  // --- Import / Export ---
+  // --- 存档导入/导出 (Import / Export) ---
 
   async exportSave(saveSlotId: number): Promise<Blob> {
     return new Promise((resolve, reject) => {
       const id = this.generateId();
       this.pendingRequests.set(id, {
         resolve: (data: any) => {
-          // The worker now returns a Blob directly
+          // 通讯协议升级：Worker 现已改为直接返回 Blob 对象。
           if (data instanceof Blob) {
             resolve(data);
           } else {
             console.error('Unexpected data format from worker export', data);
-            // Fallback for legacy format (though worker is updated)
+            // 容错回退：兼容旧版数据格式（尽管 Worker 已完成升级）。
             try {
               const json = JSON.stringify(data);
               resolve(new Blob([json], { type: 'application/json' }));
@@ -337,7 +335,7 @@ export class DatabaseService {
           payload: { jsonContent: fileContent }
         },
         [fileContent]
-      ); // Transfer the ArrayBuffer
+      ); // 性能优化：通过所有权转移 (Transferable Object) 方式传递 ArrayBuffer
     });
   }
 
@@ -390,7 +388,7 @@ export class DatabaseService {
   }
 
   // =================================================================
-  //  Facility Registry Methods
+  //  设施注册表管理方法 (Facility Registry)
   // =================================================================
 
   async getFacilities(saveSlotId: number): Promise<Facility[]> {
@@ -468,8 +466,12 @@ export class DatabaseService {
     }
   }
 
+  async deleteFacility(id: string): Promise<void> {
+    await this.exec('DELETE FROM facilities WHERE id = ?', [id]);
+  }
+
   // =================================================================
-  //  Memory Related Methods
+  //  记忆系统相关方法 (Memory System)
   // =================================================================
 
   async addMemory(memory: any): Promise<number> {
@@ -521,7 +523,7 @@ export class DatabaseService {
       'SELECT * FROM memories WHERE saveSlotId = ? AND type = ? ORDER BY id DESC LIMIT ?',
       [saveSlotId, type, limit]
     );
-    // Parse JSON fields
+    // 逆序列化解析 JSON 存储字段
     return rows.map(this.parseMemoryRow);
   }
 
@@ -578,21 +580,18 @@ export class DatabaseService {
   }
 
   async searchMemories(saveSlotId: number, keywords: string[]): Promise<any[]> {
-    // Simple implementation: Fetch all and filter in JS if FTS is complex to bridge.
-    // However, we have FTS5. Let's try to use it if possible.
-    // But FTS5 queries are global. We need to filter by saveSlotId too.
-    // JOINing virtual table with standard table:
+    // 基础实现方案：由于 FTS5 全文搜索桥接较为复杂，当前优先采用 LIKE 模糊检索。
+    // 技术预研：系统已集成 FTS5，后续应考虑启用虚拟表 (Virtual Table) 进行原生全文检索优化。
     // SELECT m.* FROM memories m JOIN memories_fts f ON m.id = f.rowid WHERE m.saveSlotId = ? AND f.memories_fts MATCH ?
 
-    // Construct FTS query: "tag OR content OR ..."
-    // For now, to ensure 100% compatibility with the previous "split keyword" logic which was permissive (OR),
-    // let's fetch all relevant memories (e.g. summaries) and filter in JS, OR implement a LIKE-based search.
-    // Given the potentially large number of memories, FTS is better.
-    // But "memories" table might not be that huge per save.
-    // Let's stick to providing a helper to get all summaries for now,
-    // as the `retrieve` method in memory.ts does explicit filtering.
-
-    // Actually, let's provide a SEARCH method that does a LIKE query for each keyword.
+    // 构造 FTS 查询语句: "标签 OR 内容 OR ..."
+    // 目前为了确保与之前基于“拆分关键词”的宽泛（OR）逻辑 100% 兼容，
+    // 我们先拉取所有相关的记忆（例如摘要）并在 JS 中过滤，或者执行基于 LIKE 的搜索。
+    // 考虑到记忆数量可能很大，FTS（全文搜索）会是更好的选择。
+    // 但对于每个存档来说，“memories”表可能并没那么庞大。
+    // 暂时先提供一个获取所有摘要的辅助方法，
+    // 因为 memory.ts 中的 retrieve（检索）方法会执行显式过滤。
+    // 实际上，让我们提供一个对每个关键词执行 LIKE 查询的 SEARCH 方法。
     if (keywords.length === 0) return [];
 
     const conditions = keywords
@@ -636,7 +635,7 @@ export class DatabaseService {
   }
 
   async getPrecedingUserMessage(chatId: number, saveSlotId: number): Promise<any | null> {
-    // Get the message with id < chatId AND role='user' AND saveSlotId = ... ORDER BY id DESC LIMIT 1
+    // 检索上下文：获取当前消息之前的最后一条用户输入 (Preceding User Prompt)
     const res = await this.exec(
       'SELECT * FROM chats WHERE id < ? AND saveSlotId = ? AND role = ? ORDER BY id DESC LIMIT 1',
       [chatId, saveSlotId, 'user']
@@ -660,7 +659,7 @@ export class DatabaseService {
   }
 
   // =================================================================
-  //  Character Methods
+  //  角色设定库管理方法 (Character / Lorebook)
   // =================================================================
 
   async getAllCharacters(): Promise<any[]> {
@@ -744,7 +743,7 @@ export class DatabaseService {
     const fields = [];
     const values = [];
 
-    // Map common fields
+    // 核心通用字段映射 (Direct Mapping)
     const directFields = [
       'uuid',
       'name',

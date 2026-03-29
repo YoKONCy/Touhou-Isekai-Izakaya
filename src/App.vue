@@ -66,7 +66,7 @@ const gameStore = useGameStore();
 const toastStore = useToastStore();
 const { confirm } = useConfirm();
 
-// Setup smooth streaming
+// 平滑流式输出配置
 const { displayed: smoothContent } = useSmoothStream(
   gameLoop.streamedContent,
   gameLoop.isProcessing,
@@ -103,7 +103,7 @@ const isMultiplayerHubOpen = ref(false);
 const isDecisionOverlayOpen = ref(false);
 const helpInitialSectionId = ref<string | undefined>(undefined);
 
-// Mobile navigation state
+// 移动端导航状态管理
 const mobileActivePanel = ref<'chat' | 'status' | 'map' | 'characters' | 'quests'>('chat');
 const isMobileDrawerOpen = ref(false);
 
@@ -114,7 +114,7 @@ const migrationMessage = ref('');
 const userOpenCombat = ref(false);
 const userOpenQuest = ref(false);
 
-// Multiplayer Status Feedback
+// 联机状态反馈感知
 const mpStatusMessage = ref('');
 const mpStatusVisible = ref(false);
 
@@ -122,7 +122,7 @@ const isGuestProcessing = ref(false);
 const guestStage = ref<'preparing' | 'generating_story' | 'background_processing' | 'idle'>('idle');
 const guestStreamedContent = ref('');
 
-// Listen for global events for feedback
+// 监听全局事件以获取交互反馈
 onMounted(() => {
   window.addEventListener('mp-story-generating', ((e: any) => {
     guestStage.value = e.detail?.stage || 'generating_story';
@@ -203,7 +203,7 @@ watch(
   }
 );
 
-// Audio Unlock Logic
+// 音频解锁逻辑（应对浏览器自动播放策略限制）
 const hasInteracted = ref(false);
 const handleFirstInteraction = async () => {
   if (!hasInteracted.value) {
@@ -253,7 +253,7 @@ function handleOpenHelp(sectionId?: string) {
 const isSummaryModalOpen = ref(false);
 const summaryTurnCount = ref(20);
 
-// Scroll to bottom when messages change
+// 消息更新后自动滚动至底部
 watch(
   () => chatStore.messages.length,
   () => {
@@ -266,7 +266,7 @@ watch(
   }
 );
 
-// Handle Jump to message
+// 路由跳转：处理对话点跳转定位
 watch(
   () => chatStore.jumpTargetId,
   async (newId) => {
@@ -326,13 +326,13 @@ watch(
 onMounted(async () => {
   await settingsStore.loadSettings();
 
-  // Init Audio
+  // 初始化音频引擎策略
   audioManager.setVolume(settingsStore.audioVolume);
   audioManager.setMute(!settingsStore.enableAudio);
   audioManager.setBgmVolume(settingsStore.bgmVolume);
   audioManager.setSfxVolume(settingsStore.sfxVolume);
 
-  // Init Theme
+  // 昼夜主题风格动态初始化
   watch(
     () => settingsStore.theme,
     (newTheme) => {
@@ -348,7 +348,7 @@ onMounted(async () => {
     { immediate: true }
   );
 
-  // Database Migration Check
+  // 数据库 Schema 迁移完整性巡检
   await dbService.init();
   const needsMigration = await checkMigrationNeeded();
   if (needsMigration) {
@@ -370,7 +370,7 @@ onMounted(async () => {
 
   await saveStore.init(); // This will load history for the active save
 
-  // Check Persistence Status
+  // 运行环境持久化能力沙盒预检
   try {
     const dbInfo = await dbService.getDbInfo();
     if (dbInfo.type !== 'opfs') {
@@ -506,9 +506,9 @@ async function handleSend() {
   const content = userInput.value.trim();
   if (!content || gameLoop.isProcessing.value || gameLoop.isBackgroundProcessing.value) return;
 
-  // Clear input immediately to prevent double send
+  // 立即清空输入框以防重复派发指令 (Debounce Effect)
   userInput.value = '';
-  gameStore.clearQuickReplies(); // Clear quick replies on new action
+  gameStore.clearQuickReplies(); // 启动新动作时清空快捷回复分身
 
   audioManager.playClick();
   await gameLoop.handleUserAction(content);
@@ -555,7 +555,7 @@ async function handleRefresh() {
   let textToResend = '';
   let msgToDeleteId: number | undefined;
 
-  // Scenario 1: Last message is Assistant (Normal reply exists)
+  // 场景 1: 末位消息为 AI 助手 (存在正常的回复链路)
   if (lastMsg.role === 'assistant') {
     // Check if there is a preceding user message
     if (messages.length >= 2) {
@@ -566,7 +566,7 @@ async function handleRefresh() {
       }
     }
   }
-  // Scenario 2: Last message is User (Generation failed / No reply yet)
+  // 场景 2: 末位消息为用户输入 (生成失败或尚未开始生成)
   else if (lastMsg.role === 'user') {
     textToResend = lastMsg.content;
     msgToDeleteId = lastMsg.id;
@@ -587,10 +587,10 @@ async function handleRefresh() {
 
     audioManager.playClick();
 
-    // 1. Delete the turn(s)
+    // 1. 递归执行对话轮次物理清除
     await chatStore.deleteTurn(msgToDeleteId);
 
-    // 2. Resend the text
+    // 2. 重新派发用户输入指令
     await gameLoop.handleUserAction(textToResend);
   }
 }
@@ -599,18 +599,18 @@ async function handleMultiplayerSubmit(hostAction: string) {
   isDecisionOverlayOpen.value = false;
   audioManager.playClick();
 
-  // Aggregate inputs
+  // 聚合全员联机输入分量
   const guestInputs = multiplayerService.getPendingGuestInputs();
   let combinedPrompt = '';
 
   const hostName = gameStore.state.player.name;
 
-  // Add Host Action
+  // 注入房主决策权重
   if (hostAction.trim()) {
     combinedPrompt += `[玩家:${hostName}] ${hostAction}\n`;
   }
 
-  // Add Guest Actions
+  // 注入客机决策权重集
   for (const [playerId, input] of Object.entries(guestInputs)) {
     const p = gameStore.multiplayer.players.find((x) => x.id === playerId);
     const name = p ? p.name : playerId.substring(0, 4);
@@ -619,15 +619,15 @@ async function handleMultiplayerSubmit(hostAction: string) {
 
   if (!combinedPrompt.trim()) return;
 
-  // Clear inputs
+  // 决策链指令清空
   multiplayerService.clearPendingGuestInputs();
 
-  // Broadcast status
+  // 实时广播故事生成状态至全房间
   if (gameStore.multiplayer.isHost) {
     multiplayerService.send('STORY_GENERATING', { stage: 'preparing' });
   }
 
-  // Send to Game Loop
+  // 提交至核心游戏逻辑循环
   await gameLoop.handleUserAction(combinedPrompt);
 }
 
@@ -683,7 +683,7 @@ function handleHelpAction(action: string) {
       break;
     case 'highlightQuests':
     case 'highlightCharacters':
-      // TODO: Maybe scroll to or highlight these sections?
+      // 待办：后续可考虑对这些区域执行滚动联动或高亮反馈
       // For now, just open a toast or log
       // But actually, on mobile these might be hidden, so we could open the drawer if we had one.
       // On desktop, they are visible.
@@ -697,7 +697,7 @@ function handleHelpAction(action: string) {
   }
 }
 
-// Mobile panel switch handler
+// 移动端分屏面板切换中心
 function handleMobilePanelSwitch(panel: 'chat' | 'status' | 'map' | 'characters' | 'quests') {
   mobileActivePanel.value = panel;
   // If switching to map, open the map modal

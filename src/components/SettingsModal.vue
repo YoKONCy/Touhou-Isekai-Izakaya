@@ -54,7 +54,7 @@ const activeTab = ref<
   'global' | 'chat' | 'logic' | 'memory' | 'misc' | 'audio' | 'interface' | 'drawing' | 'debug'
 >('global');
 
-// Drawing Models State
+// 绘图模型状态集 (Drawing Models State)
 const drawingModels = ref<ModelInfo[]>([]);
 const isLoadingDrawingModels = ref(false);
 const drawingFetchError = ref('');
@@ -93,7 +93,7 @@ const handleImport = async (event: Event) => {
       const success = await settingsStore.importGlobalConfig(content);
       if (success) {
         toastStore.addToast({ message: '数据恢复成功，配置与存档已还原', type: 'success' });
-        // Optional: reload page to ensure all stores are in sync with new DB state
+        // (可选) 重新加载页面，确保所有 Pinia Store 与 IndexedDB 的最新状态保持物理同步
         if (confirm('数据已还原。建议刷新页面以确保所有状态同步，是否立即刷新？')) {
           window.location.reload();
         }
@@ -105,7 +105,7 @@ const handleImport = async (event: Event) => {
   } catch (error) {
     toastStore.addToast({ message: '导入过程出错', type: 'error' });
   } finally {
-    // Reset file input
+    // 复位文件输入控件 (Reset input)
     target.value = '';
   }
 };
@@ -126,7 +126,7 @@ const testNovelAI = async () => {
   }
 };
 
-// Map Generation State
+// 瓦片地图生成相关的响应式状态 (Map Generation State)
 const mapGenerationPrompt = ref('Cozy Izakaya with a large kitchen');
 const isGeneratingMap = ref(false);
 
@@ -147,7 +147,7 @@ watch(
   () => settingsStore.drawingConfig.providerType,
   (newVal) => {
     if (newVal === 'novelai') {
-      // If the URL is empty or the default OpenAI one, set to the CF proxy (which works for CORS)
+      // 若 URL 为空或仍指向 OpenAI 域名，则自动切换至推荐的跨域反代网关 (CF Proxy)
       if (
         !settingsStore.drawingConfig.apiBaseUrl ||
         settingsStore.drawingConfig.apiBaseUrl.includes('openai.com')
@@ -186,7 +186,7 @@ watch(
   }
 );
 
-// Audio Watchers
+// 音频控制器监听器集 (Audio Watchers)
 watch(
   () => settingsStore.audioVolume,
   (newVal) => {
@@ -257,12 +257,12 @@ async function handleGenerateMap() {
   try {
     const newMap = await generateMap('Debug Theme', mapGenerationPrompt.value, undefined, true);
 
-    // Update Game Store
-    // Use direct assignment to avoid lodash.merge array merging issues
+    // 更新游戏仓库状态
+    // 此处使用直接赋值，规避 lodash.merge 在处理数组合并时的不可控行为 (Direct Write)
     gameStore.state.system.customMap = newMap;
 
     toastStore.addToast({ message: '新瓦片地图生成成功！', type: 'success' });
-    emit('close'); // Close modal to see the map
+    emit('close'); // 关闭弹窗以便即时预览新地图效果
   } catch (error) {
     console.error('Map generation failed:', error);
     toastStore.addToast({ message: '地图生成失败，请查看控制台', type: 'error' });
@@ -285,8 +285,8 @@ function handleTabChange(id: any) {
 async function loadDrawingModels() {
   const { apiBaseUrl, apiKey, providerType } = settingsStore.drawingConfig;
 
-  // Only fetch models for OpenAI/Nanobanana providers.
-  // NovelAI uses fixed model IDs.
+  // 仅针对 OpenAI 或兼容架构的供应方执行模型列表抓取动作。
+  // NovelAI 因为使用固定的模型 ID 集合，故此处跳过异步路由拉取。
   if (providerType !== 'openai' && providerType !== 'openai-image') {
     drawingModels.value = [];
     drawingFetchError.value = '';
@@ -324,7 +324,7 @@ function refreshDrawingModels() {
   loadDrawingModels();
 }
 
-// Watch for changes in drawing config to auto-load models
+// 监听绘图配置变更，触发模型列表自动嗅探加载 (Auto-Fetch)
 watch(
   () => [
     settingsStore.drawingConfig.apiBaseUrl,
@@ -348,7 +348,7 @@ watch(
       typeof newModel === 'string' &&
       newModel.includes('nai-diffusion-4')
     ) {
-      // Auto-switch to V4 recommended sampler if currently on an old one
+      // 针对 V4 系列模型，若当前仍在使用旧版采样器，则自动执行采样器对齐引导 (Sampler Sync)
       const v3Samplers = [
         'k_euler_ancestral',
         'k_euler',
@@ -360,7 +360,7 @@ watch(
         settingsStore.drawingConfig.sampler = 'proxi_euler_ancestral';
       }
 
-      // V4 usually works better with higher steps (default 28)
+      // V4 模型通常在更高步数（推荐 28 步）下表现更为优异
       if (settingsStore.drawingConfig.steps < 28) {
         settingsStore.drawingConfig.steps = 28;
       }
@@ -407,10 +407,10 @@ function handleVolumeChangeTest() {
     <div
       class="bg-izakaya-paper w-full max-w-2xl rounded-xl shadow-paper flex flex-col max-h-[90vh] border border-izakaya-wood/10 relative overflow-hidden"
     >
-      <!-- Texture -->
+      <!-- 纸张纹理蒙层 (Texture Overflow) -->
       <div class="absolute inset-0 pointer-events-none opacity-10 bg-texture-rice-paper"></div>
 
-      <!-- Header -->
+      <!-- 顶栏区域 (Header) -->
       <div
         class="flex items-center justify-between p-4 border-b border-izakaya-wood/10 bg-white/40 relative z-10"
       >
@@ -426,9 +426,9 @@ function handleVolumeChangeTest() {
         </button>
       </div>
 
-      <!-- Content -->
+      <!-- 主体内容容器 (Content) -->
       <div class="flex-1 overflow-hidden flex flex-col md:flex-row relative z-10">
-        <!-- Sidebar Tabs -->
+        <!-- 侧边栏页签 (Sidebar Tabs) -->
         <div
           class="w-full md:w-48 flex-shrink-0 bg-izakaya-wood/5 p-2 space-y-1 border-b md:border-b-0 md:border-r border-izakaya-wood/10 overflow-x-auto md:overflow-y-auto flex md:block"
           style="-webkit-overflow-scrolling: touch"
@@ -448,7 +448,7 @@ function handleVolumeChangeTest() {
           </button>
         </div>
 
-        <!-- Panel Content -->
+        <!-- 面板展示区域 (Panel Content) -->
         <div
           class="flex-1 p-4 md:p-6 overflow-y-auto custom-scrollbar min-h-0"
           style="-webkit-overflow-scrolling: touch"
@@ -612,7 +612,7 @@ function handleVolumeChangeTest() {
             </div>
           </div>
 
-          <!-- Individual LLM Configs -->
+          <!-- 各个 LLM 模块独立配置集 (Individual LLM Configs) -->
           <div v-show="activeTab === 'chat'">
             <LLMConfigPanel config-key="chat" label="对话模型配置" />
             <div
@@ -638,7 +638,7 @@ function handleVolumeChangeTest() {
           <div v-show="activeTab === 'memory'">
             <LLMConfigPanel config-key="memory" label="记忆模型配置" />
 
-            <!-- Memory Refinement Setting -->
+            <!-- 记忆精炼微调开关 (Memory Refinement Setting) -->
             <div class="mt-4 p-4 border border-izakaya-wood/10 rounded-lg bg-white/30">
               <div class="flex items-center justify-between mb-2">
                 <h4 class="font-bold text-izakaya-wood font-display">记忆检索精筛</h4>
@@ -677,9 +677,9 @@ function handleVolumeChangeTest() {
             </div>
           </div>
 
-          <!-- Drawing Settings -->
+          <!-- AI 绘图/插画配置 (Drawing Settings) -->
           <div v-show="activeTab === 'drawing'" class="space-y-6 animate-fade-in">
-            <!-- Feature Switch -->
+            <!-- 功能主开关 (Feature Switch) -->
             <div
               class="flex items-center justify-between p-4 border border-izakaya-wood/10 rounded-lg bg-white/30"
             >
@@ -706,14 +706,14 @@ function handleVolumeChangeTest() {
               </label>
             </div>
 
-            <!-- Prompt LLM Config -->
+            <!-- 提示词生成模型配置 (Prompt LLM Config) -->
             <div class="border-t border-izakaya-wood/10 pt-4">
               <div class="flex items-center justify-between mb-2">
                 <h4 class="font-bold text-izakaya-wood font-display">
                   步骤1：提示词生成模型 (LLM #5)
                 </h4>
 
-                <!-- Reference Image Toggle -->
+                <!-- 参考图 (Reference Image) 机制配置 -->
                 <div
                   class="flex items-center gap-2 px-3 py-1 bg-white/40 rounded-full border border-izakaya-wood/10 shadow-sm"
                 >
@@ -736,7 +736,7 @@ function handleVolumeChangeTest() {
               </div>
               <LLMConfigPanel config-key="drawing" label="提示词生成模型配置" />
 
-              <!-- System Prompt Config -->
+              <!-- 系统提示词模板配置 (System Prompt Config) -->
               <div class="mt-4 space-y-1">
                 <label class="block text-sm font-bold text-izakaya-wood font-display">
                   提示词生成指令 (System Prompt)
@@ -909,7 +909,7 @@ function handleVolumeChangeTest() {
                   />
                 </div>
 
-                <!-- OpenAI/SiliconFlow Specific: Model Fetcher -->
+                <!-- 针对 OpenAI 或兼容架构服务商的模型抓取器 (Model Fetcher) -->
                 <div
                   v-if="
                     settingsStore.drawingConfig.providerType === 'openai' ||
@@ -970,7 +970,7 @@ function handleVolumeChangeTest() {
                   </div>
                 </div>
 
-                <!-- NovelAI Specific Fields -->
+                <!-- NovelAI 专用属性配置映射集 (NovelAI Specific Fields) -->
                 <div v-else class="space-y-4 pt-2 border-t border-izakaya-wood/10">
                   <div class="space-y-1">
                     <label
@@ -1135,7 +1135,7 @@ function handleVolumeChangeTest() {
               </h3>
 
               <div class="space-y-6">
-                <!-- Master Switch -->
+                <!-- 全局生效开关 (Master Switch) -->
                 <div
                   class="flex items-center justify-between p-4 border border-izakaya-wood/10 rounded-lg bg-white/30"
                 >
@@ -1157,7 +1157,7 @@ function handleVolumeChangeTest() {
                   </label>
                 </div>
 
-                <!-- Volume Slider -->
+                <!-- 总体音效推子控制器 (Volume Slider) -->
                 <div
                   class="space-y-2"
                   :class="{ 'opacity-50 pointer-events-none': !settingsStore.enableAudio }"
@@ -1183,7 +1183,7 @@ function handleVolumeChangeTest() {
                   </div>
                 </div>
 
-                <!-- BGM Volume Slider -->
+                <!-- 背景音乐推子控制器 (BGM Volume Slider) -->
                 <div
                   class="space-y-2"
                   :class="{ 'opacity-50 pointer-events-none': !settingsStore.enableAudio }"
@@ -1210,7 +1210,7 @@ function handleVolumeChangeTest() {
                   </div>
                 </div>
 
-                <!-- SFX Volume Slider -->
+                <!-- 用户界面反馈音推子控制器 (SFX Volume Slider) -->
                 <div
                   class="space-y-2"
                   :class="{ 'opacity-50 pointer-events-none': !settingsStore.enableAudio }"
@@ -1247,7 +1247,7 @@ function handleVolumeChangeTest() {
             </div>
           </div>
 
-          <!-- Debug Settings -->
+          <!-- 开发者调试参数中心 (Debug Settings) -->
           <div v-show="activeTab === 'debug'" class="space-y-6 animate-fade-in">
             <div class="bg-white/40 p-4 rounded-lg border border-izakaya-wood/10">
               <h3 class="font-display font-bold text-lg mb-2 text-izakaya-wood">调试工具</h3>
@@ -1332,7 +1332,7 @@ function handleVolumeChangeTest() {
         </div>
       </div>
 
-      <!-- Footer -->
+      <!-- 底栏操作区 (Footer) -->
       <div
         class="p-4 border-t border-izakaya-wood/10 flex justify-end gap-2 bg-izakaya-wood/5 rounded-b-xl relative z-10"
       >

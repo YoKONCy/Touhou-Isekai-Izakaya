@@ -22,11 +22,11 @@ export interface PromptContext {
   userContent: string;
   sections: PromptSection[];
   totalTokens: number;
-  maxTokens: number; // For context window management
+  maxTokens: number; // 用于上下文窗口容量管理
 }
 
 export class PromptService {
-  // Logic mapping for each block ID
+  // 针对每个功能块 ID 的逻辑处理器映射表 (Handler Map)
   private blockHandlers: Record<string, (ctx: PromptContext, content?: string) => Promise<void>> =
     {};
 
@@ -35,14 +35,14 @@ export class PromptService {
   }
 
   private registerHandlers() {
-    // 1. System Root (Static/Selectable Options)
+    // 1. 系统核心根节点 (包含静态/可选的预设指令选项)
     this.blockHandlers['system_root'] = async (ctx, content) => {
       const promptStore = usePromptStore();
       const block = promptStore.blocks.find((b) => b.id === 'system_root');
 
       let finalContent = content || '';
 
-      // If has options, use the selected one
+      // 如果配置了选项列表，则根据用户的选择项提取内容 (Option Matching)
       if (block && block.options && block.options.length > 0) {
         const options = block.options;
         const selectedId = block.selectedOptionId || options[0]?.id;
@@ -58,18 +58,18 @@ export class PromptService {
       this.addSection(ctx, 'system_root', '核心规则', 'system', finalContent);
     };
 
-    // 1.5 Multiplayer Rules (Dynamic) - Move to front for higher priority
+    // 1.5 联机规则 (动态) - 移至前部以获得更高处理优先级
     this.blockHandlers['multiplayer_rules'] = async (ctx, content) => {
       const gameStore = useGameStore();
       if (gameStore.multiplayer.isMultiplayer) {
-        // Construct a list of current players for context
+        // 构建当前房间内玩家列表的上下文信息 (Construct Player List)
         let playerListInfo = '当前房间玩家列表:\n';
 
-        // Host
+        // 主机 (Host) 信息锁定
         const hostName = gameStore.state.player.name || '房主';
         playerListInfo += `- [Host] ${hostName} (你当前服务的对象)\n`;
 
-        // Companions
+        // 伙伴列表 (Guest Companions) 遍历同步
         if (gameStore.state.multiplayer_companions) {
           Object.values(gameStore.state.multiplayer_companions).forEach((comp: any) => {
             playerListInfo += `- [Guest] ${comp.name}\n`;
@@ -81,7 +81,7 @@ export class PromptService {
       }
     };
 
-    // 2. Narrative Perspective (Selectable Options)
+    // 2. 叙述视角设置 (可选预设方案)
     this.blockHandlers['narrative_perspective'] = async (ctx) => {
       const promptStore = usePromptStore();
       const block = promptStore.blocks.find((b) => b.id === 'narrative_perspective');
@@ -94,7 +94,7 @@ export class PromptService {
       if (selectedOption) {
         let finalContent = selectedOption.content;
 
-        // Special handling for Third Person: Replace {{user}} with player name
+        // 针对第三人称视角做规范化处理：将 {{user}} 占位符真实替换为玩家名称进行渲染
         if (selectedId === 'third_person') {
           const gameStore = useGameStore();
           const playerName = gameStore.state.player.name || '玩家';
@@ -111,7 +111,7 @@ export class PromptService {
       }
     };
 
-    // 2.5 Writing Style (Selectable Options)
+    // 2.5 文风样式设定 (可选预设方案)
     this.blockHandlers['writing_style'] = async (ctx) => {
       const promptStore = usePromptStore();
       const block = promptStore.blocks.find((b) => b.id === 'writing_style');
@@ -132,7 +132,7 @@ export class PromptService {
       }
     };
 
-    // 2.6 Narrative Relay (Selectable Options)
+    // 2.6 叙述转传/代入设定 (可选预设方案)
     this.blockHandlers['narrative_relay'] = async (ctx) => {
       const promptStore = usePromptStore();
       const block = promptStore.blocks.find((b) => b.id === 'narrative_relay');
@@ -158,18 +158,18 @@ export class PromptService {
       }
     };
 
-    // 3. World Info (Static/Configurable)
+    // 3. 世界观背景信息 (静态/可配置的辅助插项)
     this.blockHandlers['world_info'] = async (ctx, content) => {
       let finalContent = content || '';
 
-      // Replace {{user}} with player name from GameStore
+      // 将 {{user}} 占位符全局实时映射为 GameStore 中注册的玩家名称
       const gameStore = useGameStore();
       const playerName = gameStore.state.player.name || '玩家';
 
       finalContent = finalContent.replace(/\{\{user\}\}/g, playerName);
 
-      // Handle {{global_user_setting}} placeholder
-      // If player has a specific setting (e.g. from origin), inject it here.
+      // 处理 {{global_user_setting}} 全局用户设定占位符 (Dynamic Persona Injection)
+      // 若玩家拥有基于出身或剧本的特定人设 (persona)，则将其作为元数据注入此处。
 
       let userSettingStr = '无特殊设定';
       const rawPersona = gameStore.state.player.persona;
@@ -177,22 +177,21 @@ export class PromptService {
       if (rawPersona && rawPersona.trim()) {
         try {
           const jsonObj = JSON.parse(rawPersona);
-          // Remove redundant fields that are already in user_persona
+          // 移除已在 user_persona 区块中定义的重复字段
           if ('详细人设' in jsonObj) delete jsonObj['详细人设'];
           if ('补充设定' in jsonObj) delete jsonObj['补充设定'];
 
           userSettingStr = JSON.stringify(jsonObj, null, 2);
         } catch (e) {
-          // Not JSON. It is plain text persona.
-          // Since plain text persona is already in <user_persona>,
-          // we should probably NOT put it in world_info to avoid duplication.
+          // 识别为纯文本个人简介，由于该项已包含在专有的 <user_persona> 区块中，
+          // 此处不再重复注入 world_info 以防上下文空间浪费及权重冲突。
           userSettingStr = '无特殊设定';
         }
       }
 
       finalContent = finalContent.replace(/\{\{global_user_setting\}\}/g, userSettingStr);
 
-      // Difficulty Injection
+      // 当前世界难度引擎权重注入逻辑 (Difficulty Injection)
       const difficulty = gameStore.state.system.difficulty || 'normal';
       let difficultTag = '';
       if (difficulty === 'gentle') {
@@ -217,11 +216,11 @@ export class PromptService {
       this.addSection(ctx, 'world_info', '世界观设定', 'system', finalContent);
     };
 
-    // 3.1 Experimental System Rules
+    // 3.1 实验性系统组件规则注入逻辑 (Experimental)
     this.blockHandlers['experimental_system'] = async (ctx, content) => {
       if (content && content.trim()) {
         let finalContent = content;
-        // Replace {{user}}
+        // 替换 {{user}} 占位符
         const gameStore = useGameStore();
         const playerName = gameStore.state.player.name || '玩家';
         finalContent = finalContent.replace(/\{\{user\}\}/g, playerName);
@@ -230,7 +229,7 @@ export class PromptService {
       }
     };
 
-    // 3.2 COT Guide
+    // 3.2 COT (思维链) 引导逻辑 (Logic Path Reflection)
     this.blockHandlers['cot_guide'] = async (ctx, content) => {
       if (content && content.trim()) {
         let finalContent = content;
@@ -239,7 +238,7 @@ export class PromptService {
         const playerName = gameStore.state.player.name || '玩家';
         finalContent = finalContent.replace(/\{\{user\}\}/g, playerName);
 
-        // Filter Management Logic if disabled
+        // 若全局设置禁用了经营系统，则主动剥离相关的预测与评估逻辑片段 (Branch Pruning)
         const settingsStore = useSettingsStore();
         if (!settingsStore.enableManagementSystem) {
           finalContent = finalContent.replace(
@@ -252,7 +251,7 @@ export class PromptService {
       }
     };
 
-    // 3.3 High Priority Rules
+    // 3.3 高优先级核心底层规则 (强制性系统约束)
     this.blockHandlers['high_priority_rules'] = async (ctx, content) => {
       if (content && content.trim()) {
         let finalContent = content;
@@ -261,7 +260,7 @@ export class PromptService {
         const playerName = gameStore.state.player.name || '玩家';
         finalContent = finalContent.replace(/\{\{user\}\}/g, playerName);
 
-        // Filter Management Protocol if disabled
+        // 若核心玩法层禁用了经营模型，则过滤对应的触发协议说明 (Condition Strip)
         const settingsStore = useSettingsStore();
         if (!settingsStore.enableManagementSystem) {
           finalContent = finalContent.replace(
@@ -270,7 +269,7 @@ export class PromptService {
           );
         }
 
-        // Inject Word Count Rule
+        // 注入正文字数限制核心约束规则 (Wordage Rule Sync)
         const chatConfig = settingsStore.llmConfigs['chat'];
         const min = chatConfig?.minWordCount ?? 800;
         const max = chatConfig?.maxWordCount ?? 1200;
@@ -281,7 +280,7 @@ export class PromptService {
       }
     };
 
-    // 4. User Persona (Static/Configurable)
+    // 4. 玩家个人设定 (静态/可配置的属性映射)
     this.blockHandlers['user_persona'] = async (ctx, content) => {
       const gameStore = useGameStore();
       const p = gameStore.state.player;
@@ -289,44 +288,38 @@ export class PromptService {
 
       let personaContent = '';
 
-      // Priority 1: Runtime State (from New Game Wizard or Game Logic)
+      // 优先级 1: 运行时实时捕获的状态链 (源自向导节点或实时交互逻辑更新)
       if (p.persona && p.persona.trim()) {
-        // If persona is JSON, we try to extract "详细人设" or "补充设定"
-        // Because user wants <user_persona> to ONLY contain the text description, not the full JSON.
-        // Full JSON is already injected in {{global_user_setting}}.
+        // 设计约定：<user_persona> 区块仅保留叙述性特征文本，所有结构化 JSON 元数据
+        // 已通过 {{global_user_setting}} 在上游完成注入。此处执行格式规范化提取。
 
         let textPersona = p.persona;
         try {
           const jsonObj = JSON.parse(p.persona);
-          // Look for text fields.
-          // NewGameWizard saves text in "补充设定" (Preset) or "详细人设" (Custom)
-          // Or just use the whole thing if it's not JSON (fallback)
+          // 查找文本描述字段。
+          // 新游戏向导会将文本保存在“补充设定”（预设）或“详细人设”（自定义）中
+          // 若非 JSON 格式则回退至完整内容引用
           if (jsonObj['详细人设']) {
             textPersona = jsonObj['详细人设'];
           } else if (jsonObj['补充设定']) {
             textPersona = jsonObj['补充设定'];
           } else {
-            // If no explicit text field, maybe it is just settings.
-            // In this case, we might want to default to a simple description
-            // or just leave it empty if there's no narrative persona.
-            // But to be safe, let's just say "无特殊描述" or similar if we can't find text.
-            // However, user said "不导入JSON格式相关提示词".
-            // So if it's purely JSON without text field, we should probably output nothing or minimal.
+            // 安全兜底逻辑：若 JSON 结构中不含显性文本描述键值，则仅执行最简语义输出，防范不规范数据污染内容。
             textPersona = '无特殊描述';
           }
         } catch (e) {
-          // Not JSON, so it is a plain text persona. Use as is.
+          // 检测到源数据为纯文本个人设定，直接按原样执行渲染即可 (Plain Text Passthrough)
           textPersona = p.persona;
         }
 
         personaContent = `玩家信息：\n姓名：${playerName}\n描述：${textPersona}`;
       } else {
-        // Priority 2: Static Config from Prompt Builder
+        // 优先级 2: 来自指令构建器模板文件的静态缺省配置作为兜底方案
         const defaultPersona = `玩家信息：\n姓名：{{user}}\n描述：一个意外迷入幻想乡的人类。`;
         personaContent = content || defaultPersona;
       }
 
-      // Replace {{user}} placeholder
+      // 全局占位符同步：确保姓名标识符合当前会话语境
       personaContent = personaContent.replace(/\{\{user\}\}/g, playerName);
 
       this.addSection(
@@ -338,25 +331,25 @@ export class PromptService {
       );
     };
 
-    // 5. Lorebook Injection (Characters, Locations, Items, etc.)
+    // 5. 设定集 (Lorebook) 智能动态注入核心组件 (涵盖角色动态、地点分布、道具图鉴等)
     this.blockHandlers['char_injection'] = async (ctx) => {
       const charStore = useCharacterStore();
-      await charStore.loadCharacters(); // Ensure loaded
+      await charStore.loadCharacters(); // 状态守卫：确保角色资源库就绪以供检索
 
       const gameStore = useGameStore();
       const currentSceneNPCs = gameStore.state.system.current_scene_npcs;
       const currentLocation = gameStore.state.player.location;
 
-      // Get history directly from store, not from ctx.sections (which might be empty depending on block order)
+      // 上下文回拉：直接从 Store 溯源历史记录，降低因 Block 节点构建顺序导致的 Section 上下文隔离影响
       const chatStore = useChatStore();
-      const historyMessages = chatStore.messages.slice(-2); // Check last 2 messages for context (User input + Last AI reply)
+      const historyMessages = chatStore.messages.slice(-2); // 扫描范围锁定为最近 2 轮对答 (涵盖用户意图与 AI 最近一次的逻辑反馈点)
       const historyText = historyMessages.map((m) => m.content).join('\n');
 
       const playerName = gameStore.state.player.name || '玩家';
 
       const activeChars = new Map<string, any>();
 
-      // Strategy 0: Current Location based
+      // 触发策略 A: 基于当前地理坐标的角色/地点设定强制激活 (Location Affinity)
       if (currentLocation) {
         const resolvedLocId = resolveLocationId(currentLocation, charStore.characters);
         const locCard = charStore.characters.find((c) => c.uuid === resolvedLocId);
@@ -365,7 +358,7 @@ export class PromptService {
         }
       }
 
-      // Strategy 1: Scene based (Who is explicitly in the scene?)
+      // 触发策略 B: 基于场景活跃名单的显性注入 (Who is explicitly in the scene?)
       for (const npcId of currentSceneNPCs) {
         if (!npcId) continue;
         const resolvedId = resolveCharacterId(npcId, charStore.characters, gameStore.state.npcs);
@@ -375,7 +368,7 @@ export class PromptService {
         }
       }
 
-      // Strategy 2: Keyword matching in User Content OR Recent History OR Current Location Name
+      // 触发策略 C: 基于语义相似度与关键词命中率的启发式召回策略 (Scanning User Input & Recent History)
       const textToScan = ctx.userContent + '\n' + historyText + '\n' + (currentLocation || '');
 
       for (const char of charStore.characters) {
@@ -391,7 +384,7 @@ export class PromptService {
         }
       }
 
-      // Strategy 3: Injection from Prediction (Previous Round)
+      // 触发策略 D: 基于前一轮剧情发展链路的概率性预测注入 (Narrative Prediction)
       const predictedChars = gameStore.state.system.predicted_next_round_chars || [];
       for (const predName of predictedChars) {
         const resolvedId = resolveCharacterId(predName, charStore.characters, gameStore.state.npcs);
@@ -406,16 +399,16 @@ export class PromptService {
         let fullContent = '<lore_info>\n';
 
         for (const { card, reason } of activeChars.values()) {
-          // Remove [条目: xxx] header
+          // 清洗：去除底层原始数据中不必要的 [条目: xxx] 定位符前缀以优化上下文整洁度 (Header Pruning)
           let content = `${card.description}`;
 
-          // Replace {{user}} in character description
+          // 占位符同步：确保设定集描述中的代指对象与当前玩家定名匹配
           content = content.replace(/\{\{user\}\}/g, playerName);
 
           if (reason === '当前场景地点') {
             content = `[当前位置设定: ${card.name}]\n${content}`;
           } else if (reason === '提及/回忆' || reason === '剧情预测') {
-            // Double check: Is it actually in currentSceneNPCs? (In case Strategy 1 missed it)
+            // 状态二次复检：判定该角色是否确实处于当前的“物理在场”范围？(用于区分【提及/回忆】与【实时交互】)
             const isInScene = currentSceneNPCs.some((id) => {
               if (!id) return false;
               const lowerId = String(id).toLowerCase().trim();
@@ -426,14 +419,14 @@ export class PromptService {
             });
 
             if (!isInScene) {
-              // Only show warning if NOT in current scene
+              // 角色判定为“非在场”状态：通过系统消息追加元数据标注，约束模型进行发散性幻觉描写 (Context Warning)
               if (reason === '剧情预测') {
                 content += `\n(注意：该角色是有一定可能会在本轮登场的角色)`;
               } else {
                 content += `\n(注意：该条目当前不在场景中，仅作为回忆或提及对象)`;
               }
             } else {
-              // It IS in scene, so treat it as such (and append status)
+              // 该角色确实在场：按活跃实体逻辑处理，并追加其专有的动态生理/心理状态参量 (Dynamic Status Extension)
               const runtimeStatus =
                 gameStore.state.npcs[card.uuid] || gameStore.state.npcs[card.name];
               if (runtimeStatus && (card.type === 'character' || !card.type)) {
@@ -443,17 +436,6 @@ export class PromptService {
 姿势: ${runtimeStatus.posture}
 衣着: ${runtimeStatus.clothing}`;
               }
-            }
-          } else if (reason === '当前场景角色') {
-            // Reason is '当前场景角色'
-            const runtimeStatus =
-              gameStore.state.npcs[card.uuid] || gameStore.state.npcs[card.name];
-            if (runtimeStatus && (card.type === 'character' || !card.type)) {
-              content += `\n[当前状态]
-好感度: ${runtimeStatus.favorability}
-心情: ${runtimeStatus.mood}
-姿势: ${runtimeStatus.posture}
-衣着: ${runtimeStatus.clothing}`;
             }
           }
 
@@ -470,7 +452,7 @@ export class PromptService {
       }
     };
 
-    // 6. Game State (Dynamic)
+    // 6. 全局动态游戏变量状态机注入逻辑 (High-Frequency Dynamic State)
     this.blockHandlers['game_state'] = async (ctx) => {
       const gameStore = useGameStore();
       const p = gameStore.state.player;
@@ -488,35 +470,18 @@ HP：${p.hp}/${p.max_hp}
 MP：${p.mp}/${p.max_mp}
 战斗力：${p.power}
 声望：${p.reputation}
-持有物品：${p.items?.map((i) => (typeof i === 'string' ? i : `${i.name} x${i.count} (简介: ${i.description || '无'})`)).join(', ') || '无'}
+持有物品：${p.items?.map((i) => (typeof i === 'string' ? i : `${i.name} x${i.count}`)).join(', ') || '无'}
 符卡：${
         p.spell_cards
           ?.map((c) => {
             if (typeof c === 'string') return c;
-            let info = `${c.name} (消耗:${c.cost}MP, 效果:${c.description}`;
-            if (c.buffDetails) {
-              info += `, 状态:${c.buffDetails.name}`;
-              if (c.buffDetails.effects && c.buffDetails.effects.length > 0) {
-                const effs = c.buffDetails.effects
-                  .map((e: any) => {
-                    if (e.type === 'damage_over_time') return `真伤${e.value}`;
-                    if (e.type === 'heal') return `治疗${e.value}`;
-                    if (e.type === 'shield') return `盾${e.value}`;
-                    if (e.type === 'stat_mod')
-                      return `${e.targetStat}${e.value > 0 ? '+' : ''}${e.value}`;
-                    return e.type;
-                  })
-                  .join('/');
-                info += `[${effs}]`;
-              }
-            }
-            info += `)`;
+            const info = `${c.name} (消耗:${c.cost}MP, 效果:${c.description})`;
             return info;
           })
           .join(', ') || '无'
       }`;
 
-      // Add Current Scene NPCs info
+      // 注入当前场景的 NPC 信息总览
       const currentSceneNPCs = gameStore.state.system.current_scene_npcs;
 
       const maleNPCs: string[] = [];
@@ -524,20 +489,20 @@ MP：${p.mp}/${p.max_mp}
       const otherNPCs: string[] = [];
 
       for (const npcId of currentSceneNPCs) {
-        // Resolve canonical ID
+        // 身份解析：获取系统规范化后的 UUID 唯一标识令牌 (Canonical Key)
         const resolvedId = resolveCharacterId(npcId, charStore.characters, gameStore.state.npcs);
-        // Find static card data for name
+        // 模板溯源：反向查找静态卡片数据集以提取精准的定名 (Static Lookup)
         const card = charStore.characters.find((c) => c.uuid === resolvedId);
-        // Find runtime status
+        // 实时捕获：拉取内存中的最新动态运行态参量 (Runtime Snap)
         const status = gameStore.state.npcs[npcId] || gameStore.state.npcs[resolvedId];
 
-        // Determine display name: Priority: Card Name > Runtime Name > ID
+        // 名称渲染权重分发机制：优先匹配定名卡片 > 运行时重定义名称 > 原始 ID 字符串
         const name = card?.name || status?.name || npcId;
 
         let charInfo = `- ${name}`;
-        // Only inject status details for character types to avoid nonsensical data for locations/info
+        // 类型鉴权：状态细节（好感、生理等）仅针对“角色类”实体注入，避免非生物类地点或信息条目出现逻辑异常 (Type Integrity Guard)
         if (status && (!card || card.type === 'character' || !card.type)) {
-          // Add runtime variables if available
+          // 动态注入角色专有的生理与心理多维参量数据 (Dynamic Variable Injection)
           const details = [];
           if (status.favorability !== undefined) details.push(`好感:${status.favorability}`);
           if (status.obedience !== undefined) details.push(`服从:${status.obedience}`);
@@ -566,8 +531,8 @@ MP：${p.mp}/${p.max_mp}
           }
         }
 
-        // Segregate by gender
-        const gender = card?.gender || 'female'; // Default to female for Touhou
+        // 语义适配处理：基于性别分类执行逻辑排布（针对东方全员女性为主的项目语境，默认缺省为女性角色）
+        const gender = card?.gender || 'female'; // 东方 Project 语境下默认缺省为女性
         if (gender === 'male') {
           maleNPCs.push(charInfo);
         } else if (gender === 'female') {
@@ -591,20 +556,20 @@ MP：${p.mp}/${p.max_mp}
         content += `\n\n[当前区域角色]\n(无)`;
       }
 
-      // --- NEW: Add Known NPCs (Persistent Data) ---
+      // --- 核心持久化补丁：注入“已识角色”全局关系网络总览 (Known Persistent NPCs) ---
       const allRuntimeNpcs = gameStore.state.npcs;
       const knownNPCs: string[] = [];
 
       for (const [id, status] of Object.entries(allRuntimeNpcs)) {
-        // Skip if already in current scene (they are already listed above)
+        // 冗余项拦截：跳过已存在于当前场景活跃列表的角色，避免重复渲染干扰模型权重 (Deduplication)
         if (currentSceneNPCs.includes(id)) continue;
 
-        // Resolve static info for name
+        // 身份追溯：解析其 UUID 并提取定名数据
         const resolvedId = resolveCharacterId(id, charStore.characters, allRuntimeNpcs);
         const card = charStore.characters.find((c) => c.uuid === resolvedId);
         const name = card?.name || (status as any).name || id;
 
-        // Criteria for "Known NPC": non-default favorability, obedience, or relationship
+        // “已识角色”筛选准则：非零的好感度、具现出的服从度状态、已确立的显性社交关系或已知的居住地 (Significance Filter)
         const isSignificant =
           ((status as any).favorability !== undefined && (status as any).favorability !== 0) ||
           ((status as any).obedience !== undefined && (status as any).obedience !== 0) ||
@@ -638,7 +603,7 @@ MP：${p.mp}/${p.max_mp}
       }
       // ----------------------------------------------
 
-      // Add Active Quests
+      // 注入进行中的任务列表
       const activeQuests =
         gameStore.state.system.quests?.filter((q) => q.status === 'active') || [];
       if (activeQuests.length > 0) {
@@ -654,7 +619,7 @@ MP：${p.mp}/${p.max_mp}
           .join('\n');
       }
 
-      // Add Active Promises
+      // 注入有效的约定事项
       const activePromises =
         gameStore.state.system.promises?.filter((p) => p.status === 'active') || [];
       if (activePromises.length > 0) {
@@ -671,7 +636,7 @@ MP：${p.mp}/${p.max_mp}
       this.addSection(ctx, 'game_state', '游戏变量', 'system', content);
     };
 
-    // Global Memory (Alliance & Intelligence)
+    // 全局大记忆中枢处理器 (涵盖盟友动态与势力情报网信息汇总)
     this.blockHandlers['global_memory'] = async (ctx) => {
       const saveStore = useSaveStore();
       if (!saveStore.currentSaveId) return;
@@ -710,20 +675,20 @@ MP：${p.mp}/${p.max_mp}
       }
     };
 
-    // 8. Long Term Memory (Dynamic)
+    // 8. 长期记忆检索注入 (Dynamic RAG)
     this.blockHandlers['long_term_memory'] = async (ctx, content) => {
-      // Content here is passed from the build() call (the retrieved memories)
+      // 上下文透传：此块接收由 build() 函数预处理后的记忆相似度片段列表 (Memory Content Hub)
       const gameStore = useGameStore();
       const storySummary = gameStore.state.player.storySummary;
 
       let finalContent = '';
 
-      // Inject Story Summary if exists
+      // 剧情概括注入机制 (Story Summary Injection) — 若存在系统生成的摘要，则优先放入 context 最前沿以维持逻辑一致性
       if (storySummary && storySummary.trim()) {
         finalContent += `<story_summary>\n${storySummary}\n</story_summary>\n\n`;
       }
 
-      // Inject Retrieved Memories
+      // 召回记忆片段注入逻辑 (Similarity Sequence) — 包含从向量/文本索引中精准检索到的历史记忆碎片 (Recall Fragments)
       if (content && content.trim()) {
         finalContent += `<memories>\n${content}\n</memories>`;
       }
@@ -758,10 +723,10 @@ MP：${p.mp}/${p.max_mp}
       userContent,
       sections: [],
       totalTokens: 0,
-      maxTokens: 4000 // Default limit
+      maxTokens: 4000 // 默认上下文上限
     };
 
-    // Use PromptStore to determine order and content
+    // 编排中心：利用 PromptStore 定义的全局优先级规则决定各模块的最终渲染顺序与启用状态 (Block Orchestration)
     const promptStore = usePromptStore();
 
     for (const block of promptStore.blocks) {
@@ -769,7 +734,7 @@ MP：${p.mp}/${p.max_mp}
 
       const handler = this.blockHandlers[block.id];
       if (handler) {
-        // Special case: pass memoryContent to long_term_memory block
+        // 特殊路由逻辑：将预先检索到的 RAG 记忆内容透传至对应的长期记忆解构块模块
         const contentToPass = block.id === 'long_term_memory' ? memoryContent : block.content;
         await handler(ctx, contentToPass);
       } else {
@@ -777,13 +742,13 @@ MP：${p.mp}/${p.max_mp}
       }
     }
 
-    // Finally add User Instruction (Always last, not configurable in blocks for now)
+    // 对话锚点注入：将用户的当前即时指令追加至 Prompt 链条的最末端，以确保最高的注意力权重分配 (Final Query Anchor)
     this.addSection(ctx, 'user_instruction', '当前指令', 'user', userContent);
 
     return ctx;
   }
 
-  // Convert context to OpenAI format
+  // 后处理：将内部 PromptContext 上下文结构转换为符合 OpenAI 强校验格式的 ChatMessage 数组序列 (Adapter Pattern)
   toOpenAIMessages(ctx: PromptContext) {
     return ctx.sections
       .filter((s) => s.active)

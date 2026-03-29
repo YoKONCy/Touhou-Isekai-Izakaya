@@ -1,6 +1,6 @@
 <template>
   <div v-if="showOverlay" class="fixed inset-0 z-50 font-sans overflow-hidden animate-fade-in">
-    <!-- Combat Request Dialog -->
+    <!-- 战斗请求确认弹窗 -->
     <CombatRequestDialog
       v-if="isPending"
       :enemyNames="enemyNames"
@@ -10,12 +10,12 @@
       @skip-combat="skipCombat"
     />
 
-    <!-- Main Combat Container -->
+    <!-- 战斗主容器 -->
     <div
       v-else-if="isActive"
       class="absolute inset-0 bg-black text-white font-sans overflow-hidden"
     >
-      <!-- Dynamic Background Layer -->
+      <!-- 动态背景层 -->
       <div class="absolute inset-0 z-0 overflow-hidden">
         <img
           :src="currentBackground"
@@ -27,7 +27,7 @@
         ></div>
       </div>
 
-      <!-- Combat Intro Animation (VS Screen) -->
+      <!-- 战斗开场动画 (VS界面) -->
       <CombatIntroScreen
         :show="showIntro"
         :playerName="player?.name || 'Reimu'"
@@ -37,7 +37,7 @@
         :defaultSprite="defaultSprite"
       />
 
-      <!-- Cut-in Overlays (Ultimate, Skill, Combat Flow) -->
+      <!-- 技能立绘切入层 (终极技能、符卡、战斗心流) -->
       <CombatCutins
         :showUltimate="showUltimateCutin"
         :ultimateData="ultimateCutinData"
@@ -48,7 +48,7 @@
         :playerSpriteUrl="getSpriteUrl('主角')"
       />
 
-      <!-- Layer 0: Background -->
+      <!-- 第0层：底层背景 -->
       <div class="absolute inset-0 bg-gradient-to-br from-red-900/20 via-black to-blue-900/20 z-0">
         <div class="absolute inset-0 bg-texture-stardust opacity-10 mix-blend-overlay"></div>
         <div class="absolute inset-0 overflow-hidden">
@@ -61,15 +61,15 @@
         </div>
       </div>
 
-      <!-- Layer 1: Battlefield (Characters + Effects) -->
+      <!-- 第1层：战场本体 (角色与特效实体) -->
       <div
         class="absolute inset-0 z-10 overflow-hidden pointer-events-none transition-transform duration-100"
         :class="{ 'animate-shake': isScreenShaking }"
       >
-        <!-- Effect Overlay -->
+        <!-- 全局特效遮罩 -->
         <CombatEffects :activeEffect="activeEffect" />
 
-        <!-- Player Side -->
+        <!-- 己方阵营卡片 -->
         <CombatPlayerCard
           :player="player"
           :allies="allies"
@@ -81,7 +81,7 @@
           @activate-ally="activateAlly"
         />
 
-        <!-- Enemy Side -->
+        <!-- 敌方阵营卡片 -->
         <CombatEnemyCard
           :activeEnemies="activeEnemies"
           :reserveEnemies="reserveEnemies"
@@ -99,9 +99,9 @@
         />
       </div>
 
-      <!-- Layer 2: UI Overlay -->
+      <!-- 第2层：前端 UI 控制台 -->
       <div class="absolute inset-0 z-20 pointer-events-none">
-        <!-- Top Bar -->
+        <!-- 顶部状态信息栏 -->
         <CombatTopBar
           :turn="turn"
           :phase="phase"
@@ -115,7 +115,7 @@
           @close-combat="closeCombat"
         />
 
-        <!-- Action Menu -->
+        <!-- 下部操作动作选单 -->
         <CombatActionMenu
           :currentMenu="currentMenu"
           :selectionMode="selectionMode"
@@ -140,7 +140,7 @@
           @update:talkInput="(v) => (talkInput = v)"
         />
 
-        <!-- Game Over Overlay -->
+        <!-- 游戏结束结算大幕 -->
         <div
           v-if="isGameOver"
           class="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm z-30 animate-fade-in pointer-events-auto"
@@ -153,7 +153,7 @@
                 : 'text-red-600 drop-shadow-[0_0_30px_rgba(220,38,38,0.8)]'
             "
           >
-            {{ gameResult === 'win' ? 'VICTORY' : 'DEFEATED' }}
+            {{ gameResult === 'win' ? '胜利' : '战败' }}
           </div>
           <div class="text-xl text-white/80 font-serif tracking-widest animate-fade-in-up">
             {{ gameResult === 'win' ? '战斗胜利' : '战斗失败' }}
@@ -184,7 +184,7 @@ import { findBattleSprite } from '@/services/characterMapping';
 import defaultSprite from '@/assets/images/battle_sprites/其他角色.png';
 import { multiplayerService } from '@/services/MultiplayerService';
 
-// Sub-components
+// 子组件导入
 import CombatRequestDialog from '@/components/combat/CombatRequestDialog.vue';
 import CombatIntroScreen from '@/components/combat/CombatIntroScreen.vue';
 import CombatCutins from '@/components/combat/CombatCutins.vue';
@@ -196,7 +196,7 @@ import CombatEnemyCard from '@/components/combat/CombatEnemyCard.vue';
 
 const gameStore = useGameStore();
 
-// Watch for combat active state to sync (Host only)
+// 监听战斗激活状态以同步（仅限主机段）
 watch(
   () => gameStore.state.system.combat?.isActive,
   () => {
@@ -206,7 +206,7 @@ watch(
   }
 );
 
-// Watch for combat turn changes to sync (Host only)
+// 监听战斗回合变化以同步（仅限主机段）
 watch(
   () => gameStore.state.system.combat?.turn,
   () => {
@@ -221,13 +221,13 @@ const props = defineProps<{
 }>();
 const emit = defineEmits(['close', 'combat-end']);
 
-// --- BGM Management ---
+// --- BGM 背景音乐管理模块 ---
 const bgmFiles = import.meta.glob(
   '/src/assets/audio/bgm/RPG_battle/**/*.{mp3,wav,ogg,flac,m4a,aac}',
   { query: '?url', import: 'default', eager: true }
 ) as Record<string, string>;
 
-// --- Background Management ---
+// --- 战斗背景图管理模块 ---
 const backgroundImages = import.meta.glob('/src/assets/images/battle_bg/*.{jpg,png,webp}', {
   query: '?url',
   import: 'default',
@@ -235,12 +235,12 @@ const backgroundImages = import.meta.glob('/src/assets/images/battle_bg/*.{jpg,p
 }) as Record<string, string>;
 
 const currentBackground = computed(() => {
-  // Attempt to match current location
+  // 尝试匹配玩家当前地点
   const location = gameStore.state.player?.location;
   console.log('[战斗界面] 背景检查 - 位置:', location);
 
   if (location) {
-    // Try exact match first (ignoring extension)
+    // 优先尝试精确匹配 (忽略扩展名)
     const exactMatch = Object.keys(backgroundImages).find((path) => {
       const filename = path.split('/').pop()?.split('.')[0];
       return filename === location;
@@ -251,7 +251,7 @@ const currentBackground = computed(() => {
     }
   }
 
-  // Fallback: Hakurei Shrine
+  // 降级回退方案：博丽神社
   const fallback = Object.keys(backgroundImages).find((path) => path.includes('博丽神社'));
   console.log('[战斗界面] 回退至背景:', fallback);
   return fallback ? backgroundImages[fallback] : '';
@@ -262,10 +262,10 @@ function playCombatBgm() {
 
   const styleKey = combatState.value.bgm_suggestion;
 
-  // Strategy 1: Direct match (e.g. "常规", "激战")
+  // 策略 1: 直接匹配关键字 (如 "常规", "激战")
   let matchingFiles = Object.keys(bgmFiles).filter((path) => path.includes(styleKey));
 
-  // Strategy 2: Keyword match if direct match fails
+  // 策略 2: 若直接匹配失败，采用模糊关键字匹配
   if (matchingFiles.length === 0) {
     if (styleKey.includes('轻快')) {
       matchingFiles = Object.keys(bgmFiles).filter((path) => path.includes('轻快'));
@@ -290,7 +290,7 @@ function playCombatBgm() {
     }
   } else {
     console.warn('[战斗界面] 未找到对应风格的 BGM:', styleKey);
-    // Fallback to '常规' if specific style not found
+    // 若未找到指定风格，则默认回退到 '常规' 风格
     if (styleKey !== '常规') {
       const fallbackFiles = Object.keys(bgmFiles).filter((path) => path.includes('常规'));
       if (fallbackFiles.length > 0) {
@@ -311,7 +311,7 @@ onUnmounted(() => {
 });
 
 onMounted(() => {
-  // [Optimization] Logic moved to GameStore.setState to handle refresh state sanitization centrally.
+  // [架构优化] 初始化相关逻辑已移交至 GameStore.setState 以进行中心化状态清洗治理。
   window.addEventListener('mp-combat-action', handleRemoteAction as unknown as EventListener);
   window.addEventListener('mp-combat-effect', handleRemoteEffect as unknown as EventListener);
   window.addEventListener('mp-combat-log', handleRemoteLog as unknown as EventListener);
@@ -328,12 +328,12 @@ onUnmounted(() => {
   window.removeEventListener('mp-llm-token', handleRemoteLLMToken as unknown as EventListener);
 });
 
-// 多人同步：处理远程 LLM Token
+// [联机] 多人同步：处理远程主机发来的 LLM 对话词流 (Token)
 function handleRemoteLLMToken(e: CustomEvent) {
   const { token } = e.detail;
   if (token) {
     streamingNarrative.value += token;
-    // 如果日志没展开，自动展开以便看到正在输入的文本
+    // 如果右侧作战日志未展开，自动将其弹出以便查阅正在输出的文本
     if (!isLogExpanded.value) isLogExpanded.value = true;
   }
 }
@@ -356,7 +356,7 @@ async function handleRemoteEffect(e: CustomEvent) {
   } else if (data.type === 'combat_flow') {
     playCombatFlowAnimation(true);
   } else if (data.type === 'ultimate_anim') {
-    // Mock object for animation
+    // 为动画播报功能组装的模拟对象 (Mock Object)
     const mockCombatant = {
       id: data.actorId,
       name: data.charName,
@@ -398,14 +398,14 @@ async function handleRemoteAction(e: CustomEvent) {
   const { senderId, type, payload, targetId } = e.detail;
   console.log('[战斗界面] 收到远程行动:', type, payload);
 
-  // Find Actor
+  // 定位行动发起者 (Actor)
   const actor = combatState.value?.combatants.find((c) => c.ownerId === senderId);
   if (!actor) {
     console.warn('[战斗界面] 未找到发送者的角色:', senderId);
     return;
   }
 
-  // Find Target (if any)
+  // 定位受击目标实体 (如果有)
   let target: UICombatant | undefined;
   if (targetId) {
     const found = combatState.value?.combatants.find((c) => c.id === targetId);
@@ -414,14 +414,14 @@ async function handleRemoteAction(e: CustomEvent) {
     }
   }
 
-  // Execute
-  // We need to cast actor to UICombatant to match signatures, assuming it has necessary props or we add them
+  // 开启执行链路
+  // 我们需要将角色类型向下隐式断言合并为 UICombatant 以喂给内部处理逻辑
   const uiActor = { ...actor, popups: getPopups(actor.id) } as UICombatant;
 
   await executeCombatLogic(uiActor, type, payload, target);
 }
 
-// Extracted Core Logic
+// 历经抽离解耦的核心战斗循环逻辑
 async function executeCombatLogic(
   actor: UICombatant,
   type: string,
@@ -438,7 +438,7 @@ async function executeCombatLogic(
 
     await executeAction(actor, target);
 
-    // Update AP
+    // 扣减行动点 (AP)
     const currentAP = actor.actionPoints !== undefined ? actor.actionPoints : 2;
     updateCombatantState(actor.id, { actionPoints: Math.max(0, currentAP - 2) });
 
@@ -448,12 +448,12 @@ async function executeCombatLogic(
     const spell = payload as SpellCard;
     const actualCost = getSpellCost(spell, actor);
 
-    // Deduct MP
+    // 扣减符卡所需灵力 (MP)
     const newMp = actor.mp - actualCost;
     actor.mp = newMp;
     updateCombatantState(actor.id, { mp: newMp });
 
-    // Animation
+    // 触发技能立绘与动画表现
     if (spell.isUltimate) {
       await playUltimateAnimation(actor, spell.name);
     } else {
@@ -461,11 +461,11 @@ async function executeCombatLogic(
       await sleep(800);
     }
 
-    // Logic
+    // 步入数值计算闭环
     const rect = document.body.getBoundingClientRect();
 
     if (spell.scope === 'aoe') {
-      // AOE Logic
+      // 群体范围打击 (AOE) 路线
       if (spell.isUltimate) {
         audioManager.playSpellCastAoE();
         triggerEffect('ultimate_impact', rect.width * 0.5, rect.height * 0.5);
@@ -481,8 +481,8 @@ async function executeCombatLogic(
       audioManager.playAoEExplosion();
       triggerEffect('hit_aoe', rect.width * 0.5, rect.height * 0.5);
 
-      // Apply to Targets
-      // Determine if Support or Attack
+      // 落实数值伤害作用至各个所判定的目标头上
+      // 甄别该符卡本质是辅助支援类型还是进攻类型
       const typeStr = (spell.type || '').toLowerCase();
       let isSupport = ['buff', 'heal', 'shield'].includes(typeStr);
       if (!isSupport && (typeStr === 'attack' || !typeStr) && spell.damage <= 0) {
@@ -535,8 +535,8 @@ async function executeCombatLogic(
 
       await sleep(1500);
     } else {
-      // Single Target (Self or Targeted)
-      // If target provided, use it. If not, assume Self (for Buffs)
+      // 单体指定目标结算（对自己或他者）
+      // 优先取指针目标；若为空则默认砸给自己（常用以处理自身的增益 Buff）
       const finalTarget = target || actor;
 
       if (spell.isUltimate) {
@@ -559,25 +559,24 @@ async function executeCombatLogic(
         if (spell.buffDetails) applyBuff(finalTarget, spell.buffDetails, 'buff');
         addLog(`${actor.name} 释放了 ${spell.name}！`);
       } else {
-        // Attack Logic
+        // 常规打击结算模块
         await executeAction(actor, finalTarget, 'spell', spell);
       }
     }
 
-    // Deduct AP
+    // 追加扣除符卡动作的专属 AP 消耗点数
     const currentAP = actor.actionPoints !== undefined ? actor.actionPoints : 2;
     updateCombatantState(actor.id, { actionPoints: Math.max(0, currentAP - 2) });
 
-    // Gain Exp
+    // 赚取战斗经验与符卡熟练度成长 (EXP)
     const expGain = Math.floor(Math.random() * 6) + 5;
     const { levelUp, newLevel } = addSpellExp(spell, expGain);
     if (levelUp && actor.isPlayer) addPopup(actor, `符卡升级! Lv.${newLevel}`, 'buff');
   } else if (type === 'item') {
     const item = payload as Item;
-    item.count--; // This might need syncing inventory?
-    // Note: Inventory sync is handled by gameStore updates usually, but here we modify item object directly?
-    // In multiplayer, Host should update inventory.
-    // Assuming item object is from store.
+    item.count--; // (待审验：这里或需与库存管理器做直接联动同步)
+    // 备注：普通物品库存同步实为由 gameStore 处理，多端联机状态下只有主局才可进行该状态下发更变。
+    // （假定该 item 对象已由全局仓库做过底层透传实例化绑定）
 
     let processed = false;
     const effects = item.effects || {};
@@ -623,7 +622,7 @@ async function executeCombatLogic(
     playSkillAnimation(actor, skill.name, true);
     await sleep(800);
 
-    // Logic for specials
+    // 主角专有特技流处理阀门
     const baseDmg = getBaseDamage(actor.power);
 
     if (skill.id === 'active_defense') {
@@ -703,27 +702,27 @@ async function executeCombatLogic(
       addPopup(target, '内伤', 'debuff');
       addLog(`${actor.name} 对 ${target.name} 施加了【内伤】！`);
     }
-    // ... other specials
+    // ... 预留的后续其余特技槽位处理
     await sleep(1000);
   }
 
   checkTurnEnd();
 }
 
-// --- Store Integration ---
+// --- 统一全局仓库集成 (Store Integration) ---
 const combatState = computed(() => gameStore.state.system.combat);
 const isPending = computed(() => !!combatState.value?.isPending);
 const isActive = computed(() => !!combatState.value?.isActive);
 const showOverlay = computed(() => {
   if (!combatState.value) return false;
-  // If combat is active (started), always show
+  // 若战斗处在活跃进行阶段 (Active)，无视其它约束强行挂载渲染层
   if (isActive.value) return true;
-  // If combat is pending (request stage), only show if visible prop is true
+  // 若处在战斗发起的待确认期，依靠父传递下来的可见参数决议是否弹窗
   if (isPending.value) return !!props.visible;
   return false;
 });
 
-// --- Interfaces for UI ---
+// --- 前端 UI 数据接口防腐层层 (Interfaces) ---
 interface CombatLog {
   id: number;
   turn: number;
@@ -740,7 +739,7 @@ interface UICombatant extends Combatant {
   popups: Popup[];
 }
 
-// --- Local State for UI/Animations ---
+// --- 前端独立持有的视效缓存状态集 ---
 const popupMap = reactive<Record<string, Popup[]>>({});
 
 const getPopups = (id: string) => {
@@ -799,10 +798,10 @@ const allies = computed(() => {
   })) as UICombatant[];
 });
 
-// --- Ally Stack Management ---
+// --- 队友队列堆叠管理 ---
 const activeAllyId = ref<string | null>(null);
 
-// Watch allies to maintain a valid activeAllyId and handle auto-switching when pinned ally dies
+// 监听队友列表，维护有效的当前活跃队友 ID，并在指定队友阵亡时处理自动切换逻辑
 watch(
   allies,
   (newAllies) => {
@@ -831,14 +830,14 @@ watch(
 const sortedAllies = computed(() => {
   if (!allies.value || allies.value.length === 0) return [];
 
-  // Sort initially: Alive first, then by name
+  // 初步排序：存活者优先，随后按名字拼音排序
   let list = [...allies.value].sort((a, b) => {
     if (a.hp > 0 && b.hp <= 0) return -1;
     if (a.hp <= 0 && b.hp > 0) return 1;
     return a.name.localeCompare(b.name, 'zh-CN');
   });
 
-  // Reorder: Active ally first
+  // 重新调整顺序：将当前活跃的队友置于首位 (栈顶预览)
   const activeIndex = list.findIndex((a) => a.id === activeAllyId.value);
   if (activeIndex > -1) {
     const [active] = list.splice(activeIndex, 1);
@@ -849,7 +848,7 @@ const sortedAllies = computed(() => {
 });
 
 function activateAlly(id: string) {
-  // If clicking the already active ally, cycle to the next one
+  // 如果点击的是当前已激活的队友，且存在多名队友，则轮换到下一个角色
   if (activeAllyId.value === id && sortedAllies.value.length > 1) {
     const currentIndex = sortedAllies.value.findIndex((a) => a.id === id);
     if (currentIndex !== -1) {
@@ -878,18 +877,18 @@ const canAttack = computed(() => {
 const enemyNames = computed(() => enemies.value.map((e) => e.name).join(', '));
 const turn = computed(() => combatState.value?.turn || 1);
 
-// Data Access
+// 战斗数据访问层 (Getters)
 const spells = computed(() => player.value?.spellCards || []);
 const items = computed(() => {
   const allItems = gameStore.state.player.items || [];
   return allItems.filter((item) => {
-    // Exclude special/key/equipment items explicitly
+    // 显式排除特殊物品、关键道具、装备等不可直接消耗的项目
     if (['special', 'key_item', 'equipment'].includes(item.type)) return false;
 
-    // Include if explicitly consumable or material
+    // 包含显式标记为消耗品或素材的项目
     if (item.type === 'consumable' || item.type === 'material') return true;
 
-    // Include if has combat effects (fallback)
+    // 回退方案：如果项目含有战斗增益/回复逻辑，也予以包含
     if (
       item.effects &&
       (item.effects.heal || item.effects.hp || item.effects.mp || item.effects.buff)
@@ -901,10 +900,10 @@ const items = computed(() => {
   });
 });
 
-// Animation Refs
+// 动画及视觉状态引用 (Refs)
 const currentMenu = ref<'main' | 'spell' | 'item' | 'talk' | 'special'>('main');
 const isScreenShaking = ref(false);
-const showIntro = ref(false); // New Intro State
+const showIntro = ref(false); // 战斗开场 VS 动画状态位
 const isActing = ref(false);
 const selectionMode = ref(false);
 const pendingAction = ref<{ type: string; payload?: any } | null>(null);
@@ -933,7 +932,7 @@ const combatLogs = ref<CombatLog[]>([]);
 const isLogExpanded = ref(false);
 const streamingNarrative = ref('');
 
-// --- Enemy Queue System ---
+// --- 敌人候补/出场队列系统 ---
 const exitedEnemyIds = ref<string[]>([]);
 
 const visibleEnemies = computed(() => {
@@ -943,26 +942,26 @@ const visibleEnemies = computed(() => {
 const activeEnemies = computed(() => visibleEnemies.value.slice(0, 3));
 const reserveEnemies = computed(() => visibleEnemies.value.slice(3));
 
-// Watch for deaths to trigger exit
+// 监听死亡事件以触发退场动画流程
 watch(
   enemies,
   (newEnemies) => {
     newEnemies.forEach((e) => {
       if (e.hp <= 0 && !exitedEnemyIds.value.includes(e.id)) {
-        // Delay exit to allow death animation (shatter) to play
-        // Use a unique timeout per enemy? Simple timeout is fine.
+        // 延迟退场，为破碎 (Shatter) 死亡特效预留演出时间
+        // [优化建议]：后续可考虑为每个敌人独立维护计时器，目前采用通用延时已满足表现。
         setTimeout(() => {
           if (!exitedEnemyIds.value.includes(e.id)) {
             exitedEnemyIds.value.push(e.id);
           }
-        }, 2500); // 2.5 seconds delay (Shatter animation is ~1s, FlashOut is 3.5s? Shatter is infinite? No)
+        }, 2500); // 2.5 秒延迟，确保破碎特效播放完毕
       }
     });
   },
   { deep: true }
 );
 
-// Ultimate Cut-in State
+// 终极技能 (Ultimate) 切入动画状态数据
 const showUltimateCutin = ref(false);
 const ultimateCutinData = ref({
   isPlayer: true,
@@ -971,7 +970,7 @@ const ultimateCutinData = ref({
   spriteUrl: ''
 });
 
-// Skill Cut-in State
+// 常规/奥义技能切入动画状态数据
 const showSkillCutin = ref(false);
 const showCombatFlowAnim = ref(false);
 const combatFlowPhase = ref('start'); // 'start', 'impact', 'end'
@@ -983,10 +982,10 @@ const skillCutinData = ref({
   spriteUrl: ''
 });
 
-// Watchers
+// 状态监听器 (Watchers)
 watch(isActive, (val) => {
   if (val) {
-    // Reset state on combat start
+    // 战斗开启时重置上下文状态分量
     isGameOver.value = false;
     gameResult.value = null;
     phase.value = 'player';
@@ -994,15 +993,15 @@ watch(isActive, (val) => {
     selectionMode.value = false;
     currentMenu.value = 'main';
     combatLogs.value = [];
-    exitedEnemyIds.value = []; // Clear exited enemies
-    // Clear popups
+    exitedEnemyIds.value = []; // 清空已退场敌人名单
+    // 清理残留的动效漂浮文字 (Popups)
     for (const key in popupMap) {
       popupMap[key] = [];
     }
   }
 });
 
-// --- Helpers ---
+// --- 内部辅助函数 (Helpers) ---
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function playCombatFlowAnimation(isRemote: boolean = false) {
@@ -1012,28 +1011,28 @@ async function playCombatFlowAnimation(isRemote: boolean = false) {
     });
   }
 
-  // 1. Init
+  // 1. 初始化阶段 (Init)
   showCombatFlowAnim.value = true;
   combatFlowPhase.value = 'start';
 
-  // SFX: Init
+  // 音效 (SFX)：初始化
   audioManager.playSkillCutin();
 
-  // 2. Start (0-1000ms): Dim background, Character appears
+  // 2. 开始阶段 (0-1000ms): 背景变暗，角色登场
   await sleep(1000);
 
-  // 3. Impact (1000-2500ms): Text Glitch, Purple Flash
+  // 3. 冲击阶段 (1000-2500ms): 文本闪烁，紫色闪屏
   combatFlowPhase.value = 'impact';
-  audioManager.playSpellCastAoE(); // Burst sound
-  // Trigger impact effect in background too
+  audioManager.playSpellCastAoE(); // 爆发音效
+  // 触发背景中的冲击特效
   const rect = document.body.getBoundingClientRect();
-  triggerEffect('ultimate_impact', rect.width / 2, rect.height / 2, undefined, true); // Don't re-broadcast internal effect
+  triggerEffect('ultimate_impact', rect.width / 2, rect.height / 2, undefined, true); // 仅本地触发，不进行联机二次广播以免死循环
 
   await sleep(2500);
 
-  // 4. End
+  // 4. 结束阶段 (End)
   combatFlowPhase.value = 'end';
-  await sleep(500); // Fade out
+  await sleep(500); // 渐隐退场时长
   showCombatFlowAnim.value = false;
 }
 
@@ -1057,20 +1056,20 @@ async function playUltimateAnimation(
     isPlayer: isPlayerTeam,
     charName: combatant.name,
     spellName: spellName,
-    // Correct Sprite Logic: Use '主角' only if it's the player ID, otherwise use name
+    // 立绘逻辑修正：仅当 ID 为 'player' 时使用 '主角'，否则回退至角色真实名称进行模糊匹配
     spriteUrl: getSpriteUrl(combatant.id === 'player' ? '主角' : combatant.name)
   };
 
-  // SFX
+  // 触发施法音效
   audioManager.playSpellCast();
 
-  // Show Cut-in
+  // 显示全屏切入立绘
   showUltimateCutin.value = true;
 
-  // Wait for animation (Flash + Slide + Hold)
+  // 等待动画周期（闪光 + 滑入 + 驻留）完成
   await sleep(2500);
 
-  // Hide
+  // 隐藏切入层
   showUltimateCutin.value = false;
 }
 
@@ -1103,7 +1102,7 @@ async function playSkillAnimation(
   audioManager.playSkillCutin();
 
   showSkillCutin.value = true;
-  await sleep(800); // Shorter duration
+  await sleep(800); // 较短的演出持续时间
   showSkillCutin.value = false;
 }
 
@@ -1115,7 +1114,7 @@ function switchMenu(menu: 'main' | 'spell' | 'item' | 'talk' | 'special') {
 }
 
 function addLog(content: string, isRemote: boolean = false) {
-  // Clear streaming narrative when a final log entry is added
+  // 当有正式的日志条目加入时，清空当前正在流式生成的叙事文本缓存
   streamingNarrative.value = '';
 
   if (!isRemote && gameStore.multiplayer.isHost && gameStore.multiplayer.isMultiplayer) {
@@ -1130,10 +1129,10 @@ function addLog(content: string, isRemote: boolean = false) {
     turn: turn.value,
     content
   });
-  // Removed limit to allow full history viewing
+  // 已移除容量上限限制，以支持全量历史记录追溯回看
   // if (combatLogs.value.length > 5) combatLogs.value.pop();
 
-  // Sync to Store (Full History for LLM)
+  // 同步至全局 Store (为大语言模型提供全量战斗历史参照)
   if (combatState.value) {
     if (!combatState.value.logs) combatState.value.logs = [];
     combatState.value.logs.push({
@@ -1220,12 +1219,12 @@ function getSpellCost(spell: SpellCard, combatant: UICombatant | null) {
 
   let baseReduction = 0;
 
-  // 1. Spell Level-based reduction (0% - 29%)
+  // 1. 基于符卡等级的成本减免 (0% - 29%)
   if (spell.level && spell.level > 1) {
     baseReduction += getLevelCostReduction(spell.level);
   }
 
-  // 2. Buff-based reduction (Legacy manual check - kept for backward compatibility if needed)
+  // 2. 基于 Buff 效果的成本减免 (旧版手动检查逻辑，为协议兼容性予以保留)
   if (combatant.buffs) {
     combatant.buffs.forEach((b) => {
       b.effects.forEach((e) => {
@@ -1236,10 +1235,10 @@ function getSpellCost(spell: SpellCard, combatant: UICombatant | null) {
     });
   }
 
-  // Apply first layer of reduction
+  // 应用第一层成本折算结果
   let finalCost = spell.cost * (1 - Math.min(1.0, baseReduction));
 
-  // 3. New: Lifecycle Hook for MP Cost Reduction (e.g. BOMB专家, 灵力回收)
+  // 3. 新增：基于生命周期钩子的灵力成本修正 (如针对 BOMB专家、灵力回收等特殊天赋处理)
   const context = {
     attacker: combatant as Combatant,
     spell,
@@ -1248,8 +1247,8 @@ function getSpellCost(spell: SpellCard, combatant: UICombatant | null) {
   };
   finalCost = applyStatModifiers(finalCost, 'onCalculateMpCost', combatant as Combatant, context);
 
-  // 4. Combat Level-based reduction (Layer 2, multiplicative)
-  // Starts from Level 51, up to 25% at Level 100
+  // 4. 基于战斗等级 (Combat Level) 的成本减免 (第二层计算，属于乘法叠加)
+  // 从 51 级开始起步生效，在 100 级时最高达到 25% 减免幅度
   if (combatant.isPlayer && combatant.combatLevel && combatant.combatLevel > 50) {
     const combatReduction = getCombatLevelCostReduction(combatant.combatLevel);
     finalCost *= 1 - combatReduction;
@@ -1273,7 +1272,7 @@ function getEnemyEffectiveDodge(enemy: UICombatant) {
   return baseDodge + dodgeMod;
 }
 
-// --- Visual Style Helpers ---
+// --- 视觉动画样式辅助层 (Visual Style Helpers) ---
 function getPlayerHpStyle(hp: number, maxHp: number) {
   const ratio = Math.max(0, Math.min(1, hp / maxHp));
   let r, g, b;
@@ -1361,15 +1360,15 @@ async function triggerEffect(
   activeEffect.value.show = false;
 }
 
-// --- Combat Logic ---
+// --- 战斗核心执行逻辑架构 (Combat Logic) ---
 
 function startCombat() {
   if (combatState.value) {
-    // Trigger Intro First
+    // 首先触发战斗开场 sequence 动画流程
     showIntro.value = true;
     playIntroSequence();
 
-    // Trigger onCombatStart for all participants
+    // 为场上所有参战单位触发生命周期钩子：onCombatStart
     const allCombatants = [player.value, ...allies.value, ...enemies.value].filter(
       (c) => c !== null
     ) as UICombatant[];
@@ -1400,21 +1399,21 @@ function startCombat() {
 }
 
 async function playIntroSequence() {
-  // 1. Initial Burst
+  // 1. 冲击爆发音效阶段
   audioManager.playChime();
 
-  // 2. Slide In (Left/Right)
+  // 2. 角色立绘滑入阶段 (左右对阵)
   await sleep(200);
   audioManager.playSlash(); // Left
   await sleep(400);
   audioManager.playSlash(); // Right
 
-  // 3. VS Slam
+  // 3. VS 字样震地 Slam 效果阶段
   await sleep(600);
   audioManager.playHeavyHit();
   triggerShake();
 
-  // 4. Hold & Fade
+  // 4. 驻留静止与平滑渐隐阶段
   await sleep(2500);
   showIntro.value = false;
   playCombatBgm();
@@ -1428,9 +1427,9 @@ function skipCombat() {
   emit('close');
 }
 
-// --- Helper to Sync State ---
+// --- 战斗全局状态同步与持久化辅助组件 (Sync Helpers) ---
 function updateCombatantState(id: string, updates: Partial<Combatant>) {
-  // Validate inputs to prevent NaN propagation
+  // 入参校验：严防 NaN 脏数据对数值系统造成连锁污染
   if (updates.hp !== undefined) {
     const val = Number(updates.hp);
     if (isNaN(val)) {
@@ -1450,19 +1449,16 @@ function updateCombatantState(id: string, updates: Partial<Combatant>) {
     }
   }
 
-  // 1. Update Store Combat State (Source of Truth for Combat)
+  // 1. 首先同步至战斗系统专有的局部快照 (当前战斗的 Source of Truth)
   if (combatState.value) {
     const storeCombatant = combatState.value.combatants.find((c) => c.id === id);
     if (storeCombatant) {
       Object.assign(storeCombatant, updates);
 
-      // Sync immediately for HP changes if Host
+      // 作为主机时，若处在联机状态则立即尝试同步变更到其他玩家端
       if (gameStore.multiplayer.isHost && gameStore.multiplayer.isMultiplayer) {
-        // Debounce or sync? HP changes can be frequent (multi-hit).
-        // But syncHostState sends the whole state.
-        // Let's rely on the watchers on isActive/turn or manual trigger.
-        // Or maybe trigger here for critical updates?
-        // Let's debounce sync.
+        // 权衡：由于多段打击可能导致高频同步请求，此处后续可能需要引入节流控制
+        // 目前主要依赖于 isActive/turn 监听器或针对关键节点的 syncHostState 手动调用保证同步
         multiplayerService.syncHostState(gameStore.state);
       }
     }
@@ -1488,10 +1484,10 @@ function updateCombatantState(id: string, updates: Partial<Combatant>) {
       });
     }
   } else {
-    // It's an NPC (or Enemy)
-    // Always try to update/create the NPC in store.
-    // This ensures that even ephemeral enemies (from Static DB) get their state persisted,
-    // preventing the "HP: ?" issue in CharacterList if they are added to the scene later.
+    // 若是 NPC (包含普通敌人实体)
+    // 强制尝试更新或初次创建该 NPC 在全局仓库中的存档条目
+    // 这能确保即使是临时的敌人（来自于静态数据库）其当前数值状态也能被正确固化。
+    // 这也能从根源解决 CharacterList 界面中某些角色可能出现的 "HP: ?" 这种状态未初始化问题。
     if (updates.hp !== undefined) {
       gameStore.applyAction({
         type: 'UPDATE_NPC',
@@ -1501,21 +1497,13 @@ function updateCombatantState(id: string, updates: Partial<Combatant>) {
         value: updates.hp
       });
     }
-    if (updates.mp !== undefined) {
-      // Only update MP if the store supports it for NPCs (currently UPDATE_NPC might strictly check fields)
-      // But let's try it, as gameStore might ignore invalid fields gracefully or we can add it.
-      // Looking at gameStore, 'mp' is NOT in STRICT_NPC_NUMERIC_FIELDS (hp, max_hp, favorability, obedience).
-      // But it might be allowed as a generic field.
-      // However, NPCs usually don't track MP in this system (they use cooldowns/patterns).
-      // But if we want to track it, we can.
-      // For now, let's skip MP to avoid clutter/warnings if not supported, unless necessary.
-      // Actually, gameStore UPDATE_NPC allows generic fields.
-      // But let's focus on HP which is the reported issue.
-    }
+    // 注意：目前为避免配置冗余，暂不在此处强制同步 NPC 的灵力 (MP) 槽
+    // 因为在大部系统下敌人均采用冷却/特定模式脚本进行出招而非硬逻辑计费 MP。
+    // 后续如有明确的精英怪 MP 槽需求，可在此处扩展字段白名单。
   }
 }
 
-// --- Helper to Apply Shield Logic (Shield Gate) ---
+// --- 护盾逻辑处理器 (护盾闸机制处理) ---
 function applyShieldDamage(
   target: UICombatant,
   damage: number,
@@ -1528,13 +1516,13 @@ function applyShieldDamage(
   const damageToShield = Math.min(target.shield, damage);
 
   if (damage >= target.shield) {
-    // Shield Break
+    // 护盾击碎状态流程 (Shield Break)
     target.shield = 0;
     audioManager.playShatter();
     addPopup(target, damageToShield, 'buff');
     if (!isAoE) addLog(`${attacker.name} ${actionName}，击碎了 ${target.name} 的护盾！`);
   } else {
-    // Shield Reduce
+    // 护盾残余量扣除流程 (Shield Reduce)
     target.shield -= damage;
     addPopup(target, damage, 'buff');
     if (!isAoE) addLog(`${attacker.name} ${actionName}，造成了 ${damage} 点护盾伤害！`);
@@ -1542,18 +1530,18 @@ function applyShieldDamage(
 
   updateCombatantState(target.id, { shield: target.shield });
 
-  // Shield Gate: Absorbs ALL damage if shield was present
+  // 只要护盾尚存，其表现即为吸收该次动作涉及的所有伤害 (Shield Gate)
   return 0;
 }
 
-// Core Logic Wrapper
+// 战斗核心原子动作执行器包装 (Action Wrapper)
 async function executeAction(
   attacker: Combatant,
   defender: UICombatant,
   actionName: string = '普通攻击',
   spell?: SpellCard
 ) {
-  // Determine number of attacks
+  // 判定该次行动涉及的连击次数 (Attack Counts)
   let attackCount = 1;
   if (actionName === '普通攻击' && !spell) {
     const doubleChance = applyStatModifiers(0, 'onCalculateDoubleAttackChance', attacker, {
@@ -1572,12 +1560,12 @@ async function executeAction(
       await sleep(600);
     }
 
-    // Use existing service logic for calculation
+    // 调用底层核心计算逻辑进行精确伤害推演 (Damage Calculation)
     const result = calculateDamage(attacker, defender, spell);
 
-    // Apply Spell Effects (Debuffs or Buffs) - Only on first hit for multi-hit spells if any
+    // 应用符卡附加效果（如 Buff 加成或 Debuff 减益）—— 对于多段打击法术，仅在首击应用效果，以防重复叠加。
     if (spell && spell.buffDetails && i === 0) {
-      // Fix: Determine type based on spell type (buff/shield/heal -> buff, attack/debuff -> debuff)
+      // 意图推导：根据法术原本类型映射对应的增减益性质（回复/护盾 -> Buff类；进攻/削弱 -> Debuff类）
       const type = ['buff', 'shield', 'heal'].includes(spell.type || '') ? 'buff' : 'debuff';
       applyBuff(defender, spell.buffDetails, type);
     }
@@ -1591,12 +1579,12 @@ async function executeAction(
 
       if (remainingDamage > 0) {
         const newHp = Math.max(0, defender.hp - remainingDamage);
-        defender.hp = newHp; // Local visual update
+        defender.hp = newHp; // 本地渲染层即时状态推演更新 (用于动画同步)
         updateCombatantState(defender.id, { hp: newHp });
 
         addPopup(defender, remainingDamage, 'damage');
 
-        // Trigger Hit Spark
+        // 触发受击火花动效层 (Hit Spark)
         const isPlayer = defender.isPlayer || defender.team === 'player';
         const rect = document.body.getBoundingClientRect();
         const targetX = isPlayer ? rect.width * 0.25 : rect.width * 0.75;
@@ -1607,7 +1595,7 @@ async function executeAction(
       }
     }
 
-    // Handle Heal
+    // 处理治疗结算逻辑 (Heal)
     if (result.heal > 0) {
       const newHp = Math.min(defender.maxHp, defender.hp + result.heal);
       defender.hp = newHp;
@@ -1616,7 +1604,7 @@ async function executeAction(
       addPopup(defender, result.heal, 'heal');
       addLog(`${attacker.name} ${actionName}，恢复了 ${result.heal} 点HP！`);
     } else if (result.damage <= 0) {
-      // Handle Miss / 0 Damage (Only if no damage and no heal)
+      // 处理未击中 (Miss) 或 0 伤害的情况 (仅当既无伤害也无治疗时)
       if (result.isHit && spell && spell.buffDetails) {
         addPopup(defender, spell.buffDetails.name, 'buff');
         addLog(result.description);
@@ -1631,13 +1619,13 @@ async function executeAction(
       }
     }
 
-    // P-Point Gain Logic (Player Normal Attack)
+    // P 点 (灵力槽) 增长逻辑 (仅限玩家普通攻击)
     if ((attacker.isPlayer || attacker.team === 'player') && !spell) {
-      // Gain P-points even if missed (60% gain on miss)
+      // 即使未击中也能获得少量 P 点 (未击中时获取率为 60%)
       let pGain = calculatePPointGain(attacker, result.damage);
 
       if (!result.isHit) {
-        pGain *= 0.6; // 60% penalty for missing
+        pGain *= 0.6; // 未击中导致的 40% 衰减惩罚
       }
 
       if (pGain > 0) {
@@ -1656,11 +1644,11 @@ async function executeAction(
   }
 }
 
-// --- Helper to Apply Buffs ---
+// --- 增减益状态 (Buff/Debuff) 应用辅助函数 ---
 function applyBuff(target: UICombatant, buffDetails: any, type: 'buff' | 'debuff' = 'buff') {
   if (!buffDetails) return;
 
-  // Check for Immediate Effects (Shield, Instant Heal)
+  // 优先检视瞬时生效型项目 (如瞬间护盾、即时治疗)
   let isInstantHeal = false;
   if (buffDetails.effects) {
     for (const effect of buffDetails.effects) {
@@ -1672,7 +1660,7 @@ function applyBuff(target: UICombatant, buffDetails: any, type: 'buff' | 'debuff
           addPopup(target, val, 'buff');
         }
       } else if (effect.type === 'heal' && buffDetails.duration === 1) {
-        // Instant Heal
+        // 结算瞬时治疗 (Instant Heal)
         const val = Number(effect.value);
         if (val > 0) {
           const newHp = Math.min(target.maxHp, target.hp + val);
@@ -1722,12 +1710,12 @@ function applyBuff(target: UICombatant, buffDetails: any, type: 'buff' | 'debuff
   addLog(`${target.name} ${type === 'buff' ? '获得了' : '陷入了'}状态：${newBuff.name}！`);
 }
 
-// Main Action Handler (Player)
+// 玩家侧动作主处理器 (Main Action Handler)
 async function handleAction(type: string, payload?: any) {
   if (isActing.value || phase.value !== 'player') return;
   if (!player.value) return;
 
-  // AP Check
+  // 行动点 (AP) 强制锁死校验
   const currentAP = player.value.actionPoints !== undefined ? player.value.actionPoints : 2;
   if (currentAP < 1) {
     addPopup(player.value, '行动点不足', 'damage');
@@ -1744,12 +1732,12 @@ async function handleAction(type: string, payload?: any) {
 
     const actualCost = getSpellCost(spell, player.value);
     if (player.value.mp >= actualCost) {
-      // Special Case: Self-Buff / Shield / Heal (Immediate Execution) - Non-AOE only
+      // 特殊情况：针对自身施放的 Buff / 护盾 / 治疗 (且非全场 AOE) 直接立即执行，无需等待目标选择流程
       if (
         (spell.type === 'buff' || spell.type === 'shield' || spell.type === 'heal') &&
         spell.scope !== 'aoe'
       ) {
-        // Immediate
+        // 立即执行链路
         if (gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost) {
           multiplayerService.sendCombatAction(type, payload);
           return;
@@ -1763,7 +1751,7 @@ async function handleAction(type: string, payload?: any) {
       }
 
       if (spell.scope === 'aoe') {
-        // Immediate AOE
+        // 针对群体 AOE 直接开启结算流程
         if (gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost) {
           multiplayerService.sendCombatAction(type, payload);
           return;
@@ -1774,7 +1762,7 @@ async function handleAction(type: string, payload?: any) {
         await executeCombatLogic(player.value, type, payload);
         isActing.value = false;
       } else {
-        // Single Target -> Selection Mode
+        // 单体指向型符卡 -> 进入敌群目标选取模式
         audioManager.playClick();
         selectionMode.value = true;
         pendingAction.value = { type: 'spell', payload: spell };
@@ -1786,14 +1774,14 @@ async function handleAction(type: string, payload?: any) {
     const item = payload as Item;
     if (!player.value) return;
 
-    // Safety Check
+    // 物件类型合规性校验 (防腐层)
     if (['special', 'key_item', 'equipment'].includes(item.type)) {
       addPopup(player.value, '不可使用', 'damage');
       return;
     }
 
     if (item.count > 0) {
-      // Immediate (Self-Use)
+      // 针对自身的道具使用，直接开启执行链路
       if (gameStore.multiplayer.isMultiplayer && !gameStore.multiplayer.isHost) {
         multiplayerService.sendCombatAction(type, payload);
         return;
@@ -1807,7 +1795,7 @@ async function handleAction(type: string, payload?: any) {
   }
 }
 
-// Talk Logic
+// 嘴遁 (Talk/Persuasion) 逻辑控制枢纽
 const talkInput = ref('');
 const isProcessingTalk = ref(false);
 
@@ -1998,7 +1986,7 @@ async function handleTalk() {
     return;
   }
 
-  // Debug Command: /debug buff
+  // 调试后门指令: /debug buff (用于在无需进行嘴遁时验证 UI 状态显示)
   if (talkInput.value.trim() === '/debug buff') {
     const debugBuff: Buff = {
       id: `debug_${Date.now()}`,
@@ -2029,15 +2017,15 @@ async function handleTalk() {
       turn.value
     );
 
-    // Log Narrative
+    // 渲染生成的叙事文本日志段落
     addLog(`[嘴遁] ${result.narrative}`);
 
-    // Apply Effects
+    // 依次分发并生效叙事生成的各项数值/状态变更 (Apply Game-State Effects)
     for (const effect of result.effects) {
       console.log('[HandleTalk] Processing Effect:', effect);
 
       if (effect.target === 'ally' || effect.target === 'all_allies') {
-        // Find targets
+        // 搜寻生效目标 (Allies)流
         const targets = [];
         if (effect.target === 'ally' && typeof effect.targetIndex === 'number') {
           if (allies.value[effect.targetIndex]) targets.push(allies.value[effect.targetIndex]);
@@ -2102,7 +2090,7 @@ async function handleTalk() {
           }
         }
       } else if (effect.target === 'enemy' || effect.target === 'all_enemies') {
-        // Find targets
+        // 搜寻生效目标 (Enemies)流
         const targets = [];
         if (effect.target === 'enemy' && typeof effect.targetIndex === 'number') {
           if (enemies.value[effect.targetIndex]) targets.push(enemies.value[effect.targetIndex]);
@@ -2122,7 +2110,7 @@ async function handleTalk() {
 
               addPopup(target, dmg, 'damage');
 
-              // Hit Sound & Effect
+              // 渲染声光电特效反馈层 (Hit Sound & Effect)
               audioManager.playHeavyHit();
               const rect = document.body.getBoundingClientRect();
               triggerEffect('hit', rect.width * 0.75, rect.height * 0.4);
@@ -2178,7 +2166,7 @@ async function handleTalk() {
             }
           } else if (effect.type === 'win') {
             addLog(`${target.name} 失去了战斗意志！`);
-            target.hp = 0; // Force defeat for simplicity
+            target.hp = 0; // 为简化逻辑，精神破防后直接判定其 HP 归零 (即退出战斗)
             updateCombatantState(target.id, { hp: 0 });
             audioManager.playShatter();
           }
@@ -2245,7 +2233,7 @@ async function handleTalk() {
 
     await sleep(2000);
 
-    // Deduct Costs (AP: 2, P: 15)
+    // 扣减行动成本 (AP: 2, P: 15)
     if (player.value) {
       const currentAPFinal =
         player.value.actionPoints !== undefined ? player.value.actionPoints : 2;
@@ -2267,7 +2255,7 @@ async function handleTalk() {
   }
 }
 
-// Target Selection & Execution
+// 目标选取完成后的执行回调 (Target Selection & Execution)
 async function selectTarget(target: UICombatant) {
   if (!selectionMode.value || !pendingAction.value || isActing.value || phase.value !== 'player')
     return;
@@ -2275,7 +2263,7 @@ async function selectTarget(target: UICombatant) {
 
   const { type, payload } = pendingAction.value;
 
-  // Start Sequence
+  // 开启正式动作序列流程控制锁
   selectionMode.value = false;
   pendingAction.value = null;
 
@@ -2294,8 +2282,8 @@ async function selectTarget(target: UICombatant) {
     console.error('Action execution failed:', error);
     addLog(`[错误] 行动失败: ${error}`);
   } finally {
-    // IMPORTANT: Reset isActing to allow UI interaction if turn hasn't ended
-    // This is now in finally block to ensure it runs
+    // [重要提示] 必须在结算完毕后重置 isActing 状态位，否则当前回合后续无法再进行 UI 交互。
+    // 放置在 finally 块中以兜底任何潜在的逻辑崩溃。
     if (phase.value === 'player') {
       isActing.value = false;
     }
@@ -2312,7 +2300,7 @@ function checkTurnEnd() {
     if (!isGameOver.value) {
       isActing.value = false;
 
-      // Check for allies
+      // 轮换至队友阶段 (若存在可行动队友)
       if (allies.value.length > 0 && allies.value.some((a) => a.hp > 0)) {
         phase.value = 'ally';
         processAllyTurn();
@@ -2323,18 +2311,18 @@ function checkTurnEnd() {
       }
     }
   } else {
-    // Allow more actions
+    // 若 AP 尚存，则放回控制权，允许玩家继续发起后续动作 (如连击或道具使用)
     isActing.value = false;
     currentMenu.value = 'main';
     selectionMode.value = false;
   }
 }
 
-// Turn Management
+// 回合步进与生命周期管理 (Turn Management)
 function processTurnStart() {
   if (!combatState.value) return;
 
-  // Reset Player AP at start of Player Phase
+  // 在玩家阶段开启时，重置并刷新玩家持有的战斗行动点 (AP) 数额
   if (phase.value === 'player' && player.value) {
     updateCombatantState(player.value.id, { actionPoints: 2 });
   }
@@ -2347,7 +2335,7 @@ function processTurnStart() {
     const prevHp = c.hp;
     const prevMp = c.mp || 0;
 
-    // Trigger onTurnStart lifecycle hooks (handles DoT, HoT, and other turn-based talent effects)
+    // 触发生命周期钩子 onTurnStart (在此统一结算 DoT 扣血、HoT 回血以及各类基于回合数的天赋动效)
     applyLifecycleHook('onTurnStart', c, {
       attacker: c,
       turn: turn.value,
@@ -2356,7 +2344,7 @@ function processTurnStart() {
     });
 
     if (!c.buffs || c.buffs.length === 0) {
-      // Even if no buffs, we need to sync HP/MP changes from talents or other hooks
+      // 即便没有任何状态位，为了应对天赋或其他隐蔽钩子带来的静默变更，也需在此处进行 HP/MP 快照同步。
       if (c.hp !== prevHp || (c.mp || 0) !== prevMp) {
         updateCombatantState(c.id, { hp: c.hp, mp: c.mp });
       }
@@ -2368,19 +2356,19 @@ function processTurnStart() {
     let changed = false;
 
     for (const buff of c.buffs) {
-      // Duration Logic Optimization:
-      // Ensure buffs last for full round cycles by skipping decrement if applied recently
+      // 状态持续时间逻辑优化 (Duration Logic Optimization):
+      // 避免新加载的状态在同一个大回合内过早地发生衰减，从而确保其至少能存续一整个闭环大环节。
       let shouldDecrement = true;
       if (buff.createdTurn !== undefined && combatState.value) {
         const currentTurn = combatState.value.turn;
         if (c.isPlayer) {
-          // Player buffs created in previous turn (currentTurn - 1) should not decrement yet
-          // This ensures they last for the current turn + future turns
+          // 玩家身上刚在前一个回合 (currentTurn - 1) 建立的状态此处不应执行衰减
+          // 这确保了玩家赋予的反制型 Buff 能涵盖当前整个操作周期。
           if (buff.createdTurn === currentTurn - 1) {
             shouldDecrement = false;
           }
         } else {
-          // Enemy buffs created in current turn (Enemy Phase) should not decrement yet
+          // 敌方身上在当前大回合 (敌方阶段) 刚刚生成的状态此处不执行衰减。
           if (buff.createdTurn === currentTurn) {
             shouldDecrement = false;
           }
@@ -2402,7 +2390,7 @@ function processTurnStart() {
       }
     }
 
-    // Sync both buffs and potential HP/MP changes from DoT/HoT hooks
+    // 在一轮结算完毕后，将处理好的状态集合以及由于 DoT/HoT 导致的生理属性变化统一同步回 Store。
     const hpChanged = c.hp !== prevHp;
     const mpChanged = (c.mp || 0) !== prevMp;
 
@@ -2423,11 +2411,11 @@ function processTurnStart() {
     }
   }
 
-  // Check for deaths caused by DoT/Buffs at the start of turn
+  // 即使在回合刚开始时，也需检查是否由于 DoT 或 Buff 效果导致单位阵亡 (Check Win/Loss)
   checkWinLoss();
 }
 
-// Ally Turn Automation
+// 盟友回合自动化逻辑 (Ally Turn Automation)
 async function processAllyTurn() {
   if (phase.value !== 'ally') return;
 
@@ -2441,32 +2429,32 @@ async function processAllyTurn() {
     for (const ally of aliveAllies) {
       if (isGameOver.value) break;
 
-      // Define Opponents (Enemies)
+      // 定义敌对势力范围 (Enemies)
       const opponents = enemies.value.filter((e) => e.hp > 0);
       if (opponents.length === 0) break;
 
-      // Define Friends (Player + Other Allies)
+      // 定义友方势力范围 (Player + Other Allies)
       const friends: UICombatant[] = [];
       if (player.value && player.value.hp > 0) friends.push(player.value);
       friends.push(...allies.value.filter((a) => a.id !== ally.id && a.hp > 0));
-      // Add self to friends for self-buffs
+      // 将自身加入友方列表，以支持对自己施加增益性符卡 (Self-Buffs)
       friends.push(ally);
 
-      // AI Logic
+      // 盟友 AI 决策权重逻辑 (AI Logic)
       let action: 'attack' | 'spell' = 'attack';
       let selectedSpell: SpellCard | undefined;
       let isUltimateTrigger = false;
 
       console.log(
-        `[Combat AI Ally] ${ally.name} (HP: ${ally.hp}) thinking. Spells available: ${ally.spellCards?.length || 0}`
+        `[Combat AI Ally] ${ally.name} (HP: ${ally.hp}) 正在思考。可用符卡: ${ally.spellCards?.length || 0}`
       );
       if (ally.spellCards && ally.spellCards.length > 0) {
         console.log(
-          `[Combat AI Ally] Spell list: ${ally.spellCards.map((s) => s.name).join(', ')}`
+          `[Combat AI Ally] 符卡列表: ${ally.spellCards.map((s) => s.name).join('、')}`
         );
       }
 
-      // 1. Ultimate Trigger Check (HP < 40%)
+      // 1. 终极奥义触发校验 (当 HP 低于 40% 且未曾施放过奥义)
       if (ally.hp < ally.maxHp * 0.4 && !ally.hasUsedUltimate) {
         const ult = ally.spellCards?.find((s) => s.isUltimate);
         if (ult) {
@@ -2476,10 +2464,10 @@ async function processAllyTurn() {
         }
       }
 
-      // 2. Regular AI (60% Attack, 40% Spell)
+      // 2. 常规行动倾向 (60% 概率普通攻击，40% 概率施展符卡)
       if (!selectedSpell) {
         if (ally.spellCards && ally.spellCards.length > 0 && Math.random() < 0.4) {
-          // Use random non-ultimate spell
+          // 随机选取一张非奥义类符卡施放
           const regularSpells = ally.spellCards.filter((s) => !s.isUltimate);
           if (regularSpells.length > 0) {
             selectedSpell = regularSpells[Math.floor(Math.random() * regularSpells.length)];
@@ -2488,7 +2476,7 @@ async function processAllyTurn() {
         }
       }
 
-      // 3. Target Selection
+      // 3. 目标选取策略 (Target Selection)
       let targets: UICombatant[] = [];
 
       if (action === 'spell' && selectedSpell) {
@@ -2504,7 +2492,7 @@ async function processAllyTurn() {
           }
         }
       } else {
-        // Attack
+        // 执行常规物理攻击流程
         if (opponents.length > 0) {
           const randomOpponent = opponents[Math.floor(Math.random() * opponents.length)];
           if (randomOpponent) targets = [randomOpponent];
@@ -2513,7 +2501,7 @@ async function processAllyTurn() {
 
       if (targets.length === 0) continue;
 
-      // 4. Execution
+      // 4. 正式执行链路 (Execution Loop)
       if (action === 'spell' && selectedSpell) {
         addLog(`${ally.name} 发动了符卡：${selectedSpell.name}！`);
 
@@ -2528,28 +2516,28 @@ async function processAllyTurn() {
         const isAoE = selectedSpell.scope === 'aoe' || targets.length > 1;
         const rect = document.body.getBoundingClientRect();
 
-        // Cast Sound
+        // 触发对应的施法音效表现层
         if (isAoE) audioManager.playSpellCastAoE();
         else audioManager.playSpellCastSingle();
 
-        // Visuals
+        // 渲染对应的视觉特效表现层 (Visuals)
         if (isUltimateTrigger || isAoE) {
           if (isSupport) {
-            // Center on self/allies (Left side)
+            // 锚定在己方阵营中心 (左侧半场)
             triggerEffect('spell_aoe', rect.width * 0.25, rect.height * 0.5);
           } else {
-            // Center on enemies (Right side)
+            // 锚定在敌方阵营中心 (右侧半场)
             triggerEffect('spell_aoe', rect.width * 0.75, rect.height * 0.5);
           }
         } else {
-          // Single Target Effect
+          // 单体目标指向性特效定位逻辑
           const t = targets[0];
           let tx = rect.width * 0.5;
           let ty = rect.height * 0.5;
           if (t) {
-            // Estimate position based on team
-            // Ally attacking Enemy -> Enemy side (Right)
-            // Ally buffing Ally -> Ally side (Left)
+            // 根据阵营属性估算特效应出现的屏幕坐标位置
+            // 盟友攻击敌人 -> 渲染在敌方半场 (右侧)
+            // 盟友支援队友 -> 渲染在己方半场 (左侧)
             const isTargetEnemy = !t.isPlayer && t.team === 'enemy';
             tx = isTargetEnemy ? rect.width * 0.75 : rect.width * 0.25;
             ty = rect.height * 0.6;
@@ -2574,7 +2562,7 @@ async function processAllyTurn() {
           await executeAction(ally, target, selectedSpell.name, selectedSpell);
         }
       } else {
-        // Regular Attack
+        // 普通物理攻击执行分支
         const target = targets[0];
         if (!target) continue;
         audioManager.playSlash();
@@ -2599,20 +2587,20 @@ async function processAllyTurn() {
     }
   } catch (e) {
     console.error('[Combat] Ally turn error:', e);
-    // Fallback to enemy phase
+    // 如果盟友回合执行异常，降级回退至敌人阶段，防止流程挂死
     phase.value = 'enemy';
     processEnemyTurn();
   }
 }
 
-// Enemy Turn Automation
+// 敌人回合自动化逻辑 (Enemy Turn Automation)
 async function processEnemyTurn() {
   if (phase.value !== 'enemy') return;
 
   console.log('[战斗] 敌人回合处理开始');
 
   try {
-    // Simulate thinking
+    // 模拟 AI 决策思考延迟时长
     await sleep(800);
 
     const aliveEnemies = enemies.value.filter((e) => e.hp > 0);
@@ -2621,31 +2609,31 @@ async function processEnemyTurn() {
       try {
         if (isGameOver.value) break;
 
-        // Define Opponents (Player + Allies)
+        // 定义攻击对象池 (Player + Allies)
         const opponents: UICombatant[] = [];
         if (player.value && player.value.hp > 0) opponents.push(player.value);
         opponents.push(...allies.value.filter((a) => a.hp > 0));
 
         if (opponents.length === 0) break;
 
-        // Define Friends (Self + Other Enemies)
+        // 定义队友互助池 (Self + Other Enemies)
         const friends = [enemy, ...enemies.value.filter((e) => e.id !== enemy.id && e.hp > 0)];
 
-        // AI Logic
+        // 敌人 AI 决策倾向引擎 (AI Logic)
         let action: 'attack' | 'spell' = 'attack';
         let selectedSpell: SpellCard | undefined;
         let isUltimateTrigger = false;
 
         console.log(
-          `[Combat AI Enemy] ${enemy.name} (HP: ${enemy.hp}) thinking. Spells available: ${enemy.spellCards?.length || 0}`
+          `[Combat AI Enemy] ${enemy.name} (HP: ${enemy.hp}) 正在思考。可用符卡: ${enemy.spellCards?.length || 0}`
         );
         if (enemy.spellCards && enemy.spellCards.length > 0) {
           console.log(
-            `[Combat AI Enemy] Spell list: ${enemy.spellCards.map((s) => s.name).join(', ')}`
+            `[Combat AI Enemy] 符卡列表: ${enemy.spellCards.map((s) => s.name).join('、')}`
           );
         }
 
-        // 1. Ultimate Trigger Check (HP < 40%)
+        // 1. BOSS/精英怪 终极奥义生命阈值检测 (HP < 40%)
         if (enemy.hp < enemy.maxHp * 0.4 && !enemy.hasUsedUltimate) {
           const ult = enemy.spellCards?.find((s) => s.isUltimate);
           if (ult) {
@@ -2655,7 +2643,7 @@ async function processEnemyTurn() {
           }
         }
 
-        // 2. Regular AI (60% Attack, 40% Spell)
+        // 2. 敌人常规行动分布控制 (60% 物攻, 40% 怪技)
         if (!selectedSpell) {
           if (enemy.spellCards && enemy.spellCards.length > 0 && Math.random() < 0.4) {
             const regularSpells = enemy.spellCards.filter((s) => !s.isUltimate);
@@ -2666,7 +2654,7 @@ async function processEnemyTurn() {
           }
         }
 
-        // 3. Target Selection
+        // 3. 目标锁定策略引擎 (Target Selection)
         let targets: UICombatant[] = [];
 
         if (action === 'spell' && selectedSpell) {
@@ -2682,7 +2670,7 @@ async function processEnemyTurn() {
             }
           }
         } else {
-          // Attack
+          // 物理平砍攻击分支
           if (opponents.length > 0) {
             const randomOpponent = opponents[Math.floor(Math.random() * opponents.length)];
             if (randomOpponent) targets = [randomOpponent];
@@ -2691,7 +2679,7 @@ async function processEnemyTurn() {
 
         if (targets.length === 0) continue;
 
-        // 4. Execution
+        // 4. 正式逻辑下发与执行 (Execution)
         if (action === 'spell' && selectedSpell) {
           addLog(`${enemy.name} 发动了符卡：${selectedSpell.name}！`);
 
@@ -2704,16 +2692,16 @@ async function processEnemyTurn() {
 
           if (isUltimateTrigger) audioManager.playSpellCast();
 
-          // Visuals
+          // 渲染敌人侧视效分层 (Visuals)
           const isSupport = ['heal', 'buff', 'shield'].includes(selectedSpell.type || '');
           const rect = document.body.getBoundingClientRect();
 
           if (isUltimateTrigger) {
             if (isSupport) {
-              // Center on self/enemies (Right side)
+              // 作用在敌方自己半场 (右侧)
               triggerEffect('spell', rect.width * 0.75, rect.height * 0.5);
             } else {
-              // Center on player/allies (Left side)
+              // 作用在玩家正义半场 (左侧)
               triggerEffect('spell', rect.width * 0.25, rect.height * 0.5);
             }
           }
@@ -2724,19 +2712,19 @@ async function processEnemyTurn() {
             audioManager.playHeavyHit();
           }
 
-          // Execute for all targets
+          // 针对判定的所有受影响目标进行数值摊派执行
           for (const target of targets) {
             await executeAction(enemy, target, selectedSpell.name, selectedSpell);
           }
         } else {
-          // Regular Attack
+          // 普通物理撕咬/打击分支 (Regular Attack)
           const target = targets[0];
           if (!target) continue;
 
           audioManager.playSlash();
           const rect = document.body.getBoundingClientRect();
 
-          // Visual on target side
+          // 特效在受击者所在的方位进行渲染定位
           const isTargetPlayer = target.isPlayer || target.team === 'player';
           const tx = isTargetPlayer ? rect.width * 0.25 : rect.width * 0.75;
           const ty = isTargetPlayer ? rect.height * 0.6 : rect.height * 0.7;
@@ -2775,7 +2763,7 @@ function checkWinLoss() {
     isGameOver.value = true;
     gameResult.value = 'win';
 
-    // Trigger onCombatWin lifecycle hook
+    // 触发生命周期钩子：onCombatWin (结算战后天赋、词条奖励等)
     if (player.value) {
       applyLifecycleHook('onCombatWin', player.value, {
         attacker: player.value,
@@ -2795,12 +2783,12 @@ function closeCombat() {
 
   audioManager.stopBgm();
 
-  // Sync Player
+  // 1. 玩家侧数值写回与成长核算 (Sync Player)
   if (player.value) {
     let expGain = 0;
     let logMsg = '';
 
-    // 1. Spell Card EXP
+    // 计算并下发参战符卡的熟练度经验 (Spell Card EXP)
     if (gameResult.value === 'win' && player.value.spellCards) {
       let levelUpMsg = '';
       player.value.spellCards.forEach((spell) => {
@@ -2816,12 +2804,12 @@ function closeCombat() {
       }
     }
 
-    // 2. Combat Proficiency EXP (Talent Points are awarded inside GameStore.applyAction)
+    // 2. 战斗熟练度与天赋点核算 (Talent Points 实际触发逻辑封装在 GameStore.applyAction 内部)
     if (gameResult.value === 'win') {
-      // Win: 200-800 exp
+      // 胜利报酬阶梯：200 ~ 800 点 EXP
       expGain = Math.floor(Math.random() * 601) + 200;
     } else {
-      // Loss/Flee: 50-100 exp
+      // 惜败/撤退报酬阶梯：50 ~ 100 点 EXP
       expGain = Math.floor(Math.random() * 51) + 50;
     }
 
@@ -2846,7 +2834,7 @@ function closeCombat() {
     });
   }
 
-  // Sync Enemies
+  // 2. 敌方单位状态持久化同步 (Sync Enemies)
   for (const enemy of enemies.value) {
     if (enemy.id && gameStore.state.npcs[enemy.id]) {
       gameStore.applyAction({
@@ -2859,7 +2847,7 @@ function closeCombat() {
     }
   }
 
-  // Generate Summary
+  // 3. 生成战斗回顾简报，为后续流程提供上下文参考 (Generate Summary)
   const logsText =
     combatState.value?.logs.map((l) => `[第${l.turn}回合] ${l.description}`).join('\n') ||
     '（无战斗记录）';
@@ -2883,7 +2871,7 @@ function closeCombat() {
 </script>
 
 <style scoped>
-/* Copied styles from CombatSandbox */
+/* 沿用自 CombatSandbox 的核心战斗 CSS 动画/切图方案库 */
 .radial-speed-lines {
   background: repeating-conic-gradient(
     from 0deg,
@@ -2909,7 +2897,7 @@ function closeCombat() {
   clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
 }
 .clip-wedge {
-  /* Changed to square as requested */
+  /* 根据需求，此处修正为正方形切口 (Square) */
   clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%);
 }
 
@@ -2945,7 +2933,7 @@ function closeCombat() {
   clip-path: polygon(15% 0, 100% 0, 100% 100%, 0 100%);
 }
 
-/* Intro Split Screen */
+/* 战斗开场 VS 分屏动画专有样式 */
 .clip-split-left {
   clip-path: polygon(0 0, 70% 0, 30% 100%, 0 100%);
 }
@@ -3114,7 +3102,7 @@ function closeCombat() {
   }
 }
 
-/* Combat Flow Animations */
+/* 战斗心流 (Combat Flow) 状态机专用视觉动画集 */
 @keyframes glitch-slam {
   0% {
     transform: scale(2) skew(20deg);
@@ -3216,7 +3204,7 @@ function closeCombat() {
   mix-blend-mode: hard-light;
 }
 
-/* New Spell Effect Animations */
+/* 新增：符卡特技通用动效库 (Spell Effect Animations) */
 .clip-triangle {
   clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
 }
@@ -3399,7 +3387,7 @@ function closeCombat() {
     opacity: 0.5;
   } /* Slight fade back for transition? No, better 0 */
 }
-/* Override flashOut for clean fade */
+/* 覆盖 flashOut 以实现更平滑的淡出过渡 */
 @keyframes flashOut {
   0% {
     opacity: 1;
@@ -3414,15 +3402,15 @@ function closeCombat() {
     opacity: 1;
   } /* Wait, this is overlay on top? */
 }
-/* Correction: The flash overlay starts white (opacity 1) then fades to 0 immediately? 
-   No, we want a flash at start? Or flash at end?
-   Usually: 
-   1. Intro starts -> Screen White -> Fades to VS scene.
-   2. VS Scene plays.
-   3. Transition to Combat -> Screen White -> Fades to Combat.
+/* 
+   逻辑修正：Flash 遮罩层应当以全白（不透明度 1）起始，随后立即向透明过渡。
+   通常流程：
+   1. 序章开启 -> 屏幕全白 -> 逐渐显现 VS 战场画面。
+   2. VS 画面动画播放中。
+   3. 战斗正式切入 -> 屏幕全白 -> 逐渐显现 3D/2D 战斗环境。
    
-   Let's keep it simple: 
-   Flash Out (Start): White -> Transparent
+   简易方案：
+   Flash Out (起始点): 白色 -> 透明
 */
 @keyframes flashOut {
   0% {
@@ -3456,7 +3444,7 @@ function closeCombat() {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-/* Custom Scrollbar for HUD logs if needed */
+/* 为 HUD 作战日志自定义滚动条样式 (如果容器溢出) */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
@@ -3468,7 +3456,7 @@ function closeCombat() {
   border-radius: 3px;
 }
 
-/* Log Transitions */
+/* 战斗日志条目进场/退场过渡 (Log Transitions) */
 .log-fade-enter-active,
 .log-fade-leave-active {
   transition: all 0.5s ease;
@@ -3518,9 +3506,9 @@ function closeCombat() {
   }
 }
 
-/* --- New Combat Effects --- */
+/* --- 战斗视觉动效实体层 (New Combat Effects) --- */
 
-/* 1. Slash Combo - P5 Style */
+/* 1. 物理斩击连段 - P5 (Persona 5) 风格实现 */
 .clip-starburst {
   clip-path: polygon(
     50% 0%,
@@ -3595,7 +3583,7 @@ function closeCombat() {
   }
 }
 
-/* 2. Talk / Zuidun */
+/* 2. 嘴遁 (Talk/Zuidun) 专属弹幕动效 */
 .animate-word-projectile {
   animation: wordProjectile 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -3623,7 +3611,7 @@ function closeCombat() {
   }
 }
 
-/* 3. Ultimate Impact */
+/* 3. 终极冲击 (Ultimate Impact) 环境震荡波 */
 .animate-beam-expand {
   animation: beamExpand 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
@@ -3674,7 +3662,7 @@ function closeCombat() {
   }
 }
 
-/* 4. Hit Spark */
+/* 4. 受击火花 (Hit Spark) 原子动效 */
 .animate-hit-spark {
   animation: hitSpark 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -3693,7 +3681,7 @@ function closeCombat() {
   }
 }
 
-/* List Transitions for Ally Stack */
+/* 队友堆叠列表项的移动与布局过渡 (List Transitions) */
 .list-complete-move,
 .list-complete-enter-active,
 .list-complete-leave-active {

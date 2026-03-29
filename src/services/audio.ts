@@ -1,33 +1,33 @@
-// Audio Manager using Web Audio API
-// Generates procedural sounds to avoid external dependencies
+// 基于 Web Audio API 的音频管理器 (Audio Hub)
+// 通过程序化合成音效，避免外部重型音频资源依赖 (Zero-dependency SFX)
 
 class AudioManager {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
-  private sfxGain: GainNode | null = null; // New SFX Bus
+  private sfxGain: GainNode | null = null; // 新增：音效独立混音通道 (SFX Bus)
   private isMuted: boolean = false;
   private volume: number = 0.25;
-  private bgmVolume: number = 1.0; // Relative to Master
-  private sfxVolume: number = 1.0; // Relative to Master
+  private bgmVolume: number = 1.0; // 相对于主音量的分量权重
+  private sfxVolume: number = 1.0; // 相对于主音量的分量权重
 
-  // Writing sound state
+  // 书写中动态音效状态 (Dynamic Writing SFX)
   private writingSource: AudioBufferSourceNode | null = null;
   private writingGain: GainNode | null = null;
   private writingFilter: BiquadFilterNode | null = null;
   private writingTimer: any = null;
 
-  // BGM State
+  // 背景音乐 (BGM) 播放状态
   private currentBgm: HTMLAudioElement | null = null;
   private bgmUrl: string | null = null;
 
   constructor() {
-    // AudioContext must be initialized after user interaction usually
-    // We'll initialize it lazily
+    // 音频上下文 (AudioContext) 处于安全审计考虑，通常需在用户交互手势后才能激活
+    // 此处采用懒加载 (Lazy Init) 策略
   }
 
   /**
-   * Unlocks audio context on user interaction
-   * Browsers block audio until a user gesture occurs
+   * 在用户交互后解锁音频上下文 (Audio Interaction Guard)
+   * 现代浏览器在监听到明确的用户手势前会强制静音网页音频节点。
    */
   public async resume() {
     this.init();
@@ -35,7 +35,7 @@ class AudioManager {
       await this.ctx.resume();
     }
 
-    // If BGM was supposed to be playing but was blocked, try again
+    // 容错处理：若 BGM 之前由于交互限制被策略拦截，此处尝试重新拉起播放链路 (Auto-Resume)
     if (this.currentBgm && this.currentBgm.paused && this.bgmUrl) {
       try {
         await this.currentBgm.play();
@@ -50,11 +50,11 @@ class AudioManager {
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
       this.ctx = new AudioContext();
 
-      // Master Gain
+      // 主音量总线增益节点 (Master Output Gain)
       this.masterGain = this.ctx!.createGain();
       this.masterGain.connect(this.ctx!.destination);
 
-      // SFX Gain (Connects to Master)
+      // 音效专用总线 (SFX Bus, 串联至主音量总线出口)
       this.sfxGain = this.ctx!.createGain();
       this.sfxGain.connect(this.masterGain);
 
@@ -88,8 +88,8 @@ class AudioManager {
 
   private updateBgmVolume() {
     if (this.currentBgm) {
-      // BGM volume is Master * BGM Sub-volume
-      // Note: HTMLAudioElement volume is 0-1.
+      // 最终 BGM 物理音量 = 主音量 * BGM 分量音量系数
+      // 注意：HTMLAudioElement.volume 接口仅接受 [0, 1] 区间的规范化浮点数。
       this.currentBgm.volume = this.isMuted ? 0 : this.volume * this.bgmVolume;
     }
   }
@@ -115,10 +115,10 @@ class AudioManager {
     return this.isMuted;
   }
 
-  // --- BGM Management ---
+  // --- 背景音乐 (BGM) 调度管理逻辑 (Playlist Orchestration) ---
   public playBgm(url: string) {
     if (this.bgmUrl === url && this.currentBgm && !this.currentBgm.paused) {
-      return; // Already playing this track
+      return; // 目标音轨正在活跃播放中，跳过冗余请求 (Duplicate Guard)
     }
 
     this.stopBgm();
@@ -126,11 +126,11 @@ class AudioManager {
     this.bgmUrl = url;
     this.currentBgm = new Audio(url);
     this.currentBgm.loop = true;
-    this.updateBgmVolume(); // Set initial volume
-    this.currentBgm.muted = false; // Mute handled by volume=0 in updateBgmVolume
+    this.updateBgmVolume(); // 执行初始分量音量配置
+    this.currentBgm.muted = false; // 静音逻辑在上层 updateBgmVolume 中通过 0 增益处理，无需触发 DOM 级 Mute 标记
 
     this.currentBgm.play().catch((e) => {
-      console.warn('BGM play failed (user interaction needed?):', e);
+      console.warn('BGM 播放拦截告警（可能因缺乏必要的用户交互手势）：', e);
     });
   }
 
@@ -143,7 +143,7 @@ class AudioManager {
     this.bgmUrl = null;
   }
 
-  // Sound: Short crisp click for UI interaction
+  // 音效算法：短促清脆的 UI 点击音（Procedural Woodblock）
   public playClick() {
     this.init();
     if (!this.ctx || !this.sfxGain) return;
@@ -154,7 +154,7 @@ class AudioManager {
     osc.connect(gain);
     gain.connect(this.sfxGain);
 
-    // Wood block style click
+    // 模拟木鱼/敲击木板的中频物理特性 (Wood-block Tonal Quality)
     osc.type = 'sine';
     osc.frequency.setValueAtTime(800, this.ctx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(400, this.ctx.currentTime + 0.1);
@@ -166,7 +166,7 @@ class AudioManager {
     osc.stop(this.ctx.currentTime + 0.1);
   }
 
-  // Sound: Subtle hover sound
+  // 音效算法：轻柔细腻的交互悬浮音 (Subtle UI Hover Feel)
   public playHover() {
     this.init();
     if (!this.ctx || !this.sfxGain) return;
@@ -177,67 +177,67 @@ class AudioManager {
     osc.connect(gain);
     gain.connect(this.sfxGain);
 
-    // High, soft ping
+    // 采用亮色调的高频正弦波点缀 (High-pitched Tonal Ping)
     osc.type = 'sine';
     osc.frequency.setValueAtTime(1200, this.ctx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(1000, this.ctx.currentTime + 0.05);
 
-    gain.gain.setValueAtTime(0.05, this.ctx.currentTime); // Very quiet
+    gain.gain.setValueAtTime(0.05, this.ctx.currentTime); // 极小增益，防听觉疲劳 (Anti-fatigue)
     gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.05);
 
     osc.start();
     osc.stop(this.ctx.currentTime + 0.05);
   }
 
-  // Sound: Continuous writing sound (Sustained scratch)
+  // 音效算法：模拟真实书写的持续摩擦音 (Dynamically Sustained Texture)
   public playWritingSound() {
     this.init();
     if (!this.ctx || !this.sfxGain) return;
 
     const now = this.ctx.currentTime;
 
-    // If already playing, sustain and modulate it
+    // 物理引擎：若对应音色源已激活，则执行包络维持与随机压力调制 (Dynamic Modulation)
     if (this.writingSource && this.writingGain && this.writingFilter) {
       if (this.writingTimer) {
         clearTimeout(this.writingTimer);
         this.writingTimer = null;
       }
 
-      // Modulate amplitude (pressure)
+      // 振幅调制：模拟真实书写时的压力动态不确定性 (Pressure Fluctuations)
       this.writingGain.gain.cancelScheduledValues(now);
       this.writingGain.gain.linearRampToValueAtTime(0.06 + Math.random() * 0.04, now + 0.05);
 
-      // Modulate frequency (texture/speed)
+      // 频率调制：模拟纸张纤维导致的微观材质感 (Texture Granularity)
       this.writingFilter.frequency.cancelScheduledValues(now);
       this.writingFilter.frequency.linearRampToValueAtTime(3000 + Math.random() * 2000, now + 0.05);
 
-      // Schedule stop
+      // 物理释放回收逻辑 (Source Reclamation)
       this.writingTimer = setTimeout(() => {
         this.stopWritingSound();
-      }, 150); // Stop after 150ms of silence
+      }, 150); // 若超过 150ms 无写入指令流，则平滑回收物理节点以节省 CPU 消耗
 
       return;
     }
 
-    // Start new sound loop
-    const bufferSize = this.ctx.sampleRate * 2.0; // 2s loop
+    // 初始化物理噪声循环缓存 (Start New Noise Loop)
+    const bufferSize = this.ctx.sampleRate * 2.0; // 构建 2 秒长度的样本滚动循环 (Rolling Buffer)
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const data = buffer.getChannelData(0);
 
-    // Pinkish noise approximation
+    // 采用粉红噪声算法 (Pinkish Noise) 模拟具备低音质感的真实摩擦感 (Acoustic Approximation)
     let lastOut = 0;
     for (let i = 0; i < bufferSize; i++) {
       const white = Math.random() * 2 - 1;
       const val = (lastOut + 0.02 * white) / 1.02;
       lastOut = val;
-      data[i] = val * 3.5; // Compensate for gain loss
+      data[i] = val * 3.5; // 静态补偿：对滤波导致的幅度损失执行物理增益补偿 (Static Gain Compensation)
     }
 
     this.writingSource = this.ctx.createBufferSource();
     this.writingSource.buffer = buffer;
     this.writingSource.loop = true;
 
-    // Filter chain: Highpass -> Bandpass
+    // 合并滤波链路：[高通滤波: 削弱浑浊低频] -> [带通滤波: 提取书写核心特征频段] (Filter Matrix)
     const highpass = this.ctx.createBiquadFilter();
     highpass.type = 'highpass';
     highpass.frequency.value = 500;
@@ -257,10 +257,10 @@ class AudioManager {
 
     this.writingSource.start();
 
-    // Fade in
+    // 渐入 (Fade in)
     this.writingGain.gain.linearRampToValueAtTime(0.06, now + 0.05);
 
-    // Schedule stop
+    // 预定停止任务 (Schedule stop)
     this.writingTimer = setTimeout(() => {
       this.stopWritingSound();
     }, 150);
@@ -270,7 +270,7 @@ class AudioManager {
     if (this.writingGain && this.ctx) {
       const now = this.ctx.currentTime;
       this.writingGain.gain.cancelScheduledValues(now);
-      this.writingGain.gain.setTargetAtTime(0, now, 0.05); // Smooth fade out
+      this.writingGain.gain.setTargetAtTime(0, now, 0.05); // 极平滑衰减，防音轨切断爆鸣 (Smooth Fade-out / Anti-pop)
 
       const source = this.writingSource;
       setTimeout(() => {
@@ -287,7 +287,7 @@ class AudioManager {
     this.writingTimer = null;
   }
 
-  // Sound: Cute pop for alerts/confirmations
+  // 音效算法：活泼、富有弹性的气泡弹窗音 (Cute Bubble UI Pop)
   public playPopupSound() {
     this.init();
     if (!this.ctx || !this.sfxGain) return;
@@ -299,7 +299,7 @@ class AudioManager {
     gain.connect(this.sfxGain);
 
     osc.type = 'sine';
-    // Cute upward slide (Bubble sound)
+    // 指数级扫频模拟气泡上浮破裂的视觉共感 (Psychological Synesthesia)
     osc.frequency.setValueAtTime(440, this.ctx.currentTime);
     osc.frequency.linearRampToValueAtTime(880, this.ctx.currentTime + 0.15);
 
@@ -311,7 +311,7 @@ class AudioManager {
     osc.stop(this.ctx.currentTime + 0.25);
   }
 
-  // Sound: Page flip / Paper rustle (for opening menus/cards)
+  // 音效算法：模拟物理纸张翻动/摩擦的白噪声纹理 (Physical Page Flip / Paper Rustle)
   public playPageFlip() {
     this.init();
     if (!this.ctx || !this.sfxGain) return;
@@ -337,7 +337,7 @@ class AudioManager {
     filter.connect(gain);
     gain.connect(this.sfxGain);
 
-    const now = this.ctx.currentTime;
+    const now = this.ctx.currentTime; // 获取当前音轨时间点
     gain.gain.setValueAtTime(0, now);
     gain.gain.linearRampToValueAtTime(0.15, now + 0.05);
     gain.gain.linearRampToValueAtTime(0, now + duration);
@@ -353,12 +353,12 @@ class AudioManager {
     this.playSoftClick();
   }
 
-  // Sound: Notification chime
+  // 音效算法：标准的系统消息通知铃声 (System Notification Chime)
   public playNotification() {
     this.playChime();
   }
 
-  // Sound: Success fanfare (simple chime sequence)
+  // 音效算法：具有前进感的成功三连音 (UI Success Fanfare Expansion)
   public playSuccess() {
     this.init();
     if (!this.ctx || !this.sfxGain) return;
@@ -379,7 +379,7 @@ class AudioManager {
     });
   }
 
-  // Sound: Soft click for minor interactions
+  // 音效算法：极轻的软性按钮触发反馈 (Soft Interaction Tick)
   public playSoftClick() {
     this.init();
     if (!this.ctx || !this.sfxGain) return;
@@ -400,7 +400,7 @@ class AudioManager {
     osc.stop(this.ctx.currentTime + 0.05);
   }
 
-  // Sound: Bell chime for notifications/turns
+  // 音效算法：亮丽的水晶提示铃声 (Crystalline Chime for Notifications)
   public playChime() {
     this.init();
     if (!this.ctx || !this.sfxGain) return;
@@ -412,7 +412,7 @@ class AudioManager {
     gain.connect(this.sfxGain);
 
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(1200, this.ctx.currentTime); // High pitch
+    osc.frequency.setValueAtTime(1200, this.ctx.currentTime); // 配置指向性的亮色调高频频率 (Focused High-pitch)
 
     gain.gain.setValueAtTime(0, this.ctx.currentTime);
     gain.gain.linearRampToValueAtTime(0.2, this.ctx.currentTime + 0.05);
@@ -422,7 +422,7 @@ class AudioManager {
     osc.stop(this.ctx.currentTime + 1.5);
   }
 
-  // Sound: Hover effect (very subtle wind/breath)
+  // 音效算法：极轻的掠过气流声（风铃草语境交互）(Subtle Air/Wind Swish)
   public playHoverWind() {
     this.init();
     if (!this.ctx || !this.sfxGain) return;
@@ -443,14 +443,14 @@ class AudioManager {
     osc.stop(this.ctx.currentTime + 0.1);
   }
 
-  // Sound: Heavy Hit (Combat)
+  // 音效算法：重型战斗打击音效 (Combat Heavy Blunt Impact)
   public playHeavyHit() {
     this.init();
     if (!this.ctx || !this.sfxGain) return;
 
     const t = this.ctx.currentTime;
 
-    // Low boom (Kick-like)
+    // 频率坠落层：模拟具备足量厚度感的物理撞击核心 (Sub-bass Physical Core / Kick-like)
     const osc = this.ctx.createOscillator();
     const oscGain = this.ctx.createGain();
 
@@ -466,7 +466,7 @@ class AudioManager {
     osc.start(t);
     osc.stop(t + 0.5);
 
-    // Impact noise
+    // 冲击噪声层：叠加宽频白噪声以模拟碰撞瞬间的空气物理震荡 (Impact Shockwave Tail)
     const bufferSize = this.ctx.sampleRate * 0.3;
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -490,14 +490,14 @@ class AudioManager {
     noise.start(t);
   }
 
-  // Sound: Slash (Combat)
+  // 音效算法：锋利的战斗斩击反馈 (Combat Blade Slash / Swoosh)
   public playSlash() {
     this.init();
     if (!this.ctx || !this.sfxGain) return;
 
     const t = this.ctx.currentTime;
 
-    // White noise swoosh
+    // 噪声扫频：模拟冷兵器切断空气生成的物理湍流感 (White-noise Swoosh)
     const bufferSize = this.ctx.sampleRate * 0.3;
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -510,7 +510,7 @@ class AudioManager {
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'bandpass';
     filter.frequency.setValueAtTime(800, t);
-    filter.frequency.linearRampToValueAtTime(3000, t + 0.2); // Upward sweep
+    filter.frequency.linearRampToValueAtTime(3000, t + 0.2); // 采用快速上行扫频以提升动作的敏捷感 (Upward Pitch Sweep)
     filter.Q.value = 1;
 
     const gain = this.ctx.createGain();
@@ -524,29 +524,29 @@ class AudioManager {
     noise.start(t);
   }
 
-  // Sound: Spell Cast (Combat)
+  // 音效算法：标准咒法释放提示音 (Generic Magic Casting)
   public playSpellCast() {
-    this.playSpellCastSingle(); // Default fallback
+    this.playSpellCastSingle(); // 默认回退逻辑
   }
 
-  // Sound: Single Target Spell Cast (Fast, Sharp)
+  // 音效算法：单体及瞬发型轻快咒法音 (Sharp Single-Target Spell)
   public playSpellCastSingle() {
     this.init();
     if (!this.ctx || !this.sfxGain) return;
 
     const t = this.ctx.currentTime;
 
-    // Fast, high-pitched shimmer
+    // 合成逻辑：配置双路高频闪烁振荡器 (Two-tone Shimmer Matrix)
     [660, 880].forEach((freq) => {
       const osc = this.ctx!.createOscillator();
       const gain = this.ctx!.createGain();
 
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, t);
-      osc.frequency.linearRampToValueAtTime(freq * 1.5, t + 0.3); // Quick pitch up
+      osc.frequency.linearRampToValueAtTime(freq * 1.5, t + 0.3); // 极速音阶攀升，模拟法力流的极速坍缩感 (Quick Ascension)
 
       const lfo = this.ctx!.createOscillator();
-      lfo.frequency.value = 20; // Fast vibrato
+      lfo.frequency.value = 20; // 高频颤音 (Fast Mystical Vibrato)
       const lfoGain = this.ctx!.createGain();
       lfoGain.gain.value = 30;
       lfo.connect(lfoGain);
@@ -564,21 +564,21 @@ class AudioManager {
     });
   }
 
-  // Sound: AOE Spell Cast (Deep, Resonant, Charging)
+  // 音效算法：广域/群体咒法蓄力与释放音 (Ethereal AoE Charging & Manifestation)
   public playSpellCastAoE() {
     this.init();
     if (!this.ctx || !this.sfxGain) return;
 
     const t = this.ctx.currentTime;
 
-    // 1. Deep Drone (Power gathering)
+    // 1. 底层沉浸音 (Deep Drone): 模拟周围大气环境开始法力汇聚时的共鸣律动 (Atmospheric Power Gathering)
     const drone = this.ctx.createOscillator();
     const droneGain = this.ctx.createGain();
     drone.type = 'sawtooth';
-    drone.frequency.setValueAtTime(110, t); // Low A
-    drone.frequency.linearRampToValueAtTime(220, t + 1.5); // Slow rise
+    drone.frequency.setValueAtTime(110, t); // 核心基准 A 调 (Low A)
+    drone.frequency.linearRampToValueAtTime(220, t + 1.5); // 包络缓慢上升，营造大招将至的压迫感 (Tension Build-up)
 
-    // Lowpass filter opening up
+    // 滤波器包络开启 (Low-pass Filter Manifestation)
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'lowpass';
     filter.frequency.setValueAtTime(200, t);
@@ -594,15 +594,15 @@ class AudioManager {
     drone.start(t);
     drone.stop(t + 1.5);
 
-    // 2. Swirling Highs
+    // 2. 高频轨道环绕 (Phase Swirling Highs)
     [440, 554, 659, 880].forEach((freq, i) => {
       const osc = this.ctx!.createOscillator();
-      const gain = this.ctx!.createGain();
+      const gain = this.ctx!.createGain(); // 配置分量增益节点
 
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, t);
 
-      // Slow LFO for "swirl"
+      // 低频 LFO 逻辑：模拟法力球在施法者周身盘旋的相位旋转感 (Swirl Effect)
       const lfo = this.ctx!.createOscillator();
       lfo.frequency.value = 4 + i;
       const lfoGain = this.ctx!.createGain();
@@ -622,18 +622,18 @@ class AudioManager {
     });
   }
 
-  // Sound: AOE Explosion (Massive Boom)
+  // 音效算法：超大规模法术爆破/炸裂音 (Massive AoE Explosion / Detonation)
   public playAoEExplosion() {
     this.init();
     if (!this.ctx || !this.sfxGain) return;
     const t = this.ctx.currentTime;
 
-    // 1. Sub-bass Boom
+    // 1. 物理极低频下潜音 (Sub-bass Physical Manifestation): 直接触发显示设备共振感的巨象冲击层 (Massive Thump)
     const osc = this.ctx.createOscillator();
     const oscGain = this.ctx.createGain();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(80, t);
-    osc.frequency.exponentialRampToValueAtTime(10, t + 1.0); // Deep drop
+    osc.frequency.exponentialRampToValueAtTime(10, t + 1.0); // 采用指数级锐减，复写“大爆炸后瞬间失聪”的沉寂感 (Vacuum Collapse Effect)
 
     oscGain.gain.setValueAtTime(1.0, t);
     oscGain.gain.exponentialRampToValueAtTime(0.01, t + 1.0);
@@ -643,7 +643,7 @@ class AudioManager {
     osc.start(t);
     osc.stop(t + 1.0);
 
-    // 2. Wide Noise Wash
+    // 2. 宽频谱噪声余波 (Wide Noise Shockwave): 模拟尘土扬起与屏障碎裂后的物理余热 (Post-impact Wash)
     const bufferSize = this.ctx.sampleRate * 1.5;
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -655,7 +655,7 @@ class AudioManager {
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'lowpass';
     filter.frequency.setValueAtTime(800, t);
-    filter.frequency.linearRampToValueAtTime(100, t + 1.5); // Muffle down
+    filter.frequency.linearRampToValueAtTime(100, t + 1.5); // 尾随频率下行，模拟爆炸后的闷声消散过程 (Muffle Decay)
 
     const noiseGain = this.ctx.createGain();
     noiseGain.gain.setValueAtTime(0.8, t);
@@ -667,15 +667,15 @@ class AudioManager {
     noise.start(t);
   }
 
-  // Sound: Skill Cut-in (Moonlight/Ethereal theme)
+  // 音效算法：必杀技/立绘切入插画音 (Thematic Skill Cut-in / Ethereal Arc)
   public playSkillCutin() {
     this.init();
     if (!this.ctx || !this.sfxGain) return;
 
     const t = this.ctx.currentTime;
 
-    // 1. "Moonlight" Chimes (Crystal/Glassy)
-    // A Major 7 chord: A (880), E (1318), G# (1661), C# (2217)
+    // 1. “月光”水晶编钟韵律 (Glassy/Crystalline Moonlight Chimes)
+    // 核心谐和和弦：A Major 7 (基于 A 大调构建具备神圣感与优雅度的视觉背景感)
     const freqs = [880, 1318.5, 1661.2, 2217.5];
 
     freqs.forEach((f, i) => {
@@ -685,41 +685,41 @@ class AudioManager {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(f, t);
 
-      // Subtle downward drift (Falling feel)
+      // 微弱的频率下行漂移，模拟月华伴随立绘屏风缓缓落下的动态错觉 (Ethereal Falling Feel)
       osc.frequency.exponentialRampToValueAtTime(f * 0.98, t + 0.6);
 
       osc.connect(gain);
       gain.connect(this.sfxGain!);
 
-      // Staggered entry (arpeggio effect) - very fast descending feel?
-      // Actually slightly staggered start creates a "shimmer"
+      // 采用极速琶音序列 (Staggered Arpeggio) 构建华丽的瞬态响应感
+      // 构建极微小的物理相位偏差，营造一种带有“闪烁感”的多维听觉纹理 (Shimmering Phase Jitter)
       const start = t + i * 0.04;
       const duration = 0.6 - i * 0.05;
 
       gain.gain.setValueAtTime(0, start);
-      gain.gain.linearRampToValueAtTime(0.08, start + 0.05); // Soft attack
+      gain.gain.linearRampToValueAtTime(0.08, start + 0.05); // 极软的包络攻击感，防止生硬触发毁掉氛围 (Soft Attack Envelope)
       gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
 
       osc.start(start);
       osc.stop(start + duration);
     });
 
-    // 2. "Shimmer" (High frequency sparkle)
+    // 2. 高频颗粒感闪烁组件 (Ethereal Sparkle Details)
     const lfo = this.ctx.createOscillator();
     lfo.type = 'sine';
-    lfo.frequency.value = 15; // Fast shimmer
+    lfo.frequency.value = 15; // 高频随机闪烁 LFO 震荡 (Fast Particle Shimmering)
 
     const lfoGain = this.ctx.createGain();
     lfoGain.gain.value = 500;
 
     const carrier = this.ctx.createOscillator();
     carrier.type = 'triangle';
-    carrier.frequency.setValueAtTime(3000, t); // High pitch
+    carrier.frequency.setValueAtTime(3000, t); // 配置超高频点缀频率，提升视觉聚焦力 (Focus High-pitch)
 
     const carrierGain = this.ctx.createGain();
 
     lfo.connect(lfoGain);
-    lfoGain.connect(carrier.frequency); // FM Synthesis for sparkle
+    lfoGain.connect(carrier.frequency); // 物理算法：基于频率调制 (FM Synthesis) 合成出带有波光粼粼感的音频质地 (Twinkling Sound Design)
 
     carrier.connect(carrierGain);
     carrierGain.connect(this.sfxGain);
@@ -733,7 +733,7 @@ class AudioManager {
     lfo.stop(t + 0.5);
     carrier.stop(t + 0.5);
 
-    // 3. "Falling" Wash (Filtered Noise)
+    // 3. 全局沉降式环境 Wash (Narrative Falling Wash)
     const bufferSize = this.ctx.sampleRate * 0.8;
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -746,8 +746,8 @@ class AudioManager {
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'bandpass';
     filter.Q.value = 1;
-    filter.frequency.setValueAtTime(3000, t); // Start high
-    filter.frequency.exponentialRampToValueAtTime(500, t + 0.6); // Sweep down (Falling)
+    filter.frequency.setValueAtTime(3000, t); // 起点定位于高频空域，模拟光芒初现之势 (High Altitude Start)
+    filter.frequency.exponentialRampToValueAtTime(500, t + 0.6); // 采用下行指数扫频，模拟立绘完全展开后的沉降稳固感 (Acoustic Falling Motion)
 
     const noiseGain = this.ctx.createGain();
     noiseGain.gain.setValueAtTime(0, t);
@@ -760,14 +760,14 @@ class AudioManager {
     noise.start(t);
   }
 
-  // Sound: Screen Break (Revised: Balanced Impact + Crunch)
+  // 音效算法：视觉破碎/屏幕轰塌反馈 (Revised: Balanced Impact & Glass Shatter Crunch)
   public playShatter() {
     this.init();
     if (!this.ctx || !this.sfxGain) return;
 
     const t = this.ctx.currentTime;
 
-    // 1. The "Thump" (Sub-bass Impact)
+    // 1. 基底重击层 (The "Thump"): 提供具备足量物理存在感的极低频重击底蕴 (Sub-bass Physical Momentum)
     const osc = this.ctx.createOscillator();
     const oscGain = this.ctx.createGain();
 
@@ -775,7 +775,7 @@ class AudioManager {
     osc.frequency.setValueAtTime(100, t);
     osc.frequency.exponentialRampToValueAtTime(30, t + 0.25);
 
-    oscGain.gain.setValueAtTime(0.5, t); // Good base weight
+    oscGain.gain.setValueAtTime(0.5, t); // 权重补偿：提供扎实的撞击感基石 (Solid Impact Foundation)
     oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
 
     osc.connect(oscGain);
@@ -783,7 +783,7 @@ class AudioManager {
     osc.start(t);
     osc.stop(t + 0.3);
 
-    // Prepare Noise Buffer
+    // 预置噪声缓存 (Noise Buffer Initialization)
     const bufferSize = this.ctx.sampleRate * 0.8;
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -791,35 +791,35 @@ class AudioManager {
       data[i] = Math.random() * 2 - 1;
     }
 
-    // 2. The "Crack" (The sharp breaking sound)
-    // We use a Bandpass filter centered in the "presence" range (1.5kHz - 2.5kHz)
-    // This gives the crisp "snap" without the >5kHz harshness
+    // 2. 锐利崩裂层 (The "Crack"): 模拟脆性材质被彻底撕裂瞬间的极速脉冲 (High-frequency Tonal Snap)
+    // 设计逻辑：采用带通滤波锁定 1.5kHz - 2.5kHz 核心频段，旨在提供极致清脆度的同时，
+    // 也能成功避开 5kHz 以上导致听觉迅速疲劳的尖锐噪声污染域。 (Optimized Presence Filter)
     const crackSrc = this.ctx.createBufferSource();
     crackSrc.buffer = buffer;
 
     const crackFilter = this.ctx.createBiquadFilter();
     crackFilter.type = 'bandpass';
-    crackFilter.frequency.setValueAtTime(1800, t); // Sweet spot for "crunch"
+    crackFilter.frequency.setValueAtTime(1800, t); // 这里是模拟“嘎吱”碎裂感的物理频率黄金分割点
     crackFilter.Q.value = 0.8;
 
     const crackGain = this.ctx.createGain();
-    crackGain.gain.setValueAtTime(0.6, t); // Loud impact
-    crackGain.gain.exponentialRampToValueAtTime(0.01, t + 0.15); // Fast decay
+    crackGain.gain.setValueAtTime(0.6, t); // 强力撞击瞬态增益 (Peak Impact)
+    crackGain.gain.exponentialRampToValueAtTime(0.01, t + 0.15); // 极速衰减，模拟能量释放瞬间 (Fast Power Decay)
 
     crackSrc.connect(crackFilter);
     crackFilter.connect(crackGain);
     crackGain.connect(this.sfxGain);
     crackSrc.start(t);
 
-    // 3. The "Crumble" (Debris falling)
-    // A Lowpass filter sweeping down simulates pieces settling
+    // 3. 碎屑滑落/余震 (Debris Falling / Crumble)
+    // 采用低通扫频 (Low-pass Sweep Down) 模拟碎玻璃块在地面滚动并逐渐停下的物理过程。
     const crumbleSrc = this.ctx.createBufferSource();
     crumbleSrc.buffer = buffer;
 
     const crumbleFilter = this.ctx.createBiquadFilter();
     crumbleFilter.type = 'lowpass';
-    crumbleFilter.frequency.setValueAtTime(1000, t); // Start with some texture
-    crumbleFilter.frequency.linearRampToValueAtTime(200, t + 0.5); // Muffle out
+    crumbleFilter.frequency.setValueAtTime(1000, t); // 初始保留部分物理纹理质感
+    crumbleFilter.frequency.linearRampToValueAtTime(200, t + 0.5); // 随着位移结束，声音趋于闷响并消散 (Muffled Cessation)
 
     const crumbleGain = this.ctx.createGain();
     crumbleGain.gain.setValueAtTime(0.3, t);
@@ -831,14 +831,14 @@ class AudioManager {
     crumbleSrc.start(t);
   }
 
-  // Sound: Heal / Recovery
+  // 音效算法：治疗/生命值恢复 (Heal & Life Recovery)
   public playHeal() {
     this.init();
     if (!this.ctx || !this.sfxGain) return;
 
     const t = this.ctx.currentTime;
 
-    // Soft ascending sine waves (Angelic chord)
+    // 柔和的上行正弦波和弦逻辑，构建具备神圣感、天使般的治愈氛围 (Ethereal Healing Chord)
     [330, 440, 554, 659].forEach((freq, i) => {
       const osc = this.ctx!.createOscillator();
       const gain = this.ctx!.createGain();
@@ -846,7 +846,7 @@ class AudioManager {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, t);
 
-      // Gentle vibrato
+      // 注入轻微包络颤音以提升空灵感 (Gentle Vibrato)
       const lfo = this.ctx!.createOscillator();
       lfo.frequency.value = 5;
       const lfoGain = this.ctx!.createGain();
@@ -865,7 +865,7 @@ class AudioManager {
       osc.stop(t + 2.0);
     });
 
-    // Sparkle noise (High frequency bandpass)
+    // 星点噪声组件 (Sparkle Noise): 基于带通滤波模拟治愈法阵生成的闪影星星点点 (Shimmering Particles)
     const bufferSize = this.ctx.sampleRate * 1.5;
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -892,15 +892,15 @@ class AudioManager {
     noise.start(t);
   }
 
-  // Sound: Level Up (Triumphant Chime)
+  // 音效算法：等级提升/胜利凯旋铃声 (Triumphant Level Up Chime)
   public playLevelUp() {
     this.init();
     if (!this.ctx || !this.sfxGain) return;
 
     const t = this.ctx.currentTime;
 
-    // Triumphant Major Chord Arpeggio
-    // C Major: C4 (261.63), E4 (329.63), G4 (392.00), C5 (523.25)
+    // 凯旋大调琶音序列 (Triumphant Major Chord Arpeggio)
+    // 核心 C 大调结构：C4 (261.63), E4 (329.63), G4 (392.00), C5 (523.25)
     [261.63, 329.63, 392.0, 523.25].forEach((freq, i) => {
       const osc = this.ctx!.createOscillator();
       const gain = this.ctx!.createGain();
@@ -919,7 +919,7 @@ class AudioManager {
     });
   }
 
-  // Sound: Error (Dull Buzz)
+  // 音效算法：错误/操作失败提示音 (Dull Error Buzz / Reject Sound)
   public playError() {
     this.init();
     if (!this.ctx || !this.sfxGain) return;

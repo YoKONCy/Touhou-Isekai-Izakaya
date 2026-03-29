@@ -7,16 +7,16 @@ const BATCH_SIZE = 50;
 export async function checkMigrationNeeded(ignoreLocalStorage = false): Promise<boolean> {
   const migrated = localStorage.getItem('DB_MIGRATED_V1');
 
-  // Proactive check: If user has NO saves in SQLite but HAS saves in Dexie,
-  // maybe the previous migration failed or was skipped.
-  // We only do this if it's NOT already marked as migrated,
-  // OR if we are explicitly ignoring the flag.
+  // 主动检测：若 SQLite 中无存档但 Dexie 中存在存量数据，
+  // 则可能之前的迁移操作失败或被跳过了。
+  // 仅在未标记为“已迁移”时执行此检测，
+  // 或显式声明忽略本地标记位时执行。
   if (!ignoreLocalStorage && migrated === 'true') {
     return false;
   }
 
   try {
-    // Check if Dexie DB exists and has data
+    // 巡检 Dexie (旧版 IndexedDB) 数据库是否存在且包含有效载荷
     const exists = await Dexie.exists('TouhouIsekaiIzakayaDB');
     if (!exists) {
       if (!ignoreLocalStorage) {
@@ -34,14 +34,14 @@ export async function checkMigrationNeeded(ignoreLocalStorage = false): Promise<
       return false;
     }
 
-    // If we are here, Dexie HAS data.
-    // If we are in "check" mode (not manual), we should also verify if SQLite is empty.
+    // 运行至此，意味着 Dexie 中确实存在存量数据。
+    // 在“自动检测”模式下，我们还需要二次确认 SQLite 是否为空。
     if (!ignoreLocalStorage) {
       await dbService.init();
       const sqliteSaves = await dbService.exec('SELECT id FROM save_slots LIMIT 1');
       if (sqliteSaves.length > 0) {
-        // SQLite already has data, don't force auto-migration
-        // But mark as migrated so we don't keep checking
+        // SQLite 已存在业务数据，故不再强制执行自动迁移。
+        // 但需补登“已迁移”标记，防止后续重复触发检测。
         localStorage.setItem('DB_MIGRATED_V1', 'true');
         return false;
       }
@@ -49,16 +49,16 @@ export async function checkMigrationNeeded(ignoreLocalStorage = false): Promise<
 
     return true;
   } catch (e) {
-    console.warn('[Migration] Dexie DB check failed:', e);
+    console.warn('[数据库迁移] Dexie 数据库巡检失败:', e);
     return false;
   }
 }
 
 export async function migrateData(onProgress: (msg: string, progress: number) => void) {
   try {
-    console.log('[Migration] Starting migration...');
+    console.log('[数据库迁移] 正在启动迁移程序...');
     await dexieDb.open();
-    await dbService.init(); // Ensure SQLite is ready
+    await dbService.init(); // 确保 SQLite 准备就绪
 
     // 1. Settings
     onProgress('正在迁移全局设置...', 0);
@@ -76,7 +76,7 @@ export async function migrateData(onProgress: (msg: string, progress: number) =>
         raw_data: JSON.stringify(s)
       };
 
-      // Simple check if settings already exist in SQLite (e.g. from fresh init)
+      // 简单校验：确认为初次初始化（SQLite 设置表为空）。
       const existing = await dbService.exec('SELECT id FROM settings LIMIT 1');
       if (existing.length === 0) {
         await dbService.exec(
@@ -129,7 +129,7 @@ export async function migrateData(onProgress: (msg: string, progress: number) =>
     onProgress('正在迁移存档位...', 20);
     const slots = await dexieDb.saveSlots.toArray();
     if (slots.length > 0) {
-      // We must preserve IDs for save slots because chats/snapshots reference them
+      // 必须强制保留存档槽位的原始 ID，因为后续的聊天/快照记录对其存在强引用关系。
       const rows = slots.map((s) => ({
         id: s.id,
         name: s.name,
@@ -146,10 +146,9 @@ export async function migrateData(onProgress: (msg: string, progress: number) =>
     let processedChats = 0;
     let offset = 0;
 
-    // Disable FK checks temporarily? SQLite Wasm might enforce them.
-    // If we insert chats before snapshots, snapshotId FK might fail if it's not nullable?
-    // In schema: snapshotId INTEGER (nullable by default).
-    // But saveSlotId is NOT NULL and references save_slots. We inserted save_slots already.
+    // 是否需要临时禁用外键约束？SQLite Wasm 可能会强制执行校验。
+    // 若我们在快照之前插入聊天记录，且 snapshotId 字段被设为必填，则可能导致约束失败（当前 Schema 允许为空）。
+    // 但 saveSlotId 是必填项且引用了 save_slots，由于上方已优先插入 save_slots，此链路是安全的。
 
     while (true) {
       const batch = await dexieDb.chats.offset(offset).limit(BATCH_SIZE).toArray();
@@ -239,7 +238,7 @@ export async function migrateData(onProgress: (msg: string, progress: number) =>
     onProgress('迁移完成！', 100);
     localStorage.setItem('DB_MIGRATED_V1', 'true');
   } catch (err) {
-    console.error('[Migration] Failed:', err);
+    console.error('[数据库迁移] 迁移失败:', err);
     throw err;
   }
 }

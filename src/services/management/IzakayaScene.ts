@@ -354,7 +354,7 @@ export class IzakayaScene {
   }
 
   private initMap() {
-    // Initialize empty floor with walls
+    // 用包含四周墙壁的空心地板开底设局
     const map: TileType[][] = [];
     const chairs: Position[] = [];
     const exits: Position[] = [];
@@ -363,7 +363,7 @@ export class IzakayaScene {
     for (let y = 0; y < this.ROWS; y++) {
       const row: TileType[] = [];
       for (let x = 0; x < this.COLS; x++) {
-        // Borders
+        // 勾勒边界四围
         if (x === 0 || x === this.COLS - 1 || y === 0 || y === this.ROWS - 1) {
           row.push(TileType.WALL);
         } else {
@@ -426,7 +426,7 @@ export class IzakayaScene {
     // 添加进备排用上待座诸如待用的坐席各类用椅物件（第五排间中去加添）
     for (let x = 3; x < this.COLS - 3; x += 2) {
       if (x !== 9 && x !== 11) {
-        // Leave space for entrance path
+        // 刻意给要用以出入留的口道正前方腾挪留点空地儿出来
         map[5]![x] = TileType.CHAIR;
         chairs.push({ x, y: 5 });
       }
@@ -1945,18 +1945,18 @@ export class IzakayaScene {
         const item = this.getPlacedItem(x, y);
         if (item) {
           if (item.type === 'dish') {
-            // Plate
+            // 绘制餐盘
             this.ctx.fillStyle = '#ffffff';
             this.ctx.beginPath();
             this.ctx.arc(px + this.GRID_SIZE / 2, py + this.GRID_SIZE / 2, 14, 0, Math.PI * 2);
             this.ctx.fill();
-            // Food
+            // 绘制盘中食物
             this.ctx.fillStyle = '#ff5722';
             this.ctx.beginPath();
             this.ctx.arc(px + this.GRID_SIZE / 2, py + this.GRID_SIZE / 2, 8, 0, Math.PI * 2);
             this.ctx.fill();
           } else if (item.type === 'bowl') {
-            // Bowl
+            // 绘制重叠的汤碗
             this.ctx.fillStyle = '#b0bec5';
             this.ctx.beginPath();
             this.ctx.arc(px + this.GRID_SIZE / 2, py + this.GRID_SIZE / 2, 14, 0, Math.PI * 2);
@@ -1972,11 +1972,11 @@ export class IzakayaScene {
         this.ctx.fillStyle = '#263238'; // 后厨用地身防渗深颜色板砖
         this.ctx.fillRect(px, py, this.GRID_SIZE, this.GRID_SIZE);
 
-        // Stove
+        // 后厨火炉
         this.ctx.fillStyle = '#424242';
         this.ctx.fillRect(px + 4, py + 4, this.GRID_SIZE - 8, this.GRID_SIZE - 8);
 
-        // Pot
+        // 大铁锅主体
         this.ctx.fillStyle = '#9E9E9E'; // Silver Pot
         this.ctx.beginPath();
         this.ctx.arc(px + this.GRID_SIZE / 2, py + this.GRID_SIZE / 2, 14, 0, Math.PI * 2);
@@ -1984,7 +1984,7 @@ export class IzakayaScene {
         this.ctx.strokeStyle = '#616161';
         this.ctx.stroke();
 
-        // Contents?
+        // 锅里的烹饪物汤汁
         this.ctx.fillStyle = '#81D4FA'; // Water/Soup
         this.ctx.beginPath();
         this.ctx.arc(px + this.GRID_SIZE / 2, py + this.GRID_SIZE / 2, 10, 0, Math.PI * 2);
@@ -2001,7 +2001,7 @@ export class IzakayaScene {
         this.ctx.fillStyle = '#6d4c41'; // Lighter wood for step top
 
         for (let i = 0; i < 3; i++) {
-          // Draw the top surface of each step
+          // 给每一级阶梯面板的顶部上色
           this.ctx.fillRect(px, py + i * stepHeight, this.GRID_SIZE, stepHeight - 4);
         }
 
@@ -2009,7 +2009,7 @@ export class IzakayaScene {
         const hasStairsLeft = x > 0 && this.map[y]![x - 1] === TileType.STAIRS;
         const hasStairsRight = x < this.COLS - 1 && this.map[y]![x + 1] === TileType.STAIRS;
 
-        // Left Rail
+        // 左侧阶梯扶手栏杆
         if (!hasStairsLeft) {
           this.ctx.fillStyle = '#3e2723'; // Dark Rail
           this.ctx.fillRect(px, py, 4, this.GRID_SIZE);
@@ -2017,7 +2017,7 @@ export class IzakayaScene {
           this.ctx.fillRect(px, py, 4, this.GRID_SIZE);
         }
 
-        // Right Rail
+        // 右侧阶梯扶手栏杆
         if (!hasStairsRight) {
           this.ctx.fillStyle = '#3e2723'; // Dark Rail
           this.ctx.fillRect(px + this.GRID_SIZE - 4, py, 4, this.GRID_SIZE);
@@ -2051,12 +2051,12 @@ export class IzakayaScene {
 
         // 沙发主体 (红色/皮质)
         this.ctx.fillStyle = '#8d6e63'; // Brown Leather
-        // Backrest
+        // 沙发椅背
         this.ctx.fillRect(px + 4, py + 4, this.GRID_SIZE - 8, 12);
-        // Seat
+        // 沙发座垫
         this.ctx.fillStyle = '#a1887f';
         this.ctx.fillRect(px + 4, py + 16, this.GRID_SIZE - 8, this.GRID_SIZE - 20);
-        // Armrests
+        // 沙发两边扶手
         this.ctx.fillStyle = '#6d4c41';
         this.ctx.fillRect(px + 4, py + 16, 6, this.GRID_SIZE - 20);
         this.ctx.fillRect(px + this.GRID_SIZE - 10, py + 16, 6, this.GRID_SIZE - 20);

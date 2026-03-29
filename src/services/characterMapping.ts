@@ -1,14 +1,10 @@
-// Character Mapping Service
-// Centralizes logic for mapping character names (Chinese/Display) to Internal IDs/UUIDs
-// Used by: GameLoop, CombatLogic, CharacterStore, AssetLoading, MemoryService
+// 角色映射服务 (Character Mapping Service)
+// 核心逻辑：集中处理角色显示名称（中文/别称）到系统内部 ID/UUID 的双向映射
+// 调用方：GameLoop, CombatLogic, CharacterStore, 静态资源加载, 记忆服务 (MemoryService)
 
-// 1. Static Name Map (Moved from spellcards.ts to here to avoid circular deps if needed,
-//    but for now we can import or re-declare. Re-declaring for centrality is safer for future extensibility)
-//    However, since spellcards.ts is a data file, we should probably extract the map FROM there
-//    or move the map TO here and have spellcards.ts import it.
-//    Given the request is to "move relevant code", we should move the map definition here.
-//    BUT spellcards.ts is huge. Let's see if we can import it.
-//    Actually, the map is at the end of spellcards.ts. Let's assume we will move it here.
+// 1. 静态名称映射表
+// 存储最常见的角色中文名/昵称到内部 ID 的映射映射关系。
+// 设计说明：该表作为解析的一级索引，确保如“灵梦”、“魔理沙”等核心名称能被极速识别。
 
 export const CHARACTER_NAME_TO_ID_MAP: Record<string, string> = {
   博丽灵梦: 'reimu',
@@ -165,17 +161,17 @@ export const CHARACTER_NAME_TO_ID_MAP: Record<string, string> = {
 };
 
 /**
- * Standardizes a character name or ID to a canonical ID (UUID or English ID).
+ * 标准化：将角色名称或不规则输入解析为系统的规范 ID（UUID 或 内部 ID）。
  *
- * Logic Flow:
- * 1. Check Static Map (Chinese Name -> English ID)
- * 2. Check Static DB (Lorebook) via Name or UUID
- * 3. Check Runtime State (Active NPCs) via Name or ID
- * 4. Fallback to raw input if nothing found
+ * 逻辑流程：
+ * 1. 检索静态映射表 (中文名称 -> 内部 ID)
+ * 2. 检索静态数据库 (Lorebook/设定集) —— 支持 UUID 或 名称模糊匹配
+ * 3. 检索运行时状态 (活跃 NPC 列表) —— 支持 运行时 ID 或 显示名称匹配
+ * 4. 若上述均未命中，则回退至原始原始字符串。
  *
- * @param input - The name or ID to resolve (e.g. "博丽灵梦", "reimu", "reimu-uuid-...")
- * @param context - Optional context providers (Stores) to avoid circular dependencies if possible,
- *                  or we can accept data arrays.
+ * @param input - 待解析的名称或 ID（例如 "博丽灵梦", "reimu", "reimu-uuid-..."）
+ * @param staticCharacters - 静态角色数据集
+ * @param runtimeNpcs - 运行时 NPC 对象记录 (Record)
  */
 export function resolveCharacterId(
   input: string,
@@ -186,8 +182,8 @@ export function resolveCharacterId(
 
   const inputLower = input.toLowerCase().trim();
 
-  // 1. Try Static Map (Direct Name Mapping)
-  // Useful for converting "博丽灵梦" -> "reimu" immediately for asset lookups or ID prefixes
+  // 1. 尝试静态映射检索（直接名称匹配）
+  // 核心用途：立即将中文名转换为内部 ID（如 "reimu"），以便执行物理路径拼装或底层逻辑判定
   if (CHARACTER_NAME_TO_ID_MAP[input] || CHARACTER_NAME_TO_ID_MAP[input.trim()]) {
     // Note: This maps to "reimu", but the actual UUID might be "reimu-uuid-..."
     // If the static DB uses "reimu-uuid-...", we might still need step 2.
@@ -196,8 +192,8 @@ export function resolveCharacterId(
     // Let's proceed to Step 2 using the mapped ID as a candidate too.
   }
 
-  // 2. Try Static DB (Lorebook)
-  // Matches: UUID === input OR Name === input
+  // 2. 尝试静态数据库检索（设定集）
+  // 匹配策略：UUID 完全相等 OR 名称完全相等（忽略大小写与空格）
   const staticChar = staticCharacters.find(
     (c) =>
       (c.uuid && c.uuid.toLowerCase() === inputLower) ||
@@ -210,8 +206,8 @@ export function resolveCharacterId(
     return staticChar.uuid;
   }
 
-  // 3. Try Runtime State
-  // Matches: ID === input OR Name === input
+  // 3. 尝试运行时状态检索
+  // 匹配策略：当前运行时的动态 ID === input OR 当前显示名称 === input
   const foundNpcEntry = Object.entries(runtimeNpcs).find(
     ([id, npc]) =>
       id.toLowerCase() === inputLower ||
@@ -223,9 +219,8 @@ export function resolveCharacterId(
     return foundNpcEntry[0]; // Return Runtime ID
   }
 
-  // 4. Fallback: Check if input matches a mapped ID directly?
-  // If input is "博丽灵梦", map is "reimu". If "reimu" isn't in DB/Runtime, do we return "reimu"?
-  // Often system prefers the English ID over Chinese for file paths/logic.
+  // 4. 最终回退：检查输入是否本身就是一个有效的已映射 ID？
+  // 逻辑说明：如果输入是“博丽灵梦”，映射结果是“reimu”。如果“reimu”不在数据库中，系统通常倾向于返回英文 ID。
   const mappedId = CHARACTER_NAME_TO_ID_MAP[input.trim()];
   if (mappedId) {
     return mappedId;
@@ -235,11 +230,11 @@ export function resolveCharacterId(
 }
 
 /**
- * Helper to find an Avatar Image URL for a given character name.
- * Encapsulates the fuzzy matching logic from CharacterList.vue.
+ * 辅助方法：为指定角色名称查找对应的头像 URL。
+ * 封装了模糊匹配逻辑，确保多处 UI 展示在名称拼写不同（如同人名变体）时依然能显示头像。
  *
- * @param name - Character name (e.g. "博丽灵梦")
- * @param avatarMap - The map of all available avatar images (import.meta.glob results)
+ * @param name - 角色名称（例如 "博丽灵梦"）
+ * @param avatarMap - 所有已加载的头像资源映射（import.meta.glob 的结果）
  */
 export function findAvatarImage(name: string, avatarMap: Record<string, any>): string | undefined {
   if (!name) return undefined;
@@ -290,10 +285,10 @@ export function findAvatarImage(name: string, avatarMap: Record<string, any>): s
 }
 
 /**
- * Helper to find a Battle Sprite URL for a given character name.
+ * 辅助方法：为指定角色名称查找对应的战斗立绘 URL。
  *
- * @param name - Character name (e.g. "蕾米莉亚·斯卡雷特")
- * @param spriteMap - The map of all available battle sprites (import.meta.glob results)
+ * @param name - 角色名称（例如 "蕾米莉亚·斯卡雷特"）
+ * @param spriteMap - 所有已加载的战斗立绘资源（import.meta.glob 的结果）
  */
 export function findBattleSprite(name: string, spriteMap: Record<string, any>): string | undefined {
   if (!name) return undefined;

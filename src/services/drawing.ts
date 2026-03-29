@@ -4,8 +4,8 @@ import { useSettingsStore } from '@/stores/settings';
 import { useToastStore } from '@/stores/toast';
 import { findAvatarImage } from '@/services/characterMapping';
 
-// Load all character head images eagerly
-// Result is a map of file paths to public URLs
+// 预加载：全量获取所有角色头像资源（Eager Loading）
+// 结果映射：建立从文件路径到公开访问 URL 的映射表
 const headAssets = import.meta.glob('/src/assets/images/head/*.{jpg,jpeg,png,webp}', {
   eager: true,
   import: 'default'
@@ -78,9 +78,9 @@ NovelAI V4.5 拥有先进的自然语言理解能力。
 `;
 
 export const drawingService = {
-  // Sanitize model ID to handle dots in V4.5 models
-  // NovelAI uses hyphens in API calls but dots in display/config
-  // e.g. "nai-diffusion-4.5-full" -> "nai-diffusion-4-5-full"
+  // 标准化：处理模型 ID 中的小数点（特别是 V4.5 模型）
+  // 逻辑说明：NovelAI 在底层 API 调用中通常要求使用连字符 (Hyphens)，但在展示配置中习惯使用点号 (Dots)。
+  // 例如: "nai-diffusion-4.5-full" -> "nai-diffusion-4-5-full"
   sanitizeModelId(modelId: string): string {
     const modelMap: Record<string, string> = {
       'NovelAI Diffusion V4.5 Full': 'nai-diffusion-4-5-full',
@@ -93,17 +93,17 @@ export const drawingService = {
       'nai-diffusion-4.5-curated': 'nai-diffusion-4-5-curated'
     };
     let sanitized = modelMap[modelId] || modelId;
-    // Final safety: Replace dots with hyphens for any nai-diffusion-4.x model
+    // 终态容错：针对任何 nai-diffusion-4.x 系列模型，强制将剩余点号替换为连字符。
     if (sanitized.includes('nai-diffusion-4.')) {
       sanitized = sanitized.replace(/\./g, '-');
     }
     return sanitized;
   },
 
-  // Helper: Convert URL to Base64 with Compression
+  // 辅助方法：执行 URL 到 Base64 的转换，并同步执行图像压缩。
   async urlToBase64(url: string): Promise<string> {
     try {
-      // Load image into an Image element to get dimensions and draw to canvas
+      // 流程：将图像载入离屏 Image 对象以获取其物理尺寸，并准备绘制。
       return new Promise((resolve, reject) => {
         const img = new Image();
         img.crossOrigin = 'Anonymous'; // Handle CORS if needed for local assets
@@ -112,7 +112,7 @@ export const drawingService = {
           let width = img.width;
           let height = img.height;
 
-          // Resize logic: Max dimension 1024px
+          // 缩放逻辑：将图像最大边长限制在 1024 像素以内。
           const MAX_SIZE = 1024;
           if (width > MAX_SIZE || height > MAX_SIZE) {
             if (width > height) {
@@ -135,8 +135,8 @@ export const drawingService = {
 
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Compress to JPEG with 0.7 quality
-          // This significantly reduces size compared to PNG or raw Base64
+          // 转换与压缩策略：输出质量设为 0.7 的 JPEG 格式。
+          // 相比 PNG 或原始 Base64 编码，该策略能显著缩减传输体积与显存占用。
           const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
           resolve(dataUrl);
         };
@@ -151,7 +151,7 @@ export const drawingService = {
     }
   },
 
-  // Step 1: Generate Prompt using LLM #5
+  // 第一阶段：调用绘图辅助模型 (LLM #5) 生成精准提示词。
   async generatePrompt(
     storyText: string,
     location?: string,
@@ -160,7 +160,7 @@ export const drawingService = {
     const settingsStore = useSettingsStore();
     const config = settingsStore.getEffectiveConfig('drawing');
 
-    // Select System Prompt based on provider type and model
+    // 策略切换：根据服务商类型及其版本自动选择最匹配的 System Prompt。
     const rawConfig = settingsStore.drawingConfig;
     const isNovelAI = rawConfig.providerType === 'novelai';
     const isV4 = isNovelAI && (rawConfig.model?.includes('nai-diffusion-4') || false);
@@ -216,7 +216,7 @@ ${storyText}
       });
 
       let content = response.choices[0]?.message?.content || '';
-      // Strip thoughts if any
+      // 认知清理：剔除响应中可能存在的 CoT 思维链 (Thinking tags)
       content = content.replace(/<(thinking|think)>[\s\S]*?<\/\1>/gi, '').trim();
 
       try {
@@ -240,7 +240,7 @@ ${storyText}
     }
   },
 
-  // Step 2b: NovelAI Generation
+  // 第二阶段 (分流 B)：执行 NovelAI 原生接口调用流程。
   async generateImageNovelAI(prompt: string, negativePrompt: string, config: any): Promise<string> {
     if (!config.apiKey) throw new Error('NovelAI API Key is missing');
 
@@ -251,7 +251,7 @@ ${storyText}
     const isV4 = model.includes('nai-diffusion-4');
     const isV45 = model.includes('nai-diffusion-4-5');
 
-    // V4 Sampler Map (Standard to NovelAI V4)
+    // 采样器转换：将标准采样器标识符对齐至 NovelAI V4 专用名称
     let sampler = config.sampler || 'k_euler_ancestral';
     if (isV4) {
       const v4SamplerMap: Record<string, string> = {
@@ -272,11 +272,11 @@ ${storyText}
       `[绘图服务] 正在使用模型生成图像: ${model}, 服务商: NovelAI (isV4: ${isV4}, isV45: ${isV45}, 采样器: ${sampler})`
     );
 
-    // 1. Build Parameters
+    // 1. 第一步：构建推导参数集 (Inference Parameters)
     let parameters: any = {};
 
     if (isV4) {
-      // V4/V4.5 STRICT Parameter Whitelist - Minimal set to avoid 500
+      // V4/V4.5 严格参数白名单：仅启用最小配置集以规避 500 后端错误确认。
       parameters = {
         width: config.width || 832,
         height: config.height || 1216,
@@ -298,10 +298,10 @@ ${storyText}
 
       if (isV45) {
         parameters.use_coords = true;
-        // For V4.5, character_prompts can be omitted if empty to avoid validation errors
+        // 对于 V4.5，若 character_prompts 为空则需明确剔除，以规避参数校验失败。
       }
     } else {
-      // V3 Parameters
+      // V3 系列推导参数集
       parameters = {
         width: config.width || 832,
         height: config.height || 1216,
@@ -383,7 +383,7 @@ ${storyText}
     // Handle Response
     const contentType = response.headers.get('content-type');
 
-    // 1. ZIP Response (Official NovelAI returns a zip file)
+    // 响应解析方案 A：处理 ZIP 归档格式（NovelAI 官方接口默认返回格式）
     if (
       contentType?.includes('application/zip') ||
       contentType?.includes('application/x-zip-compressed')
@@ -408,7 +408,7 @@ ${storyText}
       });
     }
 
-    // 2. Direct Image Response
+    // 响应解析方案 B：处理直接返回的单张图像二进制流。
     if (contentType?.includes('image/')) {
       const blob = await response.blob();
       return new Promise((resolve, reject) => {
@@ -425,7 +425,7 @@ ${storyText}
     );
   },
 
-  // Test NovelAI Connection
+  // 连通性测试模块：验证与 NovelAI 各 Endpoint 的通信完整性。
   async testNovelAIConnection(config: any): Promise<boolean> {
     if (!config.apiKey) throw new Error('API Key 不能为空');
 
@@ -526,7 +526,7 @@ ${storyText}
     }
   },
 
-  // Step 2: Generate Image using Image API
+  // 第二阶段：调用通用图像生成 API (OpenAI / SiliconFlow / Flux 等)。
   async generateImage(
     prompt: string,
     negativePrompt: string,
@@ -537,7 +537,7 @@ ${storyText}
 
     if (!config.enabled) return '';
 
-    // Dispatch to NovelAI handler if selected
+    // 逻辑路由：若当前模式为 NovelAI，则重定向至专有生成逻辑。
     if (config.providerType === 'novelai') {
       return this.generateImageNovelAI(prompt, negativePrompt, config);
     }
@@ -546,7 +546,7 @@ ${storyText}
       throw new Error('未配置绘图 API (URL 或 Key)');
     }
 
-    // Construct Request URL
+    // 终结点 Endpoint 构造逻辑
     let baseUrl = config.apiBaseUrl.replace(/\/+$/, '');
     let targetUrl = '';
     const isStandardImageApi =
@@ -588,7 +588,7 @@ ${storyText}
           signal: controller.signal
         });
       } else {
-        // Multimodal Chat API (Nanobanana / Gemini / Custom Proxy)
+        // 混合多模态对话 API (适配 Nanobanana / Gemini / 及各类自定义中继)
         const content: any[] = [
           { type: 'text', text: `Prompt: ${prompt}\nNegative Prompt: ${negativePrompt}` }
         ];
@@ -627,7 +627,7 @@ ${storyText}
         throw new Error(`HTTP ${res.status}: ${res.statusText || ''} ${errorText}`);
       }
 
-      // Handle Standard Image API Response (JSON)
+      // 响应处理方案 A：处理标准的同步绘图响应（JSON 载荷）
       if (isStandardImageApi) {
         const data = await res.json();
         const url = data?.data?.[0]?.url || data?.images?.[0]?.url;
@@ -638,7 +638,7 @@ ${storyText}
         return url;
       }
 
-      // Handle Chat API Response (Stream)
+      // 响应处理方案 B：处理多模态对话响应流（SSE 序列 / Markdown 图片析构）
       const reader = res.body?.getReader();
       if (!reader) throw new Error('Stream not available');
 
@@ -673,19 +673,19 @@ ${storyText}
               const parsed = JSON.parse(payload);
               const ch = parsed?.choices?.[0];
 
-              // 1. Standard OpenAI Image/Gemini format
+              // 匹配规则 1: 标准 OpenAI 图像载荷或 Gemini 多模态输出
               if (ch?.delta?.image_url?.url) {
                 imageUrl = ch.delta.image_url.url;
               }
-              // 2. Alternative URL field
+              // 匹配规则 2: 回退至通用 URL 标记字段
               else if (ch?.delta?.url) {
                 imageUrl = ch.delta.url;
               }
-              // 3. Content accumulation (for Markdown images)
+              // 匹配规则 3: 处理文本累积流（用于析构 Markdown 图片标记）
               else if (typeof ch?.delta?.content === 'string') {
                 accumulatedContent += ch.delta.content;
               }
-              // 4. Non-stream fallback (rare in SSE)
+              // 匹配规则 4: 非流式降级捕获
               else if (ch?.url) {
                 imageUrl = ch.url;
               }
@@ -695,9 +695,9 @@ ${storyText}
           }
         }
 
-        // Check accumulated content for markdown image
+        // 析构逻辑：在文本流累积过程中持续捕捉 Markdown 图片规律
         if (!imageUrl && accumulatedContent) {
-          // Match markdown image ![alt](url) - handle optional title and assure http(s)
+          // 正则描述：匹配 ![alt](https://...) 格式，兼容带标题的扩展语法并确保协议头完整
           const mdMatch = accumulatedContent.match(
             /!\[.*?\]\((https?:\/\/[^\s\)]+)(?:[\s"'].*?)?\)/
           );
@@ -709,7 +709,7 @@ ${storyText}
         if (imageUrl) break; // Stop once we have the URL
       }
 
-      // Final check on accumulated content after stream ends (in case URL was split across last chunk)
+      // 终态回溯：若流结束瞬间 URL 被切分在最后一帧，则执行最后一次内容检查。
       if (!imageUrl && accumulatedContent) {
         const mdMatch = accumulatedContent.match(/!\[.*?\]\((https?:\/\/[^\s\)]+)(?:[\s"'].*?)?\)/);
         if (mdMatch && mdMatch[1]) {
@@ -717,13 +717,12 @@ ${storyText}
         }
       }
 
-      // Fallback: If not SSE or failed to find URL in stream, try parsing full response as JSON
+      // 容错降级：若非 SSE 协议或流析构异常，则尝试将全量响应体作为同步 JSON 进行强制解析。
       if (!imageUrl) {
-        console.warn('[DrawingService] No URL found in stream. Attempting full response parse...');
+        console.warn('[绘图服务] 未能在流中识别出图片链接，正在尝试全量响应解析回退...');
         try {
-          // Try to parse the accumulated buffer + remaining buffer if any, or just fullRawResponse
-          // fullRawResponse contains everything including "data: " prefixes if it was SSE.
-          // If it was NOT SSE, fullRawResponse is just the JSON body.
+          // 执行分析：fullRawResponse 包含全量原始分片合集。
+          // 逻辑说明：若检测到 SSE 帧前缀则剥离分析；若纯 JSON 则直接读取。
 
           if (!isSSE) {
             const parsed = JSON.parse(fullRawResponse);
@@ -747,7 +746,7 @@ ${storyText}
       }
 
       if (!imageUrl) {
-        console.error('[DrawingService] Raw Response Dump:', fullRawResponse.slice(0, 1000)); // Log first 1000 chars
+        console.error('[绘图服务] 原始响应追踪 (前1000字符):', fullRawResponse.slice(0, 1000));
         throw new Error('未从 API 响应中获取到图片 URL');
       }
 
@@ -758,7 +757,7 @@ ${storyText}
     }
   },
 
-  // Main Workflow
+  // 主工作流模块：协调提示词生成与图像渲染全链路流程。
   async process(
     storyText: string,
     location?: string,

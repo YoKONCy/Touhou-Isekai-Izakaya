@@ -63,7 +63,7 @@ export function getBaseDamage(level: PowerLevel): number {
 export interface DamageResult {
   damage: number;
   heal: number;
-  isCrit: boolean; // Kept for compatibility, but will be false
+  isCrit: boolean; // 保持向后兼容性，但固定返回 false（当前通过 P 点爆发模拟暴击）
   isHit: boolean;
   description: string;
 }
@@ -75,18 +75,18 @@ export function getEffectiveStats(combatant: Combatant) {
   let atkMod = 1.0;
   let defMod = 1.0;
 
-  // --- Base Stat Initialization ---
+  // --- 基础属性初始化 (Base Stat Init) ---
   let baseDodge = combatant.dodgeRate !== undefined ? combatant.dodgeRate : 0.15;
 
-  // --- Proficiency Dodge (Player Only) ---
-  // Base Dodge scales from 5% (Lv1) to 30% (Lv100)
+  // --- 熟练度闪避修正 (仅玩家生效) ---
+  // 基础闪避率阶梯：从 5% (Lv1) 线性成长至 30% (Lv100)
   if (combatant.isPlayer && combatant.combatLevel) {
     const level = Math.max(1, Math.min(100, combatant.combatLevel));
     // 0.05 + 0.25 * ((L-1)/99)
     baseDodge = 0.05 + 0.25 * ((level - 1) / 99);
   }
 
-  // --- Modifier Hooks ---
+  // --- 修正器钩子调用层 (Modifier Hooks) ---
   const context = { attacker: combatant };
   baseDodge = applyStatModifiers(baseDodge, 'onCalculateDodge', combatant, context);
   atkMod = applyStatModifiers(atkMod, 'onCalculateAtk', combatant, context);
@@ -108,17 +108,17 @@ export function getEffectiveStats(combatant: Combatant) {
 }
 
 export function calculatePPointGain(attacker: Combatant, damageDealt: number): number {
-  if (damageDealt <= 0) return 5; // Base gain for misses/blocked attacks
+  if (damageDealt <= 0) return 5; // 基础收益：闪避/格挡后的能量补偿。
 
   const basePowerVal = getBaseDamage(attacker.power);
-  // Formula: 2 + 8 * (Base / Damage)
+  // 收益算式：2 + 8 * (基础战力 / 造成的伤害数值)
   let gain = 2 + 8 * (basePowerVal / damageDealt);
 
   // Apply Modifiers (e.g., 厚积薄发)
   const stats = getEffectiveStats(attacker);
   gain *= stats.pGainMod;
 
-  // Cap at 30 to prevent explosion from very low damage or division by zero
+  // 收益熔断：上限 30 点，防止因极低伤害或除以零导致的数值膨胀
   return Math.min(30, Math.max(0, gain));
 }
 
@@ -131,7 +131,7 @@ export function calculateDamage(
   const isCrit = false;
   let description = '';
 
-  // 0. Handle Non-Attack Types
+  // 步骤 0：处理非攻击类指令（如：回蓝、架势、道具等）
   if (spell) {
     if (['buff', 'shield', 'heal'].includes(spell.type || '')) {
       return {
@@ -144,27 +144,27 @@ export function calculateDamage(
     }
   }
 
-  // --- Buff/Debuff Calculation Layer ---
+  // --- 增益/减益 效果叠加层 ---
   const attStats = getEffectiveStats(attacker);
   const defStats = getEffectiveStats(defender);
 
-  // Check Dodge
-  let hitRate = 0; // Default attack hit rate bonus (0 for normal attack)
+  // 巡检闪避判定 (Dodge Check)
+  let hitRate = 0; // 默认攻击命中加成
 
   if (spell) {
     if (typeof spell.hitRate === 'number') {
       hitRate = spell.hitRate;
     } else {
-      // Default Logic: Ultimate = 100%, Normal Spell = 10%
+      // 默认精度：终符 (Ultimate) 必定命中 (100%)，普通符卡提升 10% 精度
       hitRate = spell.isUltimate ? 1.0 : 0.1;
     }
   }
 
-  // Effective Dodge Rate = Defender Dodge - Hit Rate
+  // 有效闪避率公式：防御者闪避率 - 攻击方命中修正
   const effectiveDodgeRate = Math.max(0, defStats.dodgeRate - hitRate);
 
   if (Math.random() < effectiveDodgeRate) {
-    // New: After Dodge Hook (e.g., 反击架势)
+    // 新增：闪避后置钩子（如：反击架势）
     applyLifecycleHook('onAfterDodge', defender, {
       ...context,
       attacker: defender,
@@ -180,23 +180,23 @@ export function calculateDamage(
     };
   }
 
-  // 1. Base Damage Calculation
-  // Combine Power Level Base + Spell Flat Damage (before level suppression)
+  // 步骤 1：基础伤害演算核心
+  // 逻辑聚合：阶级基础伤害 + 符卡固伤（早于阶级压制逻辑执行）
   const powerBaseDmg = getBaseDamage(attacker.power);
   const spellFlatDmg = spell && spell.damage ? spell.damage : 0;
 
   let totalBaseDmg = powerBaseDmg + spellFlatDmg;
 
-  // New: Apply Flat Damage Modifiers (e.g., 力量训练)
+  // 新增：基础伤害固定额修正（如：力量训练）
   totalBaseDmg = applyStatModifiers(totalBaseDmg, 'onCalculateFlatDamage', attacker, context);
 
-  // --- Proficiency Modifier (Player Only) ---
+  // --- 熟练度修正 (仅玩家生效) ---
   // Formula: (Base + Spell) * (1 + 0.5 * (Level - 1) / 99)
   // Range: x1.0 (Lv1) to x1.5 (Lv100)
   if (attacker.isPlayer && attacker.combatLevel) {
     const level = Math.max(1, Math.min(100, attacker.combatLevel));
 
-    // New: Spell Level Bonus (e.g., 符卡掌握)
+    // 新增：符卡等级加成（如：符卡掌握）
     let effectiveSpellLevel = level;
     if (spell) {
       effectiveSpellLevel = applyStatModifiers(level, 'onCalculateSpellLevel', attacker, context);
@@ -208,46 +208,47 @@ export function calculateDamage(
   }
   // ------------------------------------------
 
-  // 2. Level Difference Modifier (Recursive)
+  // 步骤 2：阶级位阶压制（指数级修正）
   const attackerRankIndex = POWER_RANKS.indexOf(attacker.power);
   const defenderRankIndex = POWER_RANKS.indexOf(defender.power);
   const rankDiff = attackerRankIndex - defenderRankIndex; // Negative = Attacker Stronger
 
+  // 执行位阶修正算式 (Base * RankModifier)
   let rankModifier = 1.0;
 
-  // New: Check if Level Suppression should be ignored (e.g., 裁决天平)
+  // 新增：检查是否忽略位阶压制（如：裁决天平）
   const ignoreSuppression = checkMechanic('shouldIgnoreSuppression', attacker, context);
 
   if (!ignoreSuppression) {
     if (rankDiff < 0) {
-      // Attacker is stronger
-      // Recursive +4% per level: Base * (1.04 ^ levels)
+      // 优势方：进攻方处于上位阶
+      // 阶梯系数 1.04 ^ level：每高一阶提升 4% 独立伤害
       const levels = Math.abs(rankDiff);
       rankModifier = Math.pow(1.04, levels);
     } else if (rankDiff > 0) {
-      // Attacker is weaker
-      // Recursive -7% per level: Base * (0.93 ^ levels)
+      // 劣势方：进攻方处于下位阶
+      // 阶梯系数 0.93 ^ level：每低一阶降低 7% 独立伤害
       const levels = Math.abs(rankDiff);
       rankModifier = Math.pow(0.93, levels);
-      // Hard cap min modifier to avoid 0 damage? Let's keep it pure for now, or min 0.01
+      // 伤害兜底：最低倍率 0.01，防止位阶差距过大导致伤害归零
       rankModifier = Math.max(0.01, rankModifier);
     }
   }
 
-  // Apply Rank Modifier
+  // 执行位阶修正算式 (Base * RankModifier)
   let currentDamage = totalBaseDmg * rankModifier;
 
-  // Apply Attack Buffs
+  // 执行攻击力增益修正 (AtkMod)
   currentDamage *= attStats.atkMod;
 
-  // Final Damage Calculation
+  // 最终伤害结算核心
   let finalDamage = currentDamage;
 
-  // New: P-Point Bonus Calculation with Crit Hooks
+  // 新增：灵力点 (P-Point) 爆发系数计算（兼顾暴击钩子）
   if (attacker.pPoints && attacker.pPoints > 0) {
     const pRatio = Math.min(100, attacker.pPoints) / 100;
 
-    let maxBonus = 0.5; // Default 50% for enemies/NPCs
+    let maxBonus = 0.5; // 默认加成：NPC 为 50% (0.5)
     if (attacker.isPlayer && attacker.combatLevel) {
       const level = Math.max(1, Math.min(100, attacker.combatLevel));
 
@@ -262,11 +263,11 @@ export function calculateDamage(
       maxBonus = 0.2 + 0.6 * ((effectiveSpellLevel - 1) / 99);
     }
 
-    // New: Crit Damage Modifier (e.g., 暴击强化)
-    // Note: Our system uses P-points to simulate "critical power".
+    // 新增：爆击（爆发）伤害倍率修正（如：爆击强化）
+    // 备注：本系统利用 P 点爆发来模拟“爆击威力”提升效果。
     let critMod = applyStatModifiers(1.0, 'onCalculateCritDmg', attacker, context);
 
-    // New: Defender Crit Resist (e.g., 强韧肉体)
+    // 新增：被暴击抗性（如：强韧肉体）
     critMod = applyStatModifiers(critMod, 'onCalculateCritDmgTaken', defender, context);
 
     maxBonus *= critMod;
@@ -275,23 +276,23 @@ export function calculateDamage(
     finalDamage *= 1 + pBonus;
   }
 
-  // New: Apply Base Damage Hook (after P-Point bonus but before defense)
+  // 新增：基础伤害后置钩子（爆发之后，减免之前）
   finalDamage = applyStatModifiers(finalDamage, 'onCalculateBaseDamage', attacker, context);
 
-  // Random Fluctuation for Normal Attacks (0.85 ~ 1.15)
+  // 波动偏移：普通攻击的伤害随机浮动 (±15%)
   // Now applies to everyone for consistency, but only for normal attacks
   if (!spell) {
     const fluctuation = 0.85 + Math.random() * 0.3;
     finalDamage *= fluctuation;
   }
 
-  // Apply Defense/Damage Reduction Buffs
+  // 执行防御力与减伤增益修正 (DefMod)
   finalDamage *= defStats.defMod;
 
-  // Modifier Hook: Incoming Damage (Defender)
+  // 执行受到的伤害修正钩子 (防御侧)
   finalDamage = applyStatModifiers(finalDamage, 'onCalculateIncomingDamage', defender, context);
 
-  // Ally Vulnerability: Allies take extra damage based on favorability
+  // 友军脆弱：基于好感度决定剧情角色作为队友时的易伤惩罚系数
   // Favorability <= 0: 2.5x (Max Vulnerability)
   // Favorability >= 100: 1.0x (No Vulnerability)
   if (!defender.isPlayer && defender.team === 'player') {
@@ -316,7 +317,7 @@ export function calculateDamage(
     finalDamage *= multiplier;
   }
 
-  // --- World Difficulty Correction ---
+  // --- 世界难度全局线性修正 ---
   if (attacker.isPlayer) {
     try {
       const gameStore = useGameStore();
@@ -331,21 +332,21 @@ export function calculateDamage(
       }
       // gentle: no correction
     } catch (e) {
-      // Ignore if store not available (e.g. unit testing)
+      // 异常兜底：若 Store 不可用（如：单元测试环境），则跳过难度修正
     }
   }
 
   finalDamage = Math.floor(finalDamage);
 
-  // Modifier Hook: Final Damage (Attacker)
+  // 执行最终伤害修正钩子 (攻击侧)
   finalDamage = applyStatModifiers(finalDamage, 'onCalculateFinalDamage', attacker, context);
 
-  // New: Post-Damage Hooks (Bloodlust, etc.)
+  // 新增：伤害后置钩子（如：嗜血效果等）
   applyLifecycleHook('onAfterDamageDealt', attacker, context, finalDamage);
 
   description = `${attacker.name} 对 ${defender.name} 造成了 ${finalDamage} 点伤害。`;
 
-  // --- Shield Logic ---
+  // --- 护盾逻辑 (Shield Logic) ---
 
   return {
     damage: finalDamage,
@@ -385,7 +386,7 @@ export async function processPersuasion(
   userInput: string,
   turn?: number
 ): Promise<PersuasionResult> {
-  // 1. Fetch Character Personas
+  // 步骤 1：捕获目标角色的叙述人设数据
   const charStore = useCharacterStore();
   const gameStore = useGameStore();
 
@@ -405,7 +406,7 @@ export async function processPersuasion(
       : '暂无详细设定';
   };
 
-  // Logic for Player Persona (from GameStore)
+  // 逻辑处理：玩家个性化设定（源自 GameStore 持久化状态集）
   let playerPersonaText = '暂无详细设定';
   let playerGlobalSetting = '无特殊设定';
 
@@ -413,29 +414,29 @@ export async function processPersuasion(
   if (playerState) {
     const rawPersona = playerState.persona || '';
 
-    // Try parsing JSON
+    // 执行 JSON 反序列化尝试
     try {
       const jsonObj = JSON.parse(rawPersona);
 
-      // 1. Text Persona (user_persona)
+      // 1. 提取叙述性文本人设 (user_persona)
       if (jsonObj['详细人设']) {
         playerPersonaText = jsonObj['详细人设'];
       } else if (jsonObj['补充设定']) {
         playerPersonaText = jsonObj['补充设定'];
       } else {
-        // If purely JSON settings, maybe use raw string or default
+        // 安全兜底逻辑：若 JSON 结构中不含显性文本描述键值，则仅执行最简语义输出，防范不规范数据污染内容。
         playerPersonaText = '无特殊描述';
       }
 
-      // 2. Global Setting (global_user_setting)
-      // Clone to avoid modifying original
+      // 2. 提取全局世界观/出身设定 (global_user_setting)
+      // 内存深拷贝，防止污染原始数据源
       const settingObj = { ...jsonObj };
       if ('详细人设' in settingObj) delete settingObj['详细人设'];
       if ('补充设定' in settingObj) delete settingObj['补充设定'];
 
       playerGlobalSetting = JSON.stringify(settingObj, null, 2);
     } catch (e) {
-      // Plain text
+      // 检测到源数据为纯文本个人设定，直接按原样执行渲染即可 (Plain Text Passthrough)
       playerPersonaText = rawPersona;
     }
   }
@@ -449,7 +450,7 @@ export async function processPersuasion(
       ? allies.map((a, idx) => `### [${idx}] ${a.name}\n${getPersona(a.name, a.id)}`).join('\n\n')
       : '无友军';
 
-  // 2. Build Prompt
+  // 步骤 2：构建裁判模型指令链
   const enemyDescriptions = enemies
     .map((e, idx) => `[${idx}] ${e.name} (HP: ${e.hp}/${e.maxHp}, Power: ${e.power})`)
     .join('\n');
@@ -577,7 +578,7 @@ ${allyDescriptions}
 
     console.log('[CombatLogic] Raw response from LLM4:', response);
 
-    // Clean response: remove Markdown code blocks and conversational text
+    // 预处理：清洗 Markdown 代码块标记及冗余的开场白
     let cleaned = response.trim();
     if (cleaned.includes('```')) {
       const match = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
@@ -586,7 +587,7 @@ ${allyDescriptions}
       }
     }
 
-    // Find first '{' and last '}' to isolate JSON object
+    // 定位最外层的 '{' 与 '}' 边界指针，隔离核心 JSON 体
     const firstBrace = cleaned.indexOf('{');
     const lastBrace = cleaned.lastIndexOf('}');
     if (firstBrace !== -1 && lastBrace !== -1) {

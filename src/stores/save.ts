@@ -34,7 +34,7 @@ export const useSaveStore = defineStore('save', () => {
   async function init() {
     await loadSaves();
 
-    // Check settings for last used save
+    // 巡检设置项目，尝试还原最后一次使用的存档 ID
     if (settingsStore.currentSaveSlotId) {
       const exists = saves.value.find((s) => s.id === settingsStore.currentSaveSlotId);
       if (exists) {
@@ -42,7 +42,7 @@ export const useSaveStore = defineStore('save', () => {
       }
     }
 
-    // If no save selected or found, try to select the most recent one
+    // 若未选择或未命中特定存档，则尝试自动指向最近一次活跃的槽位
     if (!currentSaveId.value && saves.value.length > 0) {
       const firstSave = saves.value[0];
       if (firstSave) {
@@ -50,12 +50,12 @@ export const useSaveStore = defineStore('save', () => {
       }
     }
 
-    // If still no save (fresh install), create default
+    // 若存档列表依然为空（多见于首次安装环境），则初始化创建“默认存档”
     if (!currentSaveId.value) {
       await createSave('默认存档');
     }
 
-    // Load data for the selected save
+    // 执行选中存档的数据加载与状态迁移动作
     if (currentSaveId.value) {
       await switchSave(currentSaveId.value);
     }
@@ -71,22 +71,22 @@ export const useSaveStore = defineStore('save', () => {
   async function switchSave(id: number) {
     if (!id) return;
 
-    // 1. Update Current Save ID
+    // 1. 更新当前内存中的活跃存档 ID 指针
     currentSaveId.value = id;
-
-    // 2. Persist to Settings
+  
+    // 2. 将存档 ID 变更持久化至本地全局配置 (Persistence)
     settingsStore.currentSaveSlotId = id;
     await settingsStore.saveSettings();
-
-    // 3. Update Last Played
+  
+    // 3. 同步更新数据库槽位的最后游玩时间戳信息
     await dbService.updateSaveSlot(id, { lastPlayed: Date.now() });
     await loadSaves();
 
-    // 4. Reload Game Data
+    // 4. 重载游戏核心历史数据与全局状态机 (State Reload)
     const chatStore = useChatStore();
     await chatStore.loadHistory();
 
-    // 4.1 Sync Location from loaded state
+    // 4.1 从已加载的状态分片中提取并同步地理位置元数据
     const gameStore = useGameStore();
 
     // 如果是联机存档，标记为联机模式，但不激活连接状态，需手动开房
@@ -102,16 +102,16 @@ export const useSaveStore = defineStore('save', () => {
 
     if (gameStore.state.player.location) {
       await dbService.updateSaveSlot(id, { location: gameStore.state.player.location });
-      // Update local cache
+      // 同步更新本地存档列表缓存，确保 UI 响应式显示一致
       const saveIndex = saves.value.findIndex((s) => s.id === id);
       if (saveIndex !== -1 && saves.value[saveIndex]) {
         saves.value[saveIndex].location = gameStore.state.player.location;
       }
     }
 
-    // 5. Check if it's a new game (empty history)
+    // 5. 巡检是否为新游戏（检测历史对话记录是否为空）
     if (chatStore.messages.length === 0) {
-      // Check if we already have an initial snapshot
+      // 巡检是否已存在初始游戏状态快照 (Snapshot Check)
       const latestSnapshot = await dbService.getLatestSnapshot(id);
 
       if (!latestSnapshot) {
@@ -158,13 +158,13 @@ export const useSaveStore = defineStore('save', () => {
     const history = await dbService.getAllChatHistory(id);
     const gameStore = useGameStore();
 
-    // Try to get player name
+    // 尝试通过多维渠道检索玩家名称 (Name Retrieval)
     let playerName = '玩家';
 
     if (id === currentSaveId.value) {
       playerName = gameStore.state.player.name || '玩家';
     } else {
-      // For other saves, try to get name from latest snapshot
+      // 针对非活跃存档，尝试从其最新的磁盘快照中动态解析玩家名称
       try {
         const snapshot = await dbService.getLatestSnapshot(id);
         if (snapshot && snapshot.gameState) {
@@ -181,16 +181,16 @@ export const useSaveStore = defineStore('save', () => {
     let text = '';
 
     for (const msg of history) {
-      // Skip system messages (usually prompts)
+      // 忽略系统级消息（通常包含 Prompt 指令流）
       if (msg.role === 'system') continue;
 
       const roleName = msg.role === 'user' ? `【${playerName}】` : '【GM】';
       let content = msg.content || '';
 
-      // Remove <think> blocks
+      // 剔除深度思维链 <think> 代码块，净化导出的文本视界
       content = content.replace(/<think>[\s\S]*?<\/think>/gi, '');
 
-      // Remove any other XML-like tags that might be internal (optional, but <think> is the main one)
+      // (可选) 剔除其他可能存在的内部 XML 格式标签分片，维持纯净语境
 
       content = content.trim();
 

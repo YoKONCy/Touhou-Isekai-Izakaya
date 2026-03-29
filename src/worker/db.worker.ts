@@ -6,7 +6,7 @@ let db: any = null;
 const log = (...args: unknown[]) => console.log('[DB Worker]', ...args);
 const error = (...args: unknown[]) => console.error('[DB Worker]', ...args);
 
-// Initialize SQLite
+// 初始化 SQLite 引擎
 const initPromise = (sqlite3InitModule as any)({
   print: log,
   printErr: error,
@@ -20,7 +20,7 @@ const initPromise = (sqlite3InitModule as any)({
   try {
     log('运行 SQLite3 版本', sqlite3.version.libVersion);
 
-    // Diagnostic logging for OPFS requirements
+    // OPFS 运行环境诊断日志 (Diagnostic logging)
     log('诊断 - isSecureContext:', self.isSecureContext);
     log('诊断 - crossOriginIsolated:', (self as any).crossOriginIsolated);
     log('诊断 - SharedArrayBuffer:', !!(self as any).SharedArrayBuffer);
@@ -28,7 +28,7 @@ const initPromise = (sqlite3InitModule as any)({
     log('诊断 - FileSystemHandle:', !!(self as any).FileSystemHandle);
     log('诊断 - navigator.storage.getDirectory:', !!navigator?.storage?.getDirectory);
 
-    // === Strategy 1: Standard OPFS VFS (requires SharedArrayBuffer + COOP/COEP) ===
+    // === 策略 1: 标准 OPFS VFS (需启用 SharedArrayBuffer 与 COOP/COEP 隔离) ===
     if ('opfs' in sqlite3) {
       try {
         db = new sqlite3.oo1.OpfsDb('/touhou_isekai.sqlite3');
@@ -41,9 +41,9 @@ const initPromise = (sqlite3InitModule as any)({
       }
     }
 
-    // === Strategy 2: opfs-sahpool VFS (does NOT require SharedArrayBuffer!) ===
-    // This is the key fallback for Android WebView which doesn't support crossOriginIsolated.
-    // opfs-sahpool uses FileSystemSyncAccessHandle directly, available since Chrome 108+.
+    // === 策略 2: opfs-sahpool VFS (无需 SharedArrayBuffer 支持) ===
+    // 这是针对 Android WebView 的关键回退方案，因为其通常不支持 crossOriginIsolated。
+    // opfs-sahpool 直接利用 FileSystemSyncAccessHandle，适用于 Chrome 108+。
     if (!db && typeof sqlite3.installOpfsSAHPoolVfs === 'function') {
       try {
         log('尝试初始化 opfs-sahpool VFS (不需要 SharedArrayBuffer)...');
@@ -62,14 +62,14 @@ const initPromise = (sqlite3InitModule as any)({
       }
     }
 
-    // === Strategy 3: In-memory fallback (no persistence) ===
+    // === 策略 3: 内存回退方案 (无持久化存储) ===
     if (!db) {
       error('所有持久化存储方案均不可用，回退到临时内存数据库。数据将在页面关闭后丢失！');
       db = new sqlite3.oo1.DB('/touhou_isekai_mem.sqlite3', 'ct');
       (self as any).dbType = 'memory';
     }
 
-    // Apply Schema
+    // 应用数据库结构定义 (Apply Schema)
     log('正在应用数据库 Schema...');
     db.transaction(() => {
       SCHEMA_SQL.forEach((sql: string, index: number) => {
@@ -84,7 +84,7 @@ const initPromise = (sqlite3InitModule as any)({
     });
     log('数据库 Schema 应用成功。');
 
-    // Run Migrations for existing databases
+    // 为既有数据库执行版本迁移脚本 (Migrations)
     runMigrations(db);
 
     return true;
@@ -98,7 +98,7 @@ const initPromise = (sqlite3InitModule as any)({
 function runMigrations(db: any) {
   log('开始数据库迁移...');
   try {
-    // Helper to check and add column if missing
+    // 工具函数：如果列缺失则执行 DDL 自动补全 (Column Guard)
     const ensureColumn = (tableName: string, colName: string, typeDef: string) => {
       const tableInfo = db.exec({
         sql: `PRAGMA table_info(${tableName})`,
@@ -112,16 +112,16 @@ function runMigrations(db: any) {
       }
     };
 
-    // 1. Characters table migrations
+    // 1. 角色表 (Characters) 迁移路径
     ensureColumn('characters', 'type', 'TEXT DEFAULT "character"');
     ensureColumn('characters', 'gender', 'TEXT');
 
-    // 2. Chats table migrations
+    // 2. 聊天记录表 (Chats) 迁移路径
     ensureColumn('chats', 'thought_content', 'TEXT');
     ensureColumn('chats', 'illustrationUrl', 'TEXT');
     ensureColumn('chats', 'illustrationPrompt', 'TEXT');
 
-    // 3. Save slots table migrations
+    // 3. 存档插槽表 (Save Slots) 迁移路径
     ensureColumn('save_slots', 'playTime', 'INTEGER DEFAULT 0');
     ensureColumn('save_slots', 'isMultiplayer', 'BOOLEAN DEFAULT 0');
 
@@ -131,17 +131,17 @@ function runMigrations(db: any) {
   }
 }
 
-// --- Optimization Helpers ---
+// --- 数据压缩与优化工具函数 (Optimization Shards) ---
 const hashCache = new Map<string, string>();
 
 /**
- * Fast synchronous hash for deduplication. We don't need cryptographic security here,
- * just a consistent key for content-addressed storage. Using FNV-1a for speed.
+ * 用于去重的快速同步哈希算法。此处无需密码学级别的安全性，
+ * 仅需为内容寻址存储提供一致的 Key。使用 FNV-1a 以平衡速度与冲突率。
  */
 function fastHash(str: string): string {
   if (hashCache.has(str)) return hashCache.get(str)!;
 
-  // FNV-1a 32-bit + secondary djb2 to reduce collision chance
+  // FNV-1a 32位 + 辅助 djb2 算法以极大降低碰撞概率 (Anti-collision)
   let h1 = 0x811c9dc5;
   let h2 = 5381;
   for (let i = 0; i < str.length; i++) {
@@ -155,7 +155,7 @@ function fastHash(str: string): string {
   return res;
 }
 
-// Keep async sha1 as alias for backward compatibility (callers already awaited it)
+// 保留异步 sha1 别名以维持向后兼容性 (部分旧版本调用方已使用了 await 模式)
 async function sha1(str: string): Promise<string> {
   return fastHash(str);
 }
@@ -170,7 +170,7 @@ async function optimizeGameState(state: any): Promise<any> {
     });
   };
 
-  // Process Items
+  // 优化阶段 A：处理物品列表去重 (Items)
   if (state.player && Array.isArray(state.player.items)) {
     for (let i = 0; i < state.player.items.length; i++) {
       const item = state.player.items[i];
@@ -186,7 +186,7 @@ async function optimizeGameState(state: any): Promise<any> {
     }
   }
 
-  // Process Recipes
+  // 优化阶段 B：处理食谱列表去重 (Recipes)
   if (state.player && Array.isArray(state.player.recipes)) {
     for (let i = 0; i < state.player.recipes.length; i++) {
       const recipe = state.player.recipes[i];
@@ -202,22 +202,22 @@ async function optimizeGameState(state: any): Promise<any> {
     }
   }
 
-  // Process Quests
-  // Completed/failed quests: hash as whole object (they never change)
-  // Ongoing quests: partial static/dynamic split (status/logs may update)
+  // 优化阶段 C：处理任务系统 (Quests)
+  // 已完成/已失败的任务：作为整体对象进行哈希（状态不再变更）
+  // 进行中的任务：采用动静分离策略（状态和日志可能更新）
   if (state.system && Array.isArray(state.system.quests)) {
     for (let i = 0; i < state.system.quests.length; i++) {
       const quest = state.system.quests[i];
       if (quest._ref) continue;
 
       if (quest.status === 'completed' || quest.status === 'failed') {
-        // Whole-object hash for finished quests
+        // 针对终态任务执行整包哈希压缩 (Immutable)
         const content = JSON.stringify(quest);
         const hash = fastHash(content);
         storeStatic(hash, 'quest_full', content);
         state.system.quests[i] = { _ref: hash };
       } else {
-        // Partial split for ongoing quests
+        // 针对运行态任务执行属性拆分优化 (Dynamic/Static Split)
         const {
           id,
           status,
@@ -247,8 +247,8 @@ async function optimizeGameState(state: any): Promise<any> {
     }
   }
 
-  // Process NPCs — hash each NPC as a whole object, keyed by NPC id
-  // Most NPCs don't change between turns, so this deduplicates massively
+  // 优化阶段 D：处理 NPC 字典 — 将每个 NPC 视为独立对象进行整体哈希
+  // 考虑到多数 NPC 状态在回合间保持稳定，此举可大幅削减冗余快照量 (Entity Deduplication)
   if (state.npcs && typeof state.npcs === 'object') {
     const npcDict = state.npcs;
     for (const npcKey of Object.keys(npcDict)) {
@@ -262,7 +262,7 @@ async function optimizeGameState(state: any): Promise<any> {
     }
   }
 
-  // Process Promises — hash each promise as a whole object
+  // 优化阶段 E：处理约定系统汇总 (Promises) — 执行整体对象哈希
   if (state.system && Array.isArray(state.system.promises)) {
     for (let i = 0; i < state.system.promises.length; i++) {
       const promise = state.system.promises[i];
@@ -325,7 +325,7 @@ async function restoreGameState(state: any): Promise<any> {
     }
   }
 
-  // Restore NPCs — each NPC value is { _ref: hash }, restore to full object
+  // 还原阶段 D：NPC 字典解压 — 将 { _ref: hash } 形式的占位符反解为全量对象 (Expansion)
   if (state.npcs && typeof state.npcs === 'object') {
     for (const npcKey of Object.keys(state.npcs)) {
       const npc = state.npcs[npcKey];
@@ -357,7 +357,7 @@ self.onmessage = async (e: MessageEvent) => {
     let result;
     switch (type) {
       case 'EXEC':
-        // Automatically stringify objects in bind parameters
+        // 自动化处理：对绑定参数中的 Object 类型执行 JSON 序列化注入
         const bind = payload.bind
           ? payload.bind.map((val: any) => {
               if (typeof val === 'object' && val !== null) return JSON.stringify(val);
@@ -369,7 +369,7 @@ self.onmessage = async (e: MessageEvent) => {
           sql: payload.sql,
           bind: bind,
           returnValue: 'resultRows',
-          rowMode: 'object' // or 'array'
+          rowMode: 'object' // 或采用 'array' 模式取值
         });
         break;
 
@@ -395,7 +395,7 @@ self.onmessage = async (e: MessageEvent) => {
           });
           const newSnapshotId = res[0].id;
 
-          // Prune old snapshots: keep only the latest MAX_SNAPSHOTS_PER_SAVE
+          // 快照自动剪枝：每个存档槽位仅保留最近的 MAX_SNAPSHOTS_PER_SAVE 份记录 (Memory Guard)
           try {
             const countRes = db.exec({
               sql: 'SELECT COUNT(*) as c FROM snapshots WHERE saveSlotId = ?',
@@ -406,7 +406,7 @@ self.onmessage = async (e: MessageEvent) => {
             const totalSnapshots = countRes[0].c;
             if (totalSnapshots > MAX_SNAPSHOTS_PER_SAVE) {
               const excess = totalSnapshots - MAX_SNAPSHOTS_PER_SAVE;
-              // Delete the oldest snapshots and also null out the snapshotId references in chats
+              // 级联清洗：在删除物理快照前，先解除 chats 表中的快照外键关联关系
               const oldestIds = db.exec({
                 sql: 'SELECT id FROM snapshots WHERE saveSlotId = ? ORDER BY id ASC LIMIT ?',
                 bind: [saveSlotId, excess],
@@ -416,7 +416,7 @@ self.onmessage = async (e: MessageEvent) => {
               if (oldestIds.length > 0) {
                 const idsToDelete = oldestIds.map((r: any) => r.id);
                 const placeholders = idsToDelete.map(() => '?').join(',');
-                // Clear snapshotId references in chats table so chats are not orphaned
+                // 重置聊天记录中的废弃快照引用，防止查询时产生悬挂指针 (Orphan Prevention)
                 db.exec({
                   sql: `UPDATE chats SET snapshotId = NULL WHERE snapshotId IN (${placeholders})`,
                   bind: idsToDelete
@@ -612,15 +612,14 @@ async function exportSave(db: any, saveSlotId: number) {
   console.log(`[Export] Starting export. Snapshots: ${snapshotsCount}, Chats: ${chats.length}`);
 
   // =================================================================
-  // Phase 1: Optimize snapshots (deduplication)
-  // FAST PATH: Skip already-optimized snapshots (those containing "_ref")
+  // 阶段 1：执行快照增量压缩 (Deduplication Pass)
+  // 快速路径：跳过已处理过的优化快照 (即包含 "_ref" 标记的项)
   // =================================================================
   const OPTIMIZE_BATCH_SIZE = 50;
   let optimizedCount = 0;
   let skippedCount = 0;
 
-  // Cache: store optimized gameState strings keyed by snapshot id
-  // to avoid re-reading them from DB in phase 2
+  // 内存缓存层：以快照 ID 为键存储优化后的 gameState 负载，以便在阶段 2 中直接消费，避免冗余 DB IO
   const snapshotCache = new Map<number, string>();
 
   for (let offset = 0; offset < snapshotsCount; offset += OPTIMIZE_BATCH_SIZE) {
@@ -639,8 +638,8 @@ async function exportSave(db: any, saveSlotId: number) {
       const originalStr =
         typeof s.gameState === 'string' ? s.gameState : JSON.stringify(s.gameState);
 
-      // FAST PATH: If already contains _ref markers, skip optimization
-      // This is safe because optimizeGameState only adds _ref and never removes them
+      // 快速路径：若负载字符串中已存在 _ref 标记，说明当前快照已处于压缩态
+      // 此项判定是安全的，因为 optimizeGameState 仅在增量过程中插入标记而绝不执行反向操作。
       if (originalStr.includes('"_ref"')) {
         snapshotCache.set(s.id, originalStr);
         skippedCount++;
@@ -663,7 +662,7 @@ async function exportSave(db: any, saveSlotId: number) {
       }
     }
 
-    // Batch update changed snapshots
+    // 批量提交发生变更的快照数据记录 (Atomic Batch Update)
     if (updates.length > 0) {
       db.transaction(() => {
         const stmt = db.prepare('UPDATE snapshots SET gameState = ? WHERE id = ?');
@@ -681,11 +680,11 @@ async function exportSave(db: any, saveSlotId: number) {
 
     optimizedCount += batch.length;
 
-    // Yield every batch to keep worker responsive
+    // 任务切片：每批次处理后释放 CPU 事件循环，确保 Worker 线程的即时响应能力
     if (optimizedCount % 100 === 0) {
       await new Promise((resolve) => setTimeout(resolve, 0));
       console.log(
-        `[Export] Optimize: ${optimizedCount}/${snapshotsCount} (skipped ${skippedCount})`
+        `[Export] 压缩进度: ${optimizedCount}/${snapshotsCount} (已跳过已处理项: ${skippedCount})`
       );
     }
   }
@@ -695,11 +694,11 @@ async function exportSave(db: any, saveSlotId: number) {
   const facilities = getRows('SELECT * FROM facilities WHERE saveSlotId = ?', [saveSlotId]);
   const characters = getRows('SELECT * FROM characters');
 
-  // Export static data AFTER optimization (new refs may have been inserted)
+  // 最终导出静态资源库内容 (此时所有新增的内容寻址 Ref 均已完成哈希链路注入)
   const staticData = getRows('SELECT * FROM static_data');
 
   // =================================================================
-  // Phase 2: Build JSON Blob in streaming fashion
+  // 阶段 2：以流式写入方式构建 JSON 二进制大对象 (Blob)
   // =================================================================
   const jsonParts: string[] = [];
 
@@ -712,15 +711,15 @@ async function exportSave(db: any, saveSlotId: number) {
   jsonParts.push(`"facilities":${JSON.stringify(facilities)},`);
   jsonParts.push(`"staticData":${JSON.stringify(staticData)},`);
 
-  // Snapshots — use cached data from phase 1 to avoid re-reading from DB
+  // 处理快照负载：优先消费阶段 1 构建的预优化缓存，避免二次触发大规模 DB 全表扫描 (Cache Hit Recovery)
   jsonParts.push(`"snapshots":[`);
 
   let processedCount = 0;
   let isFirstSnapshot = true;
 
-  // If we have all snapshots cached, use cache directly (no DB re-read needed)
+  // 理想路径：若全量快照均命中缓存，则可脱离 DB 游标直接生成 JSON 片段
   if (snapshotCache.size > 0) {
-    // We need the full snapshot metadata. Read in batches but use cached gameState.
+    // 补全快照元数据：分批读取非静态列数据，并实时注入缓存中的 gameState 负载流 (JSON Streaming)
     const BATCH_SIZE = 100;
     for (let offset = 0; offset < snapshotsCount; offset += BATCH_SIZE) {
       const batch = getRows(
@@ -745,7 +744,7 @@ async function exportSave(db: any, saveSlotId: number) {
     }
   }
 
-  // Free cache memory
+  // 迁移完成，立即显式释放缓存占用的内存空间 (Heap Shrink)
   snapshotCache.clear();
 
   jsonParts.push(']}');
@@ -756,10 +755,10 @@ async function exportSave(db: any, saveSlotId: number) {
 }
 
 /**
- * Helper to strip a large JSON array section from ArrayBuffer
- * Returns a new ArrayBuffer (or the same one modified if we want to be destructive, but better safe)
- * Replaces the content of the array with spaces: "key": [ ... ] -> "key": [     ]
- * @param keepLast If > 0, keeps the last N items and strips the rest.
+ * 辅助工具：从大型 ArrayBuffer 中物理剥离指定的 JSON 数组片段以节约解析开销。
+ * 返回经动态裁切的新 ArrayBuffer（或在支持的场景下执行内存原地擦除）。
+ * 逻辑原理：将数组内的字节内容用空格符 (32) 物理覆写，以跳过 JSON 解码器的深层分析。
+ * @param keepLast 若大于 0，则保留最近的 N 个元素，其余部分执行物理剔除。
  */
 function stripJsonSection(buffer: ArrayBuffer, keyName: string, keepLast: number = 0): ArrayBuffer {
   const uint8 = new Uint8Array(buffer);
@@ -771,7 +770,7 @@ function stripJsonSection(buffer: ArrayBuffer, keyName: string, keepLast: number
   let cursor = 0;
   let keyFoundAt = -1;
 
-  // 1. Find the key at root level (depth 1)
+  // 1. 在根层级（树深度为 1）定位目标 Key 的字节偏移量 (Key Search Pass)
   while (cursor < uint8.length) {
     const byte = uint8[cursor]!;
     if (inString) {
@@ -813,11 +812,11 @@ function stripJsonSection(buffer: ArrayBuffer, keyName: string, keepLast: number
   }
 
   if (keyFoundAt === -1) {
-    console.warn(`[Import] Key "${keyName}" not found at root level.`);
+    console.warn(`[导入] 在根层级未找到 Key "${keyName}"。`);
     return buffer;
   }
 
-  // 2. Find start of array value
+  // 2. 定位数组字段的字节起始边界 (Array Start Bound)
   cursor = keyFoundAt;
   let startBracket = -1;
   while (cursor < uint8.length) {
@@ -826,7 +825,7 @@ function stripJsonSection(buffer: ArrayBuffer, keyName: string, keepLast: number
       startBracket = cursor;
       break;
     } else if (byte > 32) {
-      console.warn(`[Import] Value for "${keyName}" is not an array.`);
+      console.warn(`[导入] "${keyName}" 的值不是数组类型。`);
       return buffer;
     }
     cursor++;
@@ -834,7 +833,7 @@ function stripJsonSection(buffer: ArrayBuffer, keyName: string, keepLast: number
 
   if (startBracket === -1) return buffer;
 
-  // 3. Find end of array and collect comma positions
+  // 3. 追踪数组终点符号位，并同步采集元素分隔符（逗号）的位置掩码 (Comma Mapping Pass)
   depth = 1;
   inString = false;
   escaped = false;
@@ -865,14 +864,14 @@ function stripJsonSection(buffer: ArrayBuffer, keyName: string, keepLast: number
   }
 
   if (depth !== 0) {
-    console.warn(`[Import] Could not find closing bracket for "${keyName}".`);
+    console.warn(`[导入] 无法找到 "${keyName}" 的闭合括号。`);
     return buffer;
   }
 
   const endBracket = cursor;
   let stripEnd = endBracket;
 
-  // 4. Calculate strip position
+  // 4. 根据保留策略计算物理裁切的字节边界 (Boundary Calculation)
   if (keepLast > 0) {
     let hasContent = false;
     for (let k = startBracket + 1; k < endBracket; k++) {
@@ -894,7 +893,7 @@ function stripJsonSection(buffer: ArrayBuffer, keyName: string, keepLast: number
     }
   }
 
-  // 5. Fill with spaces
+  // 5. 执行物理擦除：在指定字节序列区间填充空格占位符 (Fast Buffer Fill)
   for (let k = startBracket + 1; k < stripEnd; k++) {
     uint8[k] = 32;
   }
@@ -906,39 +905,39 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
   let data;
   try {
     if (typeof jsonContent === 'string') {
-      console.log('[Import] Parsing string content, length:', jsonContent.length);
+      console.log('[导入] 正在解析字符串内容，长度:', jsonContent.length);
       data = JSON.parse(jsonContent);
     } else {
       // ArrayBuffer
       let buffer = jsonContent;
-      console.log('[Import] Parsing ArrayBuffer content, size:', buffer.byteLength);
+      console.log('[导入] 正在解析 ArrayBuffer 内容，大小:', buffer.byteLength);
 
-      // If file is very large (> 100MB), try to strip unnecessary data (snapshots) to avoid OOM
+      // 超大规模文件熔断机制 (> 100MB)：主动尝试剥离陈旧快照数据，防止解析阶段导致 Worker OOM 崩溃。
       if (buffer.byteLength > 100 * 1024 * 1024) {
         console.warn(
-          '[Import] File too large, attempting to strip old snapshots to save memory...'
+          '[导入] 文件体积过大，正在尝试剥离旧快照以节省内存...'
         );
         try {
           // Try to keep the last 50 snapshots, strip the rest
           buffer = stripJsonSection(buffer, 'snapshots', 50);
-          console.log('[Import] Snapshots processed. New size:', buffer.byteLength);
+          console.log('[导入] 快照处理完成。新大小:', buffer.byteLength);
         } catch (e) {
-          console.error('[Import] Failed to strip snapshots:', e);
+          console.error('[导入] 快照剥离失败:', e);
           // Continue with original buffer
         }
       }
 
-      // Use Response.json() to parse large JSON asynchronously and efficiently
-      // This avoids V8 string length limits for large files
+      // 异步高性能流式解析：利用底层浏览器 Response 原语解析巨型 JSON 对象。
+      // 此举通过分块加载，可有效绕过 V8 引擎在普通 JSON.parse 下对超长字符串的堆栈物理限制。
       data = await new Response(new Blob([buffer])).json();
     }
   } catch (e: any) {
-    console.error('[Import] JSON Parse failed:', e);
-    throw new Error(`JSON parsing failed: ${e.message}`);
+    console.error('[导入] JSON 解析失败:', e);
+    throw new Error(`JSON 解析失败: ${e.message}`);
   }
 
   if (!data.saveSlot || !Array.isArray(data.chats)) {
-    throw new Error('Invalid save file format');
+    throw new Error('存档文件格式无效');
   }
 
   // Ensure snapshots is an array if we stripped it (it might be parsed as empty array if we replaced content)
@@ -950,9 +949,9 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
     // const exec = (sql: string, bind: any[] = []) =>
     //    db.exec({ sql, bind, returnValue: 'resultRows', rowMode: 'object' });
 
-    // 0. Import Static Data (Pre-requisite for snapshots)
+    // 0. 导入静态资源库 (作为后续快照内容还原的核心前置依赖项)
     if (Array.isArray(data.staticData)) {
-      console.log('[Import] Importing static data...', data.staticData.length);
+      console.log('[导入] 正在导入静态资源数据...', data.staticData.length);
       const stmt = db.prepare(
         'INSERT OR IGNORE INTO static_data (id, type, content) VALUES (?, ?, ?)'
       );
@@ -973,29 +972,24 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
     // Actually optimizeGameState calculates hash and inserts if not exists.
     // So if we imported static_data, optimizeGameState will generate same hash and IGNORE insert.
     // BUT we need to process snapshots to ensure they are optimized (if importing old full save)
-    // OR if importing new optimized save, they are already refs.
+    // 或者若导入的是已优化的新版存档，数据本身即已是引用形式。 (Pre-optimized)
 
-    // We can do this optimization loop here, but since it involves DB writes (inserting static_data),
-    // it's better to do it. But wait, optimizeGameState is async because of SHA1?
-    // Yes, sha1 is async. We cannot call async function inside db.transaction callback if we want to be safe?
-    // Actually sqlite3-wasm transaction is synchronous. We cannot await inside it.
-    // So we must move snapshot optimization OUTSIDE the transaction or use synchronous SHA1.
-    // Our sha1 implementation checks crypto.subtle (async) or fallback (sync-ish but blocking).
-    // Let's keep snapshot optimization OUTSIDE transaction as before.
+    // 我们可以在此处执行优化循环，但由于涉及数据库写入指令且 optimizeGameState 因 SHA1 变为异步函数，
+    // 建议在外部流程中处理。 (Async Safety)
+    // 设计笔记：由于 SHA1 涉及 WebCrypto 异步指令，我们必须将快照优化逻辑置于同步事务的回调范围之外执行。
   });
 
-  // Optimize snapshots before transaction to save space in DB
-  // This is async, so we do it outside transaction
+  // 数据就绪：在正式落盘前执行全局快照压缩，以最大程度优化既有数据库的物理开销。
+  // 注意：此过程涉及异步 IO，务必位于事务边界外执行。
   if (data.snapshots.length > 0) {
-    console.log('[Import] Optimizing snapshots for storage...');
+    console.log('[导入] 正在优化存档快照存储...');
     for (const snap of data.snapshots) {
       try {
         let state = snap.gameState;
         if (typeof state === 'string') state = JSON.parse(state);
 
-        // Optimize (extract static data)
-        // Note: If we just imported staticData, this function will re-hash and try to insert.
-        // INSERT OR IGNORE handles duplicates efficiently.
+        // 执行数据压缩优化：提取出可公用的静态数据负载 (Static Extraction)
+        // 注意：即便刚导入过静态库，此操作引发的重复插入会被 INSERT OR IGNORE 高效拦截。
         state = await optimizeGameState(state);
 
         snap.gameState = JSON.stringify(state);
@@ -1003,14 +997,14 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
         console.warn('Snapshot pre-optimization failed', e);
       }
     }
-    console.log('[Import] Snapshots optimized.');
+    console.log('[导入] 快照优化完成。');
   }
 
   db.transaction(() => {
     const exec = (sql: string, bind: any[] = []) =>
       db.exec({ sql, bind, returnValue: 'resultRows', rowMode: 'object' });
 
-    // 1. Create Save Slot
+    // 1. 创建存档插槽记录 (Save Slot Entry)
     exec(
       'INSERT INTO save_slots (name, summary, lastPlayed, location, gameDate, gameTime, playTime, isMultiplayer) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
@@ -1029,11 +1023,11 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
     const chatIdMap = new Map<number, number>();
     const snapshotIdMap = new Map<number, number>();
 
-    // 2. Import Characters (Upsert)
+    // 2. 导入角色元数据 (采用 Upsert 模式支持增量同步)
     if (Array.isArray(data.characters)) {
       for (const char of data.characters) {
         try {
-          // Mapping for old fields
+          // 演进适配层：执行旧版本字段的向后兼容映射 (Field Compatibility Adaptation)
           const mappedChar: any = {
             uuid: char.uuid || `char-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             name: char.name || '未知角色',
@@ -1048,7 +1042,7 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
             stats: typeof char.stats === 'object' ? { ...char.stats } : {}
           };
 
-          // Collect extra fields into stats
+          // 归拢：将所有非标扩展字段统一汇入 stats 属性包中存储 (Stats Folding)
           const extraFields = [
             'initialPower',
             'initialMaxHp',
@@ -1085,17 +1079,17 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
             );
           }
         } catch (e: any) {
-          console.warn(`[Import] Failed to import character ${char.name || char.uuid}:`, e);
+          console.warn(`[导入] 角色 ${char.name || char.uuid} 导入失败:`, e);
           // Continue with other characters? Or throw?
           // Throwing stops the whole import. Let's throw to ensure data integrity.
-          throw new Error(`Failed to import character ${char.name}: ${e.message}`);
+          throw new Error(`角色 ${char.name} 导入失败: ${e.message}`);
         }
       }
     }
 
-    // 3. Import Chats (First Pass: snapshotId = NULL)
+    // 3. 导入聊天纪录 (第一轮导入：解开对 snapshotId 的物理外键依赖以便先行入库)
     for (const chat of data.chats) {
-      // Fallback for required fields in old saves
+      // 健壮性兜底：为旧版存档中缺失的必填业务字段提供默认值 (Fallback Shards)
       const role = chat.role || 'assistant';
       const timestamp = chat.timestamp || Date.now();
       const turnCount = chat.turnCount !== undefined ? chat.turnCount : 0;
@@ -1103,7 +1097,7 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
       const debugLog =
         typeof chat.debugLog === 'object' ? JSON.stringify(chat.debugLog) : chat.debugLog || null;
 
-      // Extra fields from old version
+      // 处理来自中间版本演进出的特殊标识字段 (Legacy Extension Fields)
       const thoughtContent = chat.thought_content || null;
       const illustrationUrl = chat.illustrationUrl || null;
       const illustrationPrompt = chat.illustrationPrompt || null;
@@ -1127,10 +1121,10 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
       chatIdMap.set(chat.id, newChatId);
     }
 
-    // 4. Import Snapshots (Use Mapped Chat IDs)
+    // 4. 导入快照集 (此时消费已映射就绪的 New Chat IDs 构建关联关系)
     if (Array.isArray(data.snapshots)) {
       for (const snap of data.snapshots) {
-        // Fix gameState format if needed
+        // 数据格式补丁：确保 gameState 始终以字符串协议形式落地 (Stringify Patch)
         let gameStateStr = snap.gameState;
         if (typeof gameStateStr !== 'string') {
           gameStateStr = JSON.stringify(gameStateStr);
@@ -1141,7 +1135,7 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
 
         if (newChatId === 0) {
           console.warn(
-            `[Import] Snapshot ${snap.id} refers to non-existent chat ${oldChatId}, skipping.`
+            `[导入] 快照 ${snap.id} 引用了不存在的对话 ${oldChatId}，已跳过。`
           );
           continue;
         }
@@ -1155,7 +1149,7 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
       }
     }
 
-    // 5. Update Chats with Mapped Snapshot IDs
+    // 5. 引用闭环：第二次遍历 chats 表，补全通过 ID 映射表算出的 snapshotId 正确外键引用 (Ref Repair)
     for (const chat of data.chats) {
       if (chat.snapshotId && snapshotIdMap.has(chat.snapshotId)) {
         const newChatId = chatIdMap.get(chat.id);
@@ -1166,7 +1160,7 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
       }
     }
 
-    // 6. Import Memories
+    // 6. 导入记忆系统集 (Memories Registry)
     const memoryIdMap = new Map<number, number>();
 
     if (Array.isArray(data.memories)) {
@@ -1187,7 +1181,7 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
         ];
         const placeholders = fields.map(() => '?').join(', ');
 
-        // Need to ensure JSON fields are stringified if they come as objects
+        // 健壮性适配：确保复杂嵌套字段 (tags, entities 等) 合法序列化为 JSON 字符串
         const ensureString = (val: any) =>
           typeof val === 'object' && val !== null ? JSON.stringify(val) : val || '[]';
 
@@ -1212,13 +1206,13 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
       }
     }
 
-    // 6.1 Import Memory Relations
+    // 6.1 导入记忆关联图谱 (Memory Contextual Relations)
     if (Array.isArray(data.memoryRelations)) {
       for (const rel of data.memoryRelations) {
         const newSourceId = memoryIdMap.get(rel.source_id);
         const newTargetId = memoryIdMap.get(rel.target_id);
 
-        // Only import if both memories were successfully imported/mapped
+        // 关系完整性约束：仅在源端与目标端记忆对象均成功映射后才建立关联关系 (Safety Interlock)
         if (newSourceId && newTargetId) {
           try {
             exec(
@@ -1226,16 +1220,16 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
               [newSourceId, newTargetId, rel.rel_type, rel.strength, rel.created_at || Date.now()]
             );
           } catch (e) {
-            console.warn('[Import] Failed to import memory relation:', e);
+            console.warn('[导入] 记忆关联导入失败:', e);
           }
         }
       }
     }
 
-    // 7. Import Facilities
+    // 7. 导入设施/建筑注册表 (Facilities Manifest)
     const facilityIdMap = new Map<number, number>();
     if (Array.isArray(data.facilities)) {
-      // Helper for stringifying
+      // 序列化辅助函数 (Serialization Helper)
       const ensureString = (val: any) =>
         typeof val === 'object' && val !== null ? JSON.stringify(val) : val || '[]';
 
@@ -1278,9 +1272,9 @@ async function importSaveWithCorrectOrder(db: any, jsonContent: string | ArrayBu
   return { newSaveId };
 }
 
-// @ts-expect-error: TODO: fix type error
+// @ts-expect-error: TODO: 修复类型定义错误 (Type Definition Required)
 
 function importGlobalData(db: any, gameData: any) {
-  // Implementation for global data import if needed
+  // 待办实现：根据业务需求注入全局层级的数据导入逻辑 (Global Import Logic)
   return true;
 }

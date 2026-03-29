@@ -112,7 +112,7 @@ class GameLoopService {
       return;
     }
     if (!userContent.trim()) {
-      console.warn('[GameLoop] handleUserAction ignored because content is empty');
+      console.warn('[游戏循环] handleUserAction 由于内容为空被忽略');
       return;
     }
 
@@ -128,14 +128,14 @@ class GameLoopService {
       if (gameStore.state.system.combat?.isPending) {
         gameStore.setCombatState(null);
         console.log(
-          '[GameLoop] Cleared pending combat trigger because user performed a different action.'
+          '[游戏循环] 由于用户执行了其他操作，已清除挂起的战斗触发器。'
         );
       }
 
       if (gameStore.state.system.pending_quest_trigger) {
         gameStore.setPendingQuest(null);
         console.log(
-          '[GameLoop] Cleared pending quest trigger because user performed a different action.'
+          '[游戏循环] 由于用户执行了其他操作，已清除挂起的任务触发器。'
         );
       }
 
@@ -160,7 +160,7 @@ class GameLoopService {
           }
 
           finalUserContent = aggregatedContent;
-          console.log('[GameLoop] Aggregated Multiplayer Input:\n', finalUserContent);
+          console.log('[游戏循环] 多人模式聚合输入：\n', finalUserContent);
 
           // 获取后清除待处理的多人输入
           multiplayerService.clearPendingGuestInputs();
@@ -177,12 +177,12 @@ class GameLoopService {
       this.currentStage.value = 'preparing';
       const promptContext = await promptService.build(finalUserContent, retrievedMemories);
 
-      // DEBUG: 打印上下文组成
+      // [提示词调试] 打印上下文组成结构
       console.log(
-        '[Prompt Debug] Context Composition:',
+        '[提示词调试] 上下文详情 (Sections):',
         promptContext.sections.map((s) => `${s.id}: ${s.tokenCount} tokens`).join(', ')
       );
-      console.log('[Prompt Debug] Total Tokens:', promptContext.totalTokens);
+      console.log('[提示词调试] 提示词 Token 总量:', promptContext.totalTokens);
 
       const messages = promptService.toOpenAIMessages(promptContext);
 
@@ -214,7 +214,7 @@ class GameLoopService {
         presence_penalty: chatConfig.presence_penalty
       };
 
-      console.log('[Game Loop] Chat Config:', {
+      console.log('[游戏循环] 对话模型配置详情：', {
         model: chatConfig.model,
         stream: chatConfig.stream,
         temperature: chatConfig.temperature,
@@ -244,7 +244,7 @@ class GameLoopService {
           for await (const chunk of stream) {
             // 检查是否已中止
             if (this.abortController?.signal.aborted) {
-              throw new Error('Operation aborted by user');
+              throw new Error('操作已被用户中止');
             }
             const delta = chunk.choices[0]?.delta?.content || '';
             rawContent += delta;
@@ -293,11 +293,11 @@ class GameLoopService {
             .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
         }
       } catch (error: any) {
-        if (error.message === 'Operation aborted by user' || error.name === 'AbortError') {
-          console.log('[游戏循环] 剧情生成已中止');
-          return; // 提前退出而不提交
+        if (error.message === '操作已被用户中止' || error.name === 'AbortError') {
+          console.log('[游戏循环] 剧情生成动作已中止');
+          return; // 提前退出且不执行提交
         }
-        throw error; // 重新抛出其他错误
+        throw error; // 继续向上层抛出其他异常
       }
 
       // 使用 rawContent 进行提取，确保即使被隐藏也能捕获内部思考
@@ -332,7 +332,7 @@ class GameLoopService {
           finalStory = finalStory.replace(/<combat_trigger>[\s\S]*?<\/combat_trigger>/g, '').trim();
           this.streamedContent.value = finalStory;
         } catch (e) {
-          console.warn('Failed to parse combat trigger, ignoring:', e);
+          console.warn('[游戏循环] 解析战斗触发器失败，已忽略:', e);
         }
       }
 
@@ -350,7 +350,7 @@ class GameLoopService {
           finalStory = finalStory.replace(/<quest_trigger>[\s\S]*?<\/quest_trigger>/g, '').trim();
           this.streamedContent.value = finalStory;
         } catch (e) {
-          console.warn('Failed to parse quest trigger, ignoring:', e);
+          console.warn('[游戏循环] 解析任务触发器失败，已忽略:', e);
         }
       }
 
@@ -368,7 +368,7 @@ class GameLoopService {
           finalStory = finalStory.replace(/<quest_update>[\s\S]*?<\/quest_update>/g, '').trim();
           this.streamedContent.value = finalStory;
         } catch (e) {
-          console.warn('Failed to parse quest update, ignoring:', e);
+          console.warn('[游戏循环] 解析任务更新标记失败，已忽略:', e);
         }
       }
 
@@ -390,7 +390,7 @@ class GameLoopService {
             .trim();
           this.streamedContent.value = finalStory;
         } catch (e) {
-          console.warn('Failed to parse prediction trigger, ignoring:', e);
+          console.warn('[游戏循环] 解析预测触发器标记失败，已忽略:', e);
         }
       }
 
@@ -567,7 +567,7 @@ class GameLoopService {
           }
         } else {
           console.warn(
-            '[GameLoop] Quest update requested but quest not found or not active:',
+            '[游戏循环] 请求更新任务但未找到相关任务或任务未处于激活状态:',
             questUpdateData.quest_name
           );
         }
@@ -630,7 +630,7 @@ class GameLoopService {
         gameStore.state.system.predicted_next_round_chars =
           predictionTriggerData.next_round_characters;
         console.log(
-          '[GameLoop] Updated predicted characters:',
+          '[游戏循环] 已更新预测角色名单:',
           predictionTriggerData.next_round_characters
         );
       } else {
@@ -640,7 +640,7 @@ class GameLoopService {
           gameStore.state.system.predicted_next_round_chars &&
           gameStore.state.system.predicted_next_round_chars.length > 0
         ) {
-          console.log('[GameLoop] Clearing predicted characters (no new prediction)');
+          console.log('[游戏循环] 清除历史预测角色（当前回合无后续预测数据）');
           gameStore.state.system.predicted_next_round_chars = [];
         }
       }
@@ -662,7 +662,7 @@ class GameLoopService {
           this.abortController?.signal
         );
       } else {
-        console.log('[GameLoop] Skipping background processing: aborted or empty story.');
+        console.log('[游戏循环] 跳过后台任务处理：已中止或故事内容为空。');
         this.currentStage.value = 'idle';
         this.isBackgroundProcessing.value = false;
         this.isProcessing.value = false;
@@ -670,8 +670,8 @@ class GameLoopService {
     } catch (e: any) {
       console.error('Game Loop Error:', e);
 
-      // 不要将中止（abort）作为错误处理
-      if (e.message === 'Operation aborted by user' || e.name === 'AbortError') {
+      // 对中止（abort）操作进行过滤，不视作异常错误
+      if (e.message === '操作已被用户中止' || e.name === 'AbortError') {
         this.error.value = null;
         this.currentStage.value = 'idle';
         this.isProcessing.value = false;
@@ -786,7 +786,7 @@ class GameLoopService {
           debugLog: {
             logicInput: logicInputSnapshot,
             logicOutput: JSON.stringify(logicResult, null, 2),
-            logicThinking: logicResult.thinking || 'No thinking process returned from Logic Model.'
+            logicThinking: logicResult.thinking || '逻辑模型未返回思考过程。'
           }
         });
       }
@@ -818,7 +818,7 @@ class GameLoopService {
             });
           }
         })
-        .catch((err) => console.error('[GameLoop] Drawing failed:', err));
+        .catch((err) => console.error('[游戏循环] 插图生成失败:', err));
 
       // LLM #3: 记忆提取（异步）
       // 我们不为此阻塞 UI 提交，但应该处理相应的错误
@@ -840,16 +840,16 @@ class GameLoopService {
           },
           signal
         )
-        .catch((err) => console.error('Memory Extraction Failed:', err));
+        .catch((err) => console.error('[游戏循环] 记忆提取异步任务失败:', err));
 
       // 方案 C: 同步房主状态至中继服务器
       if (gameStore.multiplayer.isMultiplayer && gameStore.multiplayer.isHost) {
         multiplayerService.syncHostState(gameStore.state).catch((err) => {
-          console.error('[GameLoop] Multiplayer Sync Failed:', err);
+          console.error('[游戏循环] 多人状态同步失败:', err);
         });
       }
     } catch (error) {
-      console.error('Background processing failed:', error);
+      console.error('[游戏循环] 后台任务处理遭遇异常:', error);
       const toastStore = useToastStore();
       toastStore.addToast('后台处理失败，但对话已保存', 'warning', 5000);
     } finally {
@@ -861,8 +861,8 @@ class GameLoopService {
   }
 
   private initializeManagement(_triggerData: any) {
-    // 强制禁用：即使收到触发器操作，也直接忽略。
-    console.warn('[GameLoop] Management system is temporarily disabled. Ignoring trigger.');
+    // 强制禁用提示：经营系统目前正在重构中，收到的触发指令已被丢弃。
+    console.warn('[游戏循环] 经营系统目前处于禁用状态，已忽略触发指令。');
     return;
   }
 
@@ -871,7 +871,7 @@ class GameLoopService {
     if ((this.isProcessing.value || this.isBackgroundProcessing.value) && this.abortController) {
       this.isAborting.value = true;
       this.abortController.abort();
-      console.log('[Game Loop] Aborting current operation...');
+      console.log('[游戏循环] 正在中止当前处理流程...');
     }
   }
 
@@ -903,7 +903,7 @@ class GameLoopService {
 
       // 1. 通过逻辑模型生成叙事（旁白模式）
       // 根据要求，这是一个单独的 API 调用
-      console.log('[GameLoop] Calling generateCombatNarrative...');
+      console.log('[游戏循环] 正在调用 generateCombatNarrative 执行战斗润色...');
       let narrative = await logicService.generateCombatNarrative(
         resultSummary,
         combatants,
@@ -913,16 +913,16 @@ class GameLoopService {
       // 次要后备检查
       if (!narrative || narrative.trim() === '') {
         console.warn(
-          '[GameLoop] Received empty narrative from LogicService. Using emergency fallback.'
+          '[游戏循环] 从 LogicService 接收到空叙事，正在启用应急降级方案。'
         );
         narrative = `(系统提示：由于技术原因，战斗润色描写失败。以下是战斗原始信息)\n${resultSummary}`;
       }
 
-      console.log('[GameLoop] Narrative received, final length:', narrative.length);
+      console.log('[游戏循环] 已接收战斗叙事描写，最终字符长度:', narrative.length);
 
       // 2. 为故事模型构造用户操作
       const content = `【战斗回放】\n${narrative}\n\n(请承接以上战斗结果，继续推进剧情)`;
-      console.log('[GameLoop] Final content constructed for handleUserAction.');
+      console.log('[游戏循环] 战斗润色内容已构造完成，准备进入 handleUserAction 处理流程。');
 
       // 3. 继续进行标准的用户操作处理
       this.currentStage.value = 'idle'; // 在调用 handleUserAction 之前重置阶段，因为它会设置自己的阶段状态
@@ -938,6 +938,7 @@ class GameLoopService {
   }
 
   private initializeCombat(triggerData: any) {
+    console.log('[游戏循环] 正在初始化战斗系统状态...');
     const gameStore = useGameStore();
     const charStore = useCharacterStore();
     const player = gameStore.state.player;
@@ -1045,7 +1046,7 @@ class GameLoopService {
         // 调试：检查映射表是否可用
         if (Object.keys(CHARACTER_NAME_TO_ID_MAP).length === 0) {
           console.warn(
-            '[Combat Init] CHARACTER_NAME_TO_ID_MAP is empty! Check characterMapping.ts export.'
+            '[战斗初始化] CHARACTER_NAME_TO_ID_MAP 为空！请检查 characterMapping.ts 的导出设置。'
           );
         }
 
@@ -1064,7 +1065,7 @@ class GameLoopService {
           if (foundKey) {
             mappedId = CHARACTER_NAME_TO_ID_MAP[foundKey];
             console.log(
-              `[Combat Init] Fuzzy mapped '${npcName}' -> '${foundKey}' -> ID: ${mappedId}`
+              `[战斗初始化] 模糊匹配成功: '${npcName}' -> '${foundKey}' -> ID: ${mappedId}`
             );
           }
         }
@@ -1082,7 +1083,7 @@ class GameLoopService {
             method = 'name_mapping';
           } else {
             console.warn(
-              `[Combat Init] ID '${mappedId}' found but no cards with prefix '${mappedPrefix}'. Sample keys: ${allKeys.slice(0, 5).join(', ')}`
+              `[战斗初始化] 已找到 ID '${mappedId}' 但未发现带前缀 '${mappedPrefix}' 的符卡。示例 Key: ${allKeys.slice(0, 5).join(', ')}`
             );
             // 后退方案：尝试查找包含该 ID 的任何键
             matches = Object.entries(PRESET_SPELLCARDS)
@@ -1090,23 +1091,23 @@ class GameLoopService {
               .map(([key, val]) => [key, val] as [string, SpellCard]);
             if (matches.length > 0) {
               console.log(
-                `[Combat Init] Fallback: Found ${matches.length} cards containing ID '${mappedId}'`
+                `[战斗初始化] 降级匹配成功：发现 ${matches.length} 张包含 ID '${mappedId}' 的符卡`
               );
               method = 'fallback_id_search';
             }
           }
         } else {
-          console.log(`[Combat Init] No mapped ID found for '${npcName}'`);
+          console.log(`[战斗初始化] 未能为 '${npcName}' 找到映射 ID`);
         }
       }
 
       if (matches.length > 0) {
         console.log(
-          `[Combat Init] Found ${matches.length} spell cards for ${npcName} (ID: ${npcId}) via ${method}`
+          `[战斗初始化] 成功为 ${npcName} (ID: ${npcId}) 找到 ${matches.length} 张符卡，匹配策略: ${method}`
         );
       } else {
         console.log(
-          `[Combat Init] No spell cards found for ${npcName} (ID: ${npcId}). Tried mapping: ${CHARACTER_NAME_TO_ID_MAP[npcName || '']}`
+          `[战斗初始化] 未为 ${npcName} (ID: ${npcId}) 找到专用符卡。尝试过的映射 ID: ${CHARACTER_NAME_TO_ID_MAP[npcName || '']}`
         );
       }
 
@@ -1162,9 +1163,9 @@ class GameLoopService {
       const buff = getBuffByName(triggerData.player_buff_name, 0, buffValue);
       if (buff) {
         console.log(
-          '[Combat Init] Applying Trigger Buff:',
+          '[战斗初始化] 正在应用触发器指定的 Buff:',
           buff.name,
-          buffValue ? `(Value: ${buffValue})` : '(Random Value)'
+          buffValue ? `(数值: ${buffValue})` : '(随机数值)'
         );
         playerCombatant.buffs.push(buff);
       }
@@ -1220,15 +1221,15 @@ class GameLoopService {
 
       if (matchedNPC) {
         console.log(
-          '[Combat Init] Resolved Enemy:',
+          '[战斗初始化] 已解析对手:',
           enemyNameRaw,
           '->',
           matchedNPC.name,
-          'Power:',
+          '战力分级:',
           matchedNPC.power
         );
       } else {
-        console.warn('[Combat Init] Could not resolve enemy:', enemyNameRaw);
+        console.warn('[战斗初始化] 无法解析该对手:', enemyNameRaw);
       }
 
       // 决定能力水平：商店 > 触发器 > 默认值
@@ -1343,7 +1344,7 @@ class GameLoopService {
               max_hp: staticChar.initialMaxHp || 1000,
               combatLevel: 1
             };
-            console.log('[Combat Init] Created ephemeral Ally from Static DB:', matchedNPC.name);
+            console.log('[战斗初始化] 从静态设定库中创建了临时盟友:', matchedNPC.name);
           }
         }
       }
@@ -1438,7 +1439,7 @@ class GameLoopService {
       multiplayerService.sendCombatInit(combatState);
     }
 
-    console.log('[Game Loop] Combat Initialized (Pending User Confirmation)');
+    console.log('[游戏循环] 战斗逻辑已初始化（当前处于“等待玩家确认”状态）');
   }
 }
 

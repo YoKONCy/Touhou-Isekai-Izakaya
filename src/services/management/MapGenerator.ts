@@ -4,7 +4,7 @@ import { useSettingsStore } from '@/stores/settings';
 
 export interface MapData {
   layout: string[];
-  // floors?: Record<string, string[]>; // Removed: Single floor only
+  // floors?: Record<string, string[]>; // 已移除设计：当前已被限制为仅支持单楼层
   theme: string;
   description: string;
 }
@@ -31,9 +31,9 @@ export const DEFAULT_MAP_DATA: MapData = {
   ]
 };
 
-// Zone Types from LLM
+// 来自 LLM 的区域设定标识
 export type ZoneChar = '#' | '.' | 'K' | 'D' | 'W' | 'E' | 'L' | 'R';
-// #: Wall, .: Floor (Generic), K: Kitchen, D: Dining, W: Walkway, E: Entrance, L: Lounge, R: Restroom
+// #: 边界墙体, .: 泛用地板, K: 后厨重地, D: 吃饭就餐区, W: 行走过道, E: 门店入口, L: 休息待客区, R: 卫生洗手间
 
 const MAP_GENERATION_PROMPT = `
 You are a level designer for a pixel art izakaya management game.
@@ -103,7 +103,7 @@ export async function generateMap(
 ): Promise<MapData> {
   const settingsStore = useSettingsStore();
 
-  // Debug: Use default map if enabled
+  // 调试专用: 若设置中启用则强制走一遍缺省默认样本地图流程
   if (settingsStore.useDefaultTilemap) {
     console.log('[地图生成器] 调试模式: 使用默认地图数据。');
     return JSON.parse(JSON.stringify(DEFAULT_MAP_DATA));
@@ -149,12 +149,12 @@ export async function generateMap(
 
     let data;
     try {
-      // Remove comments (// ...)
+      // 从结果中清理丢弃掉带单行斜杠的闲余注释语块 (// ...)
       jsonStr = jsonStr.replace(/\/\/.*$/gm, '');
-      // Remove multi-line comments (/* ... */)
+      // 清除抹去那囊括其中的夹杂做多行块状形式备注代码 (/* ... */)
       jsonStr = jsonStr.replace(/\/\*[\s\S]*?\*\//g, '');
 
-      // Simple cleanup
+      // 最根本基础款的净空打底净化
       jsonStr = jsonStr.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
       data = JSON.parse(jsonStr);
     } catch (e) {
@@ -166,15 +166,16 @@ export async function generateMap(
       throw new Error('Invalid map data: Missing layout.');
     }
 
-    // --- POPULATE ZONES ---
+    // --- 初始化区域装载开始 ---
     console.log('[地图生成器] 正在填充一楼...');
-    const populator1 = new ZonePopulator(data.layout); // Ground Floor
+    const populator1 = new ZonePopulator(data.layout); // 初始化一楼（基底主楼层）
     data.layout = populator1.generate();
 
+    // 预留的后续翻修多楼层建筑填充口 (该部代码暂行搁置废留)
     // if (data.floors) {
     //     for (const key in data.floors) {
     //         console.log(`[MapGenerator] Populating Floor ${key}...`);
-    //         const populator = new ZonePopulator(data.floors[key], false); // Upper Floors
+    //         const populator = new ZonePopulator(data.floors[key], false); // 上端的高层们
     //         data.floors[key] = populator.generate();
     //     }
     // }
@@ -190,7 +191,7 @@ export async function generateMap(
     }
 
     console.log('由于错误使用回退地图。');
-    // Fallback map (Standard Tile Map)
+    // 提供保底容错垫底项用的候补老备选图集 (标准常规默认款老瓦片地图档)
     return JSON.parse(JSON.stringify(DEFAULT_MAP_DATA));
   }
 }

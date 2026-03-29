@@ -36,11 +36,11 @@ const NPC_FIELD_MAPPING: Record<string, string> = {
   脸部: 'face',
   心情: 'mood',
   行为: 'action',
-  目前行为: 'action', // Handle alias
-  当前行为: 'action', // Handle alias
-  current_action: 'action', // Handle alias
+  目前行为: 'action', // 支持别名映射
+  当前行为: 'action', // 支持别名映射
+  current_action: 'action', // 支持别名映射
   心理活动: 'inner_thought',
-  目前心理活动: 'inner_thought', // Handle alias
+  目前心理活动: 'inner_thought', // 支持别名映射
   性别: 'gender',
   住所: 'residence',
   胸部: 'chest',
@@ -103,7 +103,7 @@ const VALID_PLAYER_FIELDS = new Set([
 
 export const useGameStore = defineStore('game', () => {
   const state = ref<GameState>(_.cloneDeep(INITIAL_GAME_STATE));
-  const quickReplies = computed(() => state.value.system.quick_replies || []); // Current round quick replies, derived from state
+  const quickReplies = computed(() => state.value.system.quick_replies || []); // 当前回合的快捷回复选项，派生自系统状态库
 
   // 联机相关状态
   const multiplayer = ref<MultiplayerState>({
@@ -117,20 +117,20 @@ export const useGameStore = defineStore('game', () => {
     isSharingEnergy: false
   });
 
-  // Computed Property: "Me"
-  // Returns the correct PlayerStatus object based on multiplayer role
+  // 计算属性: "Me" (代表当前运行环境下的“玩家自己”)
+  // 根据联机角色 (主机/客机/单机) 返回正确的 PlayerStatus 对象库引用
   const me = computed(() => {
-    // 1. If singleplayer, I am the main player
+    // 1. 若为单机模式，直接指向全局唯一的主玩家对象
     if (!multiplayer.value.isMultiplayer) {
       return state.value.player;
     }
 
-    // 2. If Host, I am also the main player (but might have updated info from MultiplayerHub)
+    // 2. 若为主机，我依然是主玩家 (但可能携带了来自联机同步枢纽的实时修正数据)
     if (multiplayer.value.isHost) {
       return state.value.player;
     }
 
-    // 3. If Guest, try to find myself in companions list using Identity Key
+    // 3. 若为客机，通过本地标识 Key (Identity Key) 在伙伴列表中自寻身位
     if (typeof window !== 'undefined') {
       const myKey = localStorage.getItem('mp_identity_key');
       if (
@@ -141,12 +141,12 @@ export const useGameStore = defineStore('game', () => {
         return state.value.multiplayer_companions[myKey];
       }
 
-      // 3.1 If not in companions yet (before persona submission), find myself in multiplayer.players
+      // 3.1 若尚未在伙伴列表中注册 (例如刚进入房间尚未提交人设)，则在原始成员列表寻找自己
       const myId = localStorage.getItem('mp_player_id');
       if (myId) {
         const playerInfo = multiplayer.value.players.find((p) => p.id === myId);
         if (playerInfo) {
-          // Create a partial PlayerStatus from MultiplayerPlayer info
+          // 基于原始连接信息构建一个 PlayerStatus 的预览分身 (Partial View)
           return {
             ...INITIAL_GAME_STATE.player,
             name: playerInfo.name || '客机玩家',
@@ -163,8 +163,7 @@ export const useGameStore = defineStore('game', () => {
       }
     }
 
-    // Fallback: Return main player (read-only view of host) if not found
-    // This happens before I have submitted my persona
+    // 兜底逻辑：若无匹配项，暂时返回主机玩家的状态引用 (多见于人设尚未注入的阶段)
     return state.value.player;
   });
 
@@ -238,7 +237,7 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function setQuickReplies(replies: string[]) {
-    // Ensure the array exists (it should from INITIAL_GAME_STATE, but just in case)
+    // 健壮性校验：确保系统状态中的快捷回复容器存在 (通常由 INITIAL_GAME_STATE 保证)
     if (!state.value.system.quick_replies) {
       state.value.system.quick_replies = [];
     }
@@ -260,11 +259,11 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function addQuest(quest: Quest) {
-    // Ensure quests array exists
+    // 确保任务队列容器已初始化
     if (!state.value.system.quests) {
       state.value.system.quests = [];
     }
-    // Check for duplicate ID
+    // 幂等性检查：避免重复注入相同 ID 的任务项
     if (!state.value.system.quests.find((q) => q.id === quest.id)) {
       state.value.system.quests.push(quest);
     }
@@ -274,7 +273,7 @@ export const useGameStore = defineStore('game', () => {
     if (!state.value.system.promises) {
       state.value.system.promises = [];
     }
-    // Check for duplicate ID
+    // 幂等性检查：避免重复注入相同 ID 的约定项
     if (!state.value.system.promises.find((p) => p.id === promise.id)) {
       state.value.system.promises.push(promise);
     }
@@ -296,7 +295,7 @@ export const useGameStore = defineStore('game', () => {
 
     const quest = state.value.system.quests.find((q) => q.id === questId);
     if (quest) {
-      // 1. Handle Log Update (Progress Report)
+      // 1. 处理任务日志追加 (进度汇报链路)
       if (updates.log) {
         if (!quest.logs) quest.logs = [];
         quest.logs.push({
@@ -307,10 +306,10 @@ export const useGameStore = defineStore('game', () => {
         });
       }
 
-      // 2. Handle Status Update (if provided)
+      // 2. 处理任务状态迁移 (State Transition)
       const newStatus = updates.status;
       if (newStatus) {
-        // Prevent double completion (and double rewards)
+        // 终态锁死机制：防止任务重复完成导致多重结算漏洞 (Exploit Prevent)
         if (quest.status === 'completed' && newStatus === 'completed') {
           return;
         }
@@ -324,9 +323,9 @@ export const useGameStore = defineStore('game', () => {
             quest.completionSummary = updates.summary;
           }
 
-          // Distribute Rewards
+          // 自动派发任务报酬结算 (Distribute Rewards)
           if (newStatus === 'completed' && quest.rewards) {
-            console.log('[GameStore] Distributing rewards for quest:', quest.name, quest.rewards);
+            console.log('[游戏存档] 正在为任务派发奖励：', quest.name, quest.rewards);
             for (const reward of quest.rewards) {
               try {
                 if (reward.type === 'money') {
@@ -354,14 +353,14 @@ export const useGameStore = defineStore('game', () => {
                   let field = '';
                   let val = 0;
 
-                  // Case 1: Standard Object Format
+                  // 情况 1: 标准结构化对象定义格式 (Standard Object)
                   if (typeof reward.value === 'object' && reward.value.field) {
                     field = reward.value.field;
                     val = Number(reward.value.value) || 0;
                   }
-                  // Case 2: LLM Text Format (Infer from description/value)
+                  // 情况 2: LLM 非结构化叙述格式 (需根据 description/value 进行语义启发式解析)
                   else {
-                    // Infer Field
+                    // 推断受影响的属性字段 (Infer Field)
                     const desc = (reward.description || '').toLowerCase();
                     const valStr = String(reward.value || '');
 
@@ -369,21 +368,21 @@ export const useGameStore = defineStore('game', () => {
                     else if (desc.includes('金钱') || desc.includes('money')) field = 'money';
                     else if (desc.includes('战斗力') || desc.includes('power')) field = 'power';
 
-                    // Infer Value
+                    // 推断具体的数值变更量 (Infer Value)
                     if (field) {
-                      // Try extracting number first
+                      // 优先尝试从文本中提取原生数值字符段
                       const numMatch = valStr.match(/-?\d+/);
                       if (numMatch) {
                         val = parseInt(numMatch[0]);
                       } else {
-                        // Fallback defaults based on field/text content
+                        // 基于语义的默认报酬兜底方案
                         if (field === 'reputation') {
-                          // Heuristic for reputation levels if mentioned in text
+                          // 声望关键字启发式映射关系 (Heuristic for reputation)
                           if (valStr.includes('小有名气')) val = 25;
                           else if (valStr.includes('名声鹤起')) val = 45;
                           else if (valStr.includes('闻名遐迩')) val = 65;
                           else if (valStr.includes('驰名天下')) val = 85;
-                          else val = 10; // Default small boost
+                          else val = 10; // 无法识别时的极小默认增幅
                         }
                         if (field === 'money') val = 1000;
                         if (field === 'power') val = 1;
@@ -399,14 +398,14 @@ export const useGameStore = defineStore('game', () => {
                       value: val
                     });
                     console.log(
-                      `[GameStore] Applied inferred attribute reward: ${field} += ${val}`
+                      `[游戏存档] 已应用推论得到的属性奖励: ${field} += ${val}`
                     );
                   } else {
-                    console.warn('[GameStore] Could not parse attribute reward:', reward);
+                    console.warn('[游戏存档] 未能成功解析属性奖励项:', reward);
                   }
                 }
               } catch (e) {
-                console.error('[GameStore] Error applying reward:', reward, e);
+                console.error('[游戏存档] 应用奖励内容时遭遇错误:', reward, e);
               }
             }
           }
@@ -431,43 +430,43 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function setState(newState: GameState) {
-    // Use merge to ensure newState overwrites INITIAL_GAME_STATE
+    // 使用 merge 策略，确保外部注入状态能精准覆盖 INITIAL_GAME_STATE 的空缺位
     // console.log('[GameStore] Restoring state. NPCs count:', Object.keys(newState.npcs || {}).length, 'Current Scene:', newState.system?.current_scene_npcs);
     state.value = _.merge({}, INITIAL_GAME_STATE, newState);
 
-    // [Sync Logic] Ensure Player Combatant has latest Spell Cards/Stats from Global State
-    // This fixes the issue where combat starts before LLM2 finishes variable processing (e.g. obtaining new spell cards).
-    // On reload, we want to inject the latest global variables into the active combat state.
+    // [同步逻辑] 强制让战斗对象同步全局状态中的最新符卡/属性。
+    // 这修复了在 LLM2 处理变量 (如获取新符卡) 异步完成前，战斗阶段便过早开启导致的同步失效。
+    // 在持久化重载时，我们将最新全局变量反向注入回激活中的战斗副本。
     const combat = state.value.system.combat;
 
-    // [Optimization] Auto-revert to pending if active on load (Handle Refresh)
-    // If the player refreshes during combat, revert to the "Combat Request" screen and reset the encounter.
+    // [负载优化] 页面刷新后的战斗重置逻辑 (Handle Hot-Reload/Refresh)
+    // 若检测到玩家在战斗交互中刷新页面，则回退至“战前确认”界面并重置本次遭遇的运行时数据。
     if (combat && combat.isActive) {
       console.log(
-        '[GameStore] Active combat detected on load. Reverting to pending confirmation (Resetting Encounter).'
+        '[游戏存档] 加载时检测到激活中的战斗。正在回退至“确认中”状态（强制重置本次遭遇）。'
       );
       combat.isActive = false;
       combat.isPending = true;
       combat.turn = 0;
       combat.logs = [];
 
-      // Reset Combatants
+      // 重置所有战斗参与者 (Reset Combatants) 运行时上下文
       if (combat.combatants) {
         combat.combatants.forEach((c: any) => {
-          // Clear Runtime Status
+          // 清除易失性运行状态 (Runtime Shards)
           c.buffs = [];
           c.shield = 0;
           delete c.hasUsedUltimate;
 
-          // Reset HP/MP for NPCs (Player is synced below)
+          // 为 NPC 单位恢复生理属性 (玩家同步逻辑在后续独立处理)
           if (!c.isPlayer) {
-            // Try to sync from global NPC state (Pre-combat state)
+            // 尝试从全局 NPC 注册中心同步战前快照 (Pre-combat state)
             const npc = state.value.npcs ? state.value.npcs[c.id] : null;
             if (npc) {
               if (npc.hp !== undefined) c.hp = npc.hp;
               if (npc.mp !== undefined) c.mp = npc.mp;
             } else {
-              // Fallback: Reset to Max
+              // 兜底：若注册中心无数据，则重置回最大值 (Fallback to Max)
               if (c.maxHp !== undefined) c.hp = c.maxHp;
               if (c.maxMp !== undefined) c.mp = c.maxMp;
             }
@@ -481,13 +480,13 @@ export const useGameStore = defineStore('game', () => {
       const globalPlayer = state.value.player;
 
       if (playerCombatant && globalPlayer) {
-        // Sync Spell Cards
+        // 同步参战符卡列表 (Sync Spell Cards)
         if (globalPlayer.spell_cards) {
-          // Use cloneDeep to avoid reference sharing issues
+          // 采用深拷贝机制防止跨副本间的变量引用污染
           playerCombatant.spellCards = _.cloneDeep(globalPlayer.spell_cards);
         }
 
-        // Sync Stats that might have changed (Level, Power, MaxHP/MP)
+        // 同步可能发生变更的关键生理与阶级属性 (Level, Power, MaxHP/MP)
         if (globalPlayer.combatLevel !== undefined) {
           playerCombatant.combatLevel = globalPlayer.combatLevel;
         }
@@ -496,8 +495,7 @@ export const useGameStore = defineStore('game', () => {
         }
         if (globalPlayer.max_hp !== undefined) {
           playerCombatant.maxHp = globalPlayer.max_hp;
-          // If pending, also sync current HP to max if needed, or just keep as is?
-          // Better to trust global HP if it's a fresh start
+          // 若处于确认阶段，此时应更信任全局存储的生命值数据 (Fresh Start Principle)
           if (combat.isPending) playerCombatant.hp = globalPlayer.hp;
         }
         if (globalPlayer.max_mp !== undefined) {
@@ -505,7 +503,7 @@ export const useGameStore = defineStore('game', () => {
           if (combat.isPending) playerCombatant.mp = globalPlayer.mp;
         }
 
-        console.log('[GameStore] Synced player combatant with global state on load.');
+        console.log('[游戏存档] 加载时已将玩家战斗数据与全局状态库同步。');
       }
     }
   }
@@ -514,9 +512,9 @@ export const useGameStore = defineStore('game', () => {
     state.value = _.cloneDeep(INITIAL_GAME_STATE);
   }
 
-  // Helper actions to modify specific parts
+  // --- 原子动作封装 Action Methods ---
   function updatePlayer(playerUpdate: Partial<GameState['player']>) {
-    // Validate numeric fields to prevent NaN/invalid values
+    // 数值合规性清洗：防止非数字类型 (NaN/Null) 混入关键状态导致 UI 崩溃
     const NUMERIC_FIELDS = [
       'hp',
       'max_hp',
@@ -530,17 +528,17 @@ export const useGameStore = defineStore('game', () => {
     ];
 
     for (const key of NUMERIC_FIELDS) {
-      // Check if key is present in the update object
+      // 巡检更新对象中是否存在对应的 Key 映射项
       if (Object.prototype.hasOwnProperty.call(playerUpdate, key)) {
         const val = (playerUpdate as any)[key];
         if (val !== undefined && val !== null) {
           const numVal = Number(val);
           if (isNaN(numVal)) {
-            console.warn(`[GameStore] Invalid numeric value for ${key} in updatePlayer:`, val);
-            // Remove invalid field to prevent state corruption
+            console.warn(`[游戏存档] updatePlayer 传入的字段 ${key} 数值非法:`, val);
+            // 剔除非法字段，防止状态应用崩溃 (State Corruption)
             delete (playerUpdate as any)[key];
           } else {
-            // Enforce number type
+            // 强制转换为 Number 原生类型
             (playerUpdate as any)[key] = numVal;
           }
         }
@@ -554,25 +552,25 @@ export const useGameStore = defineStore('game', () => {
     state.value.system.turn_count = (state.value.system.turn_count || 0) + 1;
   }
 
-  // Apply Action Logic
+  // 状态应用器动作主逻辑 (Apply Action Logic)
   function applyAction(action: GameAction) {
-    console.log('[GameStore] Applying Action:', action);
+    console.log('[游戏存档] 正在应用操作 (Action):', action);
     switch (action.type) {
       case 'UPDATE_PLAYER':
         if (action.field) {
-          // Map Chinese keys to English keys if necessary
+          // 若检测到中文 Key 映射，则将其适配为标准英文持久化 Key (Key Mapping)
           const targetField = PLAYER_FIELD_MAPPING[action.field] || action.field;
 
-          // Safety Check: Only allow whitelisted fields
+          // 白名单强制性校验：拦截所有非法字段的注入尝试 (Safety Guard)
           if (!VALID_PLAYER_FIELDS.has(targetField)) {
-            console.warn(`[GameStore] Blocked update to invalid player field: ${targetField}`);
+            console.warn(`[游戏存档] 更新被拦截：尝试操作非合规的玩家字段 ${targetField}`);
             return;
           }
 
           const currentVal = _.get(state.value.player, targetField);
           let newVal = currentVal;
 
-          // Strict Numeric Handling
+          // 严格数值加法平衡逻辑 (Strict Numeric Handling)
           const STRICT_NUMERIC_FIELDS = new Set([
             'hp',
             'max_hp',
@@ -587,10 +585,10 @@ export const useGameStore = defineStore('game', () => {
 
           if (STRICT_NUMERIC_FIELDS.has(targetField)) {
             const val = Number(action.value);
-            // Check if val is a valid number
+            // 输入源合法性校验：拦截非法数字输入流 (Input Stream Validation)
             if (isNaN(val)) {
-              console.warn(`[GameStore] Invalid numeric value for ${targetField}:`, action.value);
-              // Do not update if invalid
+              console.warn(`[游戏存档] 字段 ${targetField} 的数值校验不通过:`, action.value);
+              // 非法输入熔断 (Abort on Invalid)
               return;
             }
 
@@ -599,15 +597,15 @@ export const useGameStore = defineStore('game', () => {
             else if (action.op === 'subtract') newVal = currentNum - val;
             else if (action.op === 'set') newVal = val;
           } else {
-            // Default / String Handling
+            // 非核心数值/字符串型数据的处理链路 (Default Handling)
             if (action.op === 'add') newVal = ((currentVal as number) || 0) + action.value;
             if (action.op === 'subtract') newVal = ((currentVal as number) || 0) - action.value;
             if (action.op === 'set') newVal = action.value;
           }
 
-          // --- Special Logic: Combat Level / Exp ---
+          // --- 核心业务组件：战斗等级与经验池平衡逻辑 ---
           if (targetField === 'combatExp') {
-            // Ensure initialization
+            // 属性池空缺初始化 (Initialization)
             if (state.value.player.combatLevel === undefined) state.value.player.combatLevel = 1;
             if (state.value.player.combatExp === undefined) state.value.player.combatExp = 0;
             if (state.value.player.skillPoints === undefined) state.value.player.skillPoints = 0;
@@ -615,30 +613,29 @@ export const useGameStore = defineStore('game', () => {
             const MAX_LEVEL = 100;
             const EXP_PER_LEVEL = 1000;
 
-            // Recalculate based on current state + change
-            // Since newVal is the resulting raw value (e.g. current + gain)
-            // But wait, if op is 'add', newVal is correctly calculated above.
+            // 基于“当前状态 + 全增量”进行闭合重算 (Recalculate)
+            // 此时 newVal 代表包含了本次操作后的累计总额基数。
 
             let currentLevel = state.value.player.combatLevel;
             let totalExp = Number(newVal); // This is currentExp + gain
 
-            // Level Up Loop
+            // 循环等级溢出检测 (Level Up Loop)
             while (totalExp >= EXP_PER_LEVEL && currentLevel < MAX_LEVEL) {
               totalExp -= EXP_PER_LEVEL;
               currentLevel++;
-              // Gain 1 Skill Point per Level
+              // 等级进阶奖励：每升 1 级回馈 1 点天赋点 (Skill Point)
               state.value.player.skillPoints++;
             }
 
-            // Cap at Max Level
+            // 设置角色上限等级天花板 (Cap at Max Level)
             if (currentLevel >= MAX_LEVEL) {
               currentLevel = MAX_LEVEL;
-              totalExp = Math.min(totalExp, EXP_PER_LEVEL); // Or 0? Let's keep it maxed
+              totalExp = Math.min(totalExp, EXP_PER_LEVEL); // 或者重置为0？先保持满额经验
             }
 
-            // Apply Level Up
+            // 落实数值迁移与等级写入 (Apply State)
             state.value.player.combatLevel = currentLevel;
-            newVal = totalExp; // Update exp to remainder
+            newVal = totalExp; // 将经验池修正为扣除进阶消耗后的余盈值 (Remainder Update)
           }
           // ----------------------------------------
 
@@ -649,16 +646,16 @@ export const useGameStore = defineStore('game', () => {
       case 'UPDATE_NPC':
         if (action.npcId && action.field) {
           const charStore = useCharacterStore();
-          // Handle both English ID and Chinese Name as ID
+          // 支持混合引用标识：英文 UUID 或 中文限定真名 (Hybrid Identity Resolution)
           let npcId = action.npcId;
 
-          // 1. Resolve ID using centralized service
+          // 1. 调用中心化服务层解析真实的 UUID 身份令牌
           const resolvedId = resolveCharacterId(npcId, charStore.characters, state.value.npcs);
           npcId = resolvedId;
 
           if (!state.value.npcs[npcId]) {
-            // If still not found, try to auto-create if we have static data
-            // (This happens if LLM tries to update an NPC that isn't formally in scene yet)
+            // 若注册中心未命中，则尝试基于静态角色模版库自动生成对应的运行时对象副本
+            // (多见于 LLM 尝试操纵一个尚未在主场景环节正式登场的静态单位)
             const staticChar = charStore.characters.find((c) => c.uuid === npcId);
             if (staticChar) {
               state.value.npcs[npcId] = {
@@ -668,18 +665,18 @@ export const useGameStore = defineStore('game', () => {
               } as any;
             } else {
               console.warn(
-                `[GameStore] UPDATE_NPC failed: NPC '${npcId}' not found in runtime or static DB.`
+                `[游戏存档] UPDATE_NPC 动作异常: NPC '${npcId}' 在当前运行时或静态库中均未命中。`
               );
-              return; // Abort if really not found
+              return; // 目标不存在，拦截操作以规避逻辑空环
             }
           }
 
-          // Implicitly add to current scene if updated via UPDATE_NPC
-          // Note: This provides a safety net if the model forgets to send a SCENE add_chars.
-          // In gameLoop.ts, we ensure SCENE actions (removals) run LAST to override this if needed.
+          // 隐式场景置入逻辑：通过 UPDATE_NPC 成功修改的对象将自动补录进当前活动场景映射表
+          // 注：这为模型偶尔遗忘 SCENE.add_chars 操作提供了逻辑安全垫层。
+          // 在后续 gameLoop.ts 消费阶段，SCENE 专属动作具备更高优先级，如有冲突会以其为准。
           if (!state.value.system.current_scene_npcs.includes(npcId)) {
             console.log(
-              `[GameStore] Implicitly adding NPC ${npcId} to current scene via UPDATE_NPC`
+              `[游戏存档] 正在通过 UPDATE_NPC 动作隐式地将 NPC ${npcId} 加入当前活动场景列表`
             );
             state.value.system.current_scene_npcs.push(npcId);
           }
@@ -687,23 +684,23 @@ export const useGameStore = defineStore('game', () => {
           const npc = state.value.npcs[npcId];
           if (!npc) return;
 
-          // Map Chinese keys to English keys if necessary
+          // 属性映射：若有必要，将中文键值对转换为标准英文物理字段
           const targetField = NPC_FIELD_MAPPING[action.field] || action.field;
 
           const currentVal = _.get(npc, targetField);
           let newVal = currentVal;
 
-          // Strict Numeric Handling for NPCs
+          // NPC 关键生理生理指标严格锁死校验 (Strict Numeric Handling for NPCs)
           const STRICT_NPC_NUMERIC_FIELDS = new Set(['hp', 'max_hp', 'favorability', 'obedience']);
 
           if (STRICT_NPC_NUMERIC_FIELDS.has(targetField)) {
             const val = Number(action.value);
             if (isNaN(val)) {
               console.warn(
-                `[GameStore] Invalid numeric value for NPC ${npcId} field ${targetField}:`,
+                `[游戏存档] NPC ${npcId} 的字段 ${targetField} 数值校验失败:`,
                 action.value
               );
-              // Do not update if invalid
+              // 输入源非法，静默拦截防止崩溃 (Shield from crash)
               return;
             }
 
@@ -725,15 +722,15 @@ export const useGameStore = defineStore('game', () => {
         if ((action.targetKey || action.targetName) && action.field) {
           let targetKey = action.targetKey;
 
-          // Ensure companions map exists
+          // 确保联机伙伴数据库连接映射表已挂载 (Initialization Safe Guard)
           if (!state.value.multiplayer_companions) {
             state.value.multiplayer_companions = {};
           }
 
-          // Resolve targetName to targetKey if Key is missing
+          // 身份重定向：若缺省 Key，则基于显示名称 (targetName) 尝试反推伙伴映射关系 (Key Resolution)
           if (!targetKey && action.targetName) {
             const nameToFind = action.targetName.trim();
-            // Try exact match first
+            // 第一优先级：真名全量完全匹配检测 (Exact Match)
             const foundEntry = Object.entries(state.value.multiplayer_companions).find(
               ([_, comp]) => comp.name === nameToFind
             );
@@ -741,7 +738,7 @@ export const useGameStore = defineStore('game', () => {
             if (foundEntry) {
               targetKey = foundEntry[0];
             } else {
-              // Try fuzzy match (contains)
+              // 第二优先级：基于名称子串包含关系的模糊匹配检测 (Fuzzy Match)
               const fuzzyEntry = Object.entries(state.value.multiplayer_companions).find(
                 ([_, comp]) => comp.name.includes(nameToFind) || nameToFind.includes(comp.name)
               );
@@ -752,23 +749,22 @@ export const useGameStore = defineStore('game', () => {
 
             if (!targetKey) {
               console.warn(
-                `[GameStore] UPDATE_COMPANION: Could not find companion with name '${action.targetName}'`
+                `[游戏存档] UPDATE_COMPANION 异常: 未能定位名为 '${action.targetName}' 的伙伴节点`
               );
-              // Option: Create a placeholder? No, better to ignore invalid updates to avoid ghost players.
-              // But if it's a critical update, maybe we should log it.
+              // 无法确定该伙伴身份，静默拦截并记录异常日志 (Abort on Identity Unknown)
               return;
             }
           }
 
-          // If companion doesn't exist (and we have a valid key), log warning but try to create a placeholder?
-          // No, we should assume companions are synced. But for robustness, we create if missing.
+          // 联机鲁棒性注入：若存在有效 Key 但伙伴数据尚未同步，则实时构造一份符合 INITIAL 协议的占位对象副本 (Robust Creation)
+          // 此时假设远端伙伴状态最终会趋于强一致性同步。
           if (targetKey && !state.value.multiplayer_companions[targetKey]) {
             console.warn(
-              `[GameStore] UPDATE_COMPANION: Companion ${targetKey} not found. Creating placeholder.`
+              `[游戏存档] UPDATE_COMPANION 提示: 伙伴 ${targetKey} 记录不存在，正在按协议创建占位对象。`
             );
-            // Initialize with minimal data
+            // 载入最小可用原型数据集 (Minimal Data Initialization)
             state.value.multiplayer_companions[targetKey] = {
-              name: action.targetName || 'Unknown Companion',
+              name: action.targetName || '未知同伴',
               hp: 500,
               max_hp: 500,
               mp: 1000,
@@ -796,14 +792,13 @@ export const useGameStore = defineStore('game', () => {
 
           const companion = state.value.multiplayer_companions[targetKey!];
           if (companion) {
-            // Use NPC mapping for companions too as they share similar fields (except player specific ones)
-            // Or use PLAYER_FIELD_MAPPING? Let's use PLAYER_FIELD_MAPPING since they are players.
+            // 字段映射由于联机伙伴在底层物理字段集上与玩家高度趋同，此处复用 PLAYER_FIELD_MAPPING 策略。
             const targetField = PLAYER_FIELD_MAPPING[action.field] || action.field;
 
             const currentVal = _.get(companion, targetField);
             let newVal = currentVal;
 
-            // Strict Numeric Handling (Same as Player)
+            // 严格数值类型处理 (策略与主玩家一致) (Strict Numeric Handling)
             const STRICT_NUMERIC_FIELDS = new Set([
               'hp',
               'max_hp',
@@ -837,28 +832,28 @@ export const useGameStore = defineStore('game', () => {
       case 'INVENTORY':
         if (action.target) {
           if (action.target === 'items') {
-            // Enhanced Item Logic
+            // 增强型物品逻辑核心 (Enhanced Item Logic)
             const items = state.value.player.items;
 
             if (action.op && ['push', 'add', 'set'].includes(action.op)) {
               let newItem: Item;
               const val = action.value;
 
-              // 1. Resolve Item Data
+              // 1. 物品数据身份解析 (Resolve Item Data)
               if (typeof val === 'string') {
-                // Check for "Name,Type" format (e.g. "红茶,consumable")
+                // 适配 "物品名,类型" 的便捷输入格式 (例如 "红茶,consumable")
                 let nameOrId = val;
                 let specifiedType = 'other';
 
                 if (val.includes(',')) {
-                  // Use lastIndexOf to support names with commas, assuming format "Name, Type"
+                  // 使用 lastIndexOf 以支持属性名中带有逗号的情况，假定格式严格遵循 "物品名, 类型" (Greedy Match)
                   const lastIndex = val.lastIndexOf(',');
                   nameOrId = val.substring(0, lastIndex).trim();
                   specifiedType = val.substring(lastIndex + 1).trim();
                 }
 
-                // Try Preset by ID (exact match) OR Name (exact match)
-                // We want to support both ID ("tea") and Name ("红茶")
+                // 先尝试从预设库中根据 ID (全量匹配) 或 名称 (全量匹配) 寻找原型对象数据
+                // 我们期望同时支持原始 ID ("tea") 与 显示名称 ("红茶") 的双向查询 (Full Lookup)
                 const preset =
                   PRESET_ITEMS[nameOrId] ||
                   Object.values(PRESET_ITEMS).find((p) => p.name === nameOrId);
@@ -866,8 +861,8 @@ export const useGameStore = defineStore('game', () => {
                 if (preset) {
                   newItem = { ...preset, count: 1 };
                 } else {
-                  // Create Generic
-                  // If not found in preset, treat the input string as both ID and Name for now
+                  // 构造通用兜底对象 (Generic Object)
+                  // 若预设库中未注册，则暂时将该字符串同时作为 ID 与 名称处理 (LLM Raw Input)
                   newItem = {
                     id: nameOrId,
                     name: nameOrId,
@@ -877,27 +872,27 @@ export const useGameStore = defineStore('game', () => {
                   };
                 }
               } else {
-                // It's an object from LLM
-                // We still check if the ID or Name matches a preset to fill in missing details
+                // 场景：传入的是来自 LLM 序列化后的完整结构化对象 (Structured Object)
+                // 此时依然需要巡检预设库，以补全描述、图标等 LLM 可能遗漏的元数据 (Metadata Injection)
                 const rawId = val.id || val.name;
                 const preset = rawId
                   ? PRESET_ITEMS[rawId] || Object.values(PRESET_ITEMS).find((p) => p.name === rawId)
                   : null;
 
                 if (preset) {
-                  // Merge preset with LLM overrides (LLM takes priority for counts/specifics, Preset for static data)
+                  // 合并预设模板与 LLM 传入的运行时数据 (LLM 拥有更高优先级以覆盖数量/特定属性)
                   newItem = {
                     ...preset,
                     ...val,
-                    // Ensure critical fields exist
-                    id: preset.id, // Prefer preset ID to keep consistency
+                    // 强制域有效性检查 (Consistency Guard)
+                    id: preset.id, // 优先保留预设库 ID 以维持全局 ID 序列的一致性
                     name: val.name || preset.name,
                     count: val.count || 1
                   };
                 } else {
                   newItem = {
                     id: val.id || val.name || 'unknown',
-                    name: val.name || val.id || 'Unknown Item',
+                    name: val.name || val.id || '未知物品',
                     count: val.count || 1,
                     description: val.description || '暂无描述',
                     type: val.type || 'other',
@@ -906,22 +901,53 @@ export const useGameStore = defineStore('game', () => {
                 }
               }
 
-              // 2. Add, Stack, or Set
-              // Match by ID (preferred) or Name
-              const existingItem = items.find(
+              // 匹配原则：优先匹配 ID，其次匹配显示名称 (Identity Resolver)
+              // 增强：引入字符相似度检测，应对 LLM 输出的微小名称变动（如“红茶” vs “一袋红茶”）
+              let existingItem = items.find(
                 (i) =>
                   (newItem.id && i.id === newItem.id) || (newItem.name && i.name === newItem.name)
               );
 
+              if (!existingItem && newItem.name) {
+                existingItem = items.find((i) => {
+                  const s1 = i.name;
+                  const s2 = newItem.name;
+                  if (s1.includes(s2) || s2.includes(s1)) return true;
+
+                  // 字符集重合度检测 (Jaccard-like Similarity)
+                  const c1 = new Set(s1);
+                  const c2 = new Set(s2);
+                  let intersect = 0;
+                  c1.forEach((c) => {
+                    if (c2.has(c)) intersect++;
+                  });
+                  const minSize = Math.min(c1.size, c2.size);
+                  const similarity = intersect / minSize;
+
+                  // 判定阈值：重合字符数 >= 2 且 相似度 >= 0.75 (应对“施工现场” vs “施工中”)
+                  return intersect >= Math.min(2, minSize) && similarity >= 0.75;
+                });
+              }
+
               if (existingItem) {
                 if (action.op === 'set') {
                   existingItem.count = newItem.count;
-                  // Also update metadata to allow standardization/fixes
+                  // 同步更新元数据，以便针对旧数据进行标准化修复 (Metadata Sync)
                   existingItem.description = newItem.description;
                   existingItem.type = newItem.type;
                   existingItem.effects = newItem.effects;
                 } else {
-                  existingItem.count += newItem.count;
+                  // 方法 A：概念型物品防堆叠逻辑 (防 LLM 幻觉)
+                  // 判定条件：属于特殊或未知分类，且不含有常见消耗品/收集品后缀
+                  const isConcept = 
+                    (newItem.type === 'special' || newItem.type === 'other') && 
+                    !existingItem.name.match(/(钥匙|硬币|碎片|代币|魂|钱|币|球|卷|券|水|药|果)/);
+
+                  if (isConcept) {
+                    existingItem.count = 1; // 强制保持为 1，概念不可被物理堆叠
+                  } else {
+                    existingItem.count += newItem.count;
+                  }
                 }
               } else {
                 items.push(newItem);
@@ -929,12 +955,12 @@ export const useGameStore = defineStore('game', () => {
             }
 
             if (action.op === 'remove') {
-              const val = action.value; // string ID or Name or Object
+              const val = action.value; // 支持字符串 ID、名称或结构化对象
               let countToRemove = 1;
               let idToCheck = '';
 
               if (typeof val === 'string') {
-                // Support "Name,Count" format (e.g. "Apple,5")
+                // 适配 "物品名,数量" 的批量移动格式 (例如 "Apple,5")
                 if (val.includes(',')) {
                   const lastIndex = val.lastIndexOf(',');
                   const possibleCount = parseInt(val.substring(lastIndex + 1).trim());
@@ -952,7 +978,7 @@ export const useGameStore = defineStore('game', () => {
                 countToRemove = val.count || 1;
               }
 
-              // Find by ID or Name
+              // 按 ID 或名称检索目标物品
               const existingItem = items.find((i) => i.id === idToCheck || i.name === idToCheck);
 
               if (existingItem) {
@@ -965,7 +991,7 @@ export const useGameStore = defineStore('game', () => {
               }
             }
           } else if (action.target === 'spell_cards') {
-            // Handle Spell Cards (Similar to Items)
+            // 符卡 (Spell Cards) 仓储管理逻辑 (逻辑对齐背包系统)
             if (!state.value.player.spell_cards) state.value.player.spell_cards = [];
             const spellCards = state.value.player.spell_cards;
 
@@ -976,7 +1002,7 @@ export const useGameStore = defineStore('game', () => {
                 let newCard: SpellCard;
 
                 if (typeof val === 'string') {
-                  // Look up preset
+                  // 在符卡库中反查预设原型 (Preset Lookup)
                   const preset =
                     PRESET_SPELLCARDS[val] ||
                     Object.values(PRESET_SPELLCARDS).find((p) => p.name === val);
@@ -990,12 +1016,12 @@ export const useGameStore = defineStore('game', () => {
                       type: preset.type || 'attack',
                       effects: preset.effects,
                       isUltimate: preset.isUltimate || false,
-                      hitRate: preset.hitRate, // Optional preset hitRate
+                      hitRate: preset.hitRate, // 可选：从预设中继承原生命中率配置
                       level: 1,
                       experience: 0
                     };
                   } else {
-                    // Fallback for string only (Minimal info)
+                    // 纯文本降级处理 (仅存最简元数据)
                     newCard = {
                       name: val,
                       description: '暂无描述',
@@ -1010,7 +1036,7 @@ export const useGameStore = defineStore('game', () => {
                     };
                   }
                 } else {
-                  // Object from LLM
+                  // 接收来自 LLM 的结构化数据指令
                   const rawId = val.id || val.name;
                   const preset = rawId
                     ? PRESET_SPELLCARDS[rawId] ||
@@ -1032,7 +1058,7 @@ export const useGameStore = defineStore('game', () => {
                     if ('id' in newCard) delete (newCard as any).id;
                   } else {
                     newCard = {
-                      name: val.name || val.id || 'Unknown Spell',
+                      name: val.name || val.id || '未知符卡',
                       description: val.description || '暂无描述',
                       cost: val.cost || 0,
                       damage: val.damage || 0,
@@ -1041,16 +1067,16 @@ export const useGameStore = defineStore('game', () => {
                       isUltimate: val.isUltimate || false,
                       hitRate: val.hitRate !== undefined ? val.hitRate : val.isUltimate ? 1.0 : 0.2,
                       buffDetails: val.buffDetails,
-                      effects: val.effects // Legacy support
+                      effects: val.effects // 遗留字段兼容支持
                     };
                   }
                 }
 
-                // Avoid duplicates by Name, but allow updates via SET
+                // 幂等性防护：基于名称防重，但允许在 SET 模式下更新既有卡牌的阶级属性 (Deduplication)
                 const existingCard = spellCards.find((c) => c.name === newCard.name);
                 if (existingCard) {
                   if (action.op === 'set') {
-                    // Update existing card properties
+                    // 覆盖既有符卡的属性字段 (Prop Overwrite)
                     Object.assign(existingCard, newCard);
                   }
                 } else {
@@ -1088,7 +1114,7 @@ export const useGameStore = defineStore('game', () => {
                 } else {
                   newRecipe = {
                     id: val.id || val.name || 'unknown',
-                    name: val.name || val.id || 'Unknown Recipe',
+                    name: val.name || val.id || '未知配方',
                     description: val.description || '暂无描述',
                     practice: val.practice || '暂无做法',
                     price: Number(val.price) || 0,
@@ -1111,7 +1137,7 @@ export const useGameStore = defineStore('game', () => {
               }
             }
           } else {
-            // Legacy handling for strings (authorities)
+            // 针对纯字符串列表 (如“权限”标识集) 的遗留处理链路 (Legacy Handling)
             const list = _.get(state.value.player, action.target) as any[];
             if (Array.isArray(list)) {
               if (action.op === 'push' || action.op === 'add') {
@@ -1131,13 +1157,13 @@ export const useGameStore = defineStore('game', () => {
           state.value.player.location = action.location;
         }
 
-        // Compatibility: Handle if LLM put add_chars in 'value' (Common error)
+        // 结构兼容性兼容：处理 LLM 将 add_chars 误传至 value 字段的常见输出偏差 (Common LLM Hallucination)
         let charsToAdd = action.add_chars;
         if (!charsToAdd && action.op === 'add_chars' && Array.isArray(action.value)) {
           charsToAdd = action.value;
         }
 
-        // Handle add_chars (Add to scene)
+        // 处理角色进场指令 (Add to scene)
         if (charsToAdd && Array.isArray(charsToAdd)) {
           const charStore = useCharacterStore();
           for (const charItem of charsToAdd) {
@@ -1147,27 +1173,27 @@ export const useGameStore = defineStore('game', () => {
             if (typeof charItem === 'string') {
               charId = charItem;
             } else {
-              // It's an object (Full NPC data from LLM)
-              // We need to determine an ID. If 'id' or 'uuid' is missing, use name as ID.
+              // 情况：LLM 传回了结构化的 NPC 完整定义数据集 (Full NPC Context)
+              // 身份识别优先级：优先使用显式 ID 字段，缺失时回退至使用名称作为主键。
               charId = charItem.id || charItem.uuid || charItem.name;
               charData = charItem;
             }
 
             if (!charId) continue;
 
-            // Resolve UUID using centralized service
+            // 调用中心化身份识别服务解析标准的 UUID 主键
             const resolvedId = resolveCharacterId(charId, charStore.characters, state.value.npcs);
             const staticChar = charStore.characters.find((c) => c.uuid === resolvedId);
 
-            // If resolveCharacterId returns the original input (fallback), try to find staticChar by other means or assume it's a new ID
+            // 若解析器回退至原始输入，尝试在静态模版库中进行二次交叉比对以锁定身份 (Fallback Verification)
             if (resolvedId === charId && !staticChar) {
-              // Try finding by name in static DB one last time (resolveCharacterId should have done this, but to be safe)
-              // Actually resolveCharacterId covers this.
+              // 最后一次尝试：在静态数据库中按名称检索（虽然 resolveCharacterId 通常已覆盖此场景，但仍作为二级兜底）
+              // 内部提示：resolveCharacterId 的上层逻辑实际上已覆盖此类情况，此处做二次确认。
             } else {
               charId = resolvedId;
             }
 
-            // If we found a static char, ensure we use its UUID and Name
+            // 预设注入：若成功锁定静态模版，则强制同步全局统一的 UUID 与 规范名称基准 (Sync from Lorebook)
             if (staticChar) {
               charId = staticChar.uuid;
               if (!state.value.npcs[charId]) {
@@ -1183,7 +1209,7 @@ export const useGameStore = defineStore('game', () => {
               state.value.system.current_scene_npcs.push(charId);
             }
 
-            // Update or Create NPC entry
+            // 执行 NPC 注册记录的新建或增量更新工作 (Upsert Registry)
             if (!state.value.npcs[charId]) {
               state.value.npcs[charId] = {
                 id: charId,
@@ -1192,7 +1218,7 @@ export const useGameStore = defineStore('game', () => {
                 power: staticChar?.initialPower || 'F' // Ensure power is set
               } as any;
             } else {
-              // Patch existing NPC if gender or power is missing
+              // 属性打补丁：若既有 NPC 缺失关键字段 (如性别、战力等级)，则由静态模版库自动注标 (Lazy Patching)
               const existingNpc = state.value.npcs[charId];
               if (existingNpc && !existingNpc.gender && staticChar?.gender) {
                 existingNpc.gender = staticChar.gender as any;
@@ -1202,8 +1228,8 @@ export const useGameStore = defineStore('game', () => {
               }
             }
 
-            // If we have detailed data from LLM, merge it in!
-            // We need to map Chinese keys if present in the object
+            // 合并来自深度模型训练的详细上下文特征数据！ (Deep Context Merging)
+            // 特殊逻辑：检测入参对象中是否存在待映射的中文 Key (China-Key Adapter)
             if (Object.keys(charData).length > 0) {
               const mappedData: any = {};
               for (const [key, val] of Object.entries(charData)) {
@@ -1218,10 +1244,10 @@ export const useGameStore = defineStore('game', () => {
           }
         }
 
-        // Handle remove_chars (Remove from scene)
+        // 处理角色离场指令 (Remove from scene)
         if (action.remove_chars && Array.isArray(action.remove_chars)) {
           const charStore = useCharacterStore();
-          // Resolve all IDs to remove to their canonical internal IDs
+          // 在剔除动作前，先将所有待处理 ID 规整化为系统内部标准 UUID 令牌 (Canonical Mapping)
           const resolvedIdsToRemove = action.remove_chars.map((rawId) => {
             return resolveCharacterId(rawId, charStore.characters, state.value.npcs);
           });
@@ -1235,9 +1261,8 @@ export const useGameStore = defineStore('game', () => {
   }
 
   /**
-   * Manually save the current game state to the most recent snapshot.
-   * Useful for persisting UI-driven changes (like persona or story summary)
-   * that happen outside the main game loop.
+   * 手动将当前实时游戏状态持久化至最近一次的聊天快照节点中。
+   * 常用于在非全局循环链路逻辑下（如通过 UI 驱动的人设变更、剧情梗概更新等）维持即时存档的强一致性。
    */
   async function saveCurrentStateToLastSnapshot() {
     try {
@@ -1245,7 +1270,7 @@ export const useGameStore = defineStore('game', () => {
       const currentSaveSlotId = settingsStore.currentSaveSlotId;
       if (!currentSaveSlotId) return;
 
-      // Find the last chat message with a snapshot
+      // 溯源：寻找关联了特定存档插槽的最后一条携带快照的聊天记录项
       const lastChatWithSnapshot = await dbService.getLastChatWithSnapshot(currentSaveSlotId);
 
       if (lastChatWithSnapshot && lastChatWithSnapshot.snapshotId) {
@@ -1254,7 +1279,7 @@ export const useGameStore = defineStore('game', () => {
           gameState: JSON.stringify(currentState)
         });
         console.log(
-          '[GameStore] Persisted current state to snapshot:',
+          '[游戏存档] 已成功将当前实时状态持久化至快照节点:',
           lastChatWithSnapshot.snapshotId
         );
       }
@@ -1289,7 +1314,7 @@ export const useGameStore = defineStore('game', () => {
     updatePlayerEnergy,
     setPlayerAvatar,
     saveCurrentStateToLastSnapshot,
-    // 联机相关
+    // 联机模块指令暴露 (Multiplayer Actions)
     multiplayer,
     setMultiplayer,
     setRoomInfo,

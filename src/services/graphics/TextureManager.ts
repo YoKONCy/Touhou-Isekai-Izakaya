@@ -6,8 +6,8 @@ export interface TileSlice {
 export interface TileSet {
   id: string;
   source: HTMLImageElement;
-  slices: TileSlice[]; // 0-8 flat array
-  gridSize: number; // e.g. 48px
+  slices: TileSlice[]; // 0-8 拍扁后的一维数组结构
+  gridSize: number; // 例如 48px
 }
 
 export class TextureManager {

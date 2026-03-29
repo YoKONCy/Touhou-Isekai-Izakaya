@@ -76,7 +76,7 @@ export const TALENT_MODIFIERS: Record<string, CombatModifier> = {
     id: 'c_endurance',
     name: '耐力训练',
     source: 'talent',
-    priority: 20, // Multiplier
+    priority: 20, // 乘法修正
     onCalculateMaxHp: (val: number) => val * 1.05
   },
   c_meditation: {
@@ -85,7 +85,7 @@ export const TALENT_MODIFIERS: Record<string, CombatModifier> = {
     source: 'talent',
     priority: 10,
     onCombatStart: (combatant: Combatant, ctx: CombatContext) => {
-      // Check if onPopup and applyBuff are available in context (from CombatOverlay)
+      // 检查上下文（由 CombatOverlay 注入）中是否包含弹窗与增益逻辑
       if (ctx && ctx.applyBuff) {
         ctx.applyBuff(combatant, {
           id: 'buff_meditation',
@@ -96,7 +96,7 @@ export const TALENT_MODIFIERS: Record<string, CombatModifier> = {
           effects: [{ type: 'heal_mp', value: 50, isPercentage: false }]
         });
       } else {
-        // Fallback if context not fully set up (should be handled in CombatOverlay)
+        // 容错处理：若上下文未完全就绪，执行简约版回复逻辑
         combatant.mp = Math.min(combatant.maxMp, combatant.mp + 10);
       }
     }
@@ -113,7 +113,7 @@ export const TALENT_MODIFIERS: Record<string, CombatModifier> = {
     name: '强韧肉体',
     source: 'talent',
     priority: 10,
-    onCalculateCritDmgTaken: (val: number) => val * 0.7 // Reduce critical damage bonus taken by 30%
+    onCalculateCritDmgTaken: (val: number) => val * 0.7 // 受到暴击伤害的额外加成降低 30%
   },
 
   // --- Row 3 ---
@@ -185,7 +185,7 @@ export const TALENT_MODIFIERS: Record<string, CombatModifier> = {
     priority: 10,
     onAfterDodge: (combatant: Combatant, ctx: CombatContext) => {
       if (ctx.addPopup) ctx.addPopup(combatant, '反击准备', 'buff');
-      // Logic: Next attack +20% damage. Handled via temporary buff.
+      // 逻辑：下一次攻击伤害提升 20%。通过施加临时 Buff 实现。
       if (ctx.applyBuff) {
         ctx.applyBuff(combatant, {
           id: 'buff_counter',
@@ -214,8 +214,8 @@ export const TALENT_MODIFIERS: Record<string, CombatModifier> = {
     source: 'talent',
     priority: 10,
     onCalculateDef: (val: number, ctx: CombatContext) => {
-      // If attacker has this talent, target's defense is reduced
-      if (ctx.defender) return val * 0.8; // Reduce target's effective defense by 20%
+      // 当攻击方拥有此天赋时，目标的防御力将被削减
+      if (ctx.defender) return val * 0.8; // 削减目标 20% 的有效防御力
       return val;
     }
   },
@@ -321,12 +321,12 @@ export const TALENT_MODIFIERS: Record<string, CombatModifier> = {
     source: 'talent',
     priority: 10,
     shouldAutoDodge: (_ctx: CombatContext) => {
-      // Needs state to track "First Hit".
-      // We can check turn === 1 and maybe a flag?
-      // For simplicity: First turn dodge? Or first attack of combat?
-      // Description says "First attack in combat".
-      // We'll rely on a combat state flag handled in overlay.
-      return false; // Handled specially
+      // 需要状态追踪“初次受击”。
+      // 可通过 turn === 1 或特定标签进行判定。
+      // 简化处理：判定首回合闪避或战斗中的首次受击。
+      // 天赋描述为“战斗中的首次攻击”。
+      // 依赖于 CombatOverlay 维护的战斗状态标记。
+      return false; // 由特殊逻辑处理
     }
   },
   c_bomb_master: {
@@ -357,7 +357,7 @@ export const TALENT_MODIFIERS: Record<string, CombatModifier> = {
     priority: 10,
     onAfterDamageDealt: (combatant: Combatant, damage: number, ctx: CombatContext) => {
       if (damage > 0) {
-        const heal = Math.floor(damage * 0.1); // Heal 10% of damage dealt
+        const heal = Math.floor(damage * 0.1); // 回复造成伤害量的 10%
         combatant.hp = Math.min(combatant.maxHp, combatant.hp + heal);
         if (ctx.addPopup) ctx.addPopup(combatant, heal, 'heal');
       }
@@ -369,7 +369,7 @@ export const TALENT_MODIFIERS: Record<string, CombatModifier> = {
     id: 'c_pain_suppress',
     name: '无惧苦痛',
     source: 'talent',
-    priority: 30, // High priority reduction
+    priority: 30, // 高优先级减伤修正
     onCalculateIncomingDamage: (val: number) => Math.floor(val * 0.7)
   },
   c_crit_master: {
@@ -418,8 +418,7 @@ export const TALENT_MODIFIERS: Record<string, CombatModifier> = {
     source: 'talent',
     priority: 20,
     onCalculateFinalDamage: (val: number, ctx: CombatContext) => {
-      // Against enemies with power > S (assume power is a string or compare numeric value)
-      // Let's assume there's a power level mapping or numeric power in defender
+      // 针对战力等级高于 S 的敌人（依据防御方的战力权重表进行对比）
       if (ctx.defender) {
         const defenderPower = POWER_SCALE[ctx.defender.power];
         if (defenderPower >= POWER_SCALE['S']) {

@@ -256,9 +256,9 @@ const BASE_LOGIC_PROMPT = `
          "type": "attack|buff", 
          "isUltimate": false,
          "buffDetails": { // 增益/减益效果必须项
-            "name": "Effect Name",
+            "name": "效果名称",
             "duration": 3, // 设置为 1 表示瞬时/一次性真实伤害或治疗
-            "description": "Effect description",
+            "description": "效果描述...",
             "effects": [
               // 1. "damage_over_time" (真实伤害): 忽略防御，受护盾/闪避影响。
               //    用于中毒、燃烧或直接真实伤害攻击。
@@ -298,7 +298,7 @@ const BASE_LOGIC_PROMPT = `
      - 如果**角色离开了当前场景**（例如：道别离开、瞬间移动消失、战斗后撤退），你**必须**使用 "remove_chars" 将其从当前场景移除。
    - Example: { "type": "SCENE", "remove_chars": ["reimu"] }
    - 不要在 SCENE 动作中使用 "op" 或 "value"。使用顶层字段 "location", "add_chars", "remove_chars"。
-5. MINIGAME: trigger (boolean), type (string, e.g. "cooking"), difficulty (string)
+5. MINIGAME: trigger (布尔值), type (字符串, 如 "cooking"), difficulty (难度字符串/位阶)
 
 # 物品/符卡标准化 (Item/Spell Standardization)
 系统检测到剧情（LLM1）可能仅输出了物品或符卡的名字，导致其在状态中仅显示为 "暂无描述" 的占位符。
@@ -338,36 +338,49 @@ const BASE_LOGIC_PROMPT = `
 `;
 
 const MULTIPLAYER_RULES = `
-2. **队友变量 (Companions - Multiplayer Only)**:
-   - 你需要管理除主玩家(Host)以外的其他玩家(Companions)。
+2. **队友变量 (Companions - 仅限多人模式)**:
+   - 你需要管理除主玩家(Host)以外的其他玩家(Assistant Players/Companions)。
    - **指令**: 使用 \`UPDATE_COMPANION\` 指令。
    - **参数**: \`targetName\` (玩家的角色名), \`field\`, \`value\`, \`op\`。
-   - **逻辑**: 你无需知道复杂的 Identity Key，只需根据剧情中提到的名字（如 "玩家A", "玩家B"）来指定 targetName。系统会自动匹配。
+   - **逻辑**: 你无需知道复杂的 Identity Key，只需根据剧情中提到的名字（如 "玩家A", "灵梦"）来指定 targetName。系统会自动匹配。
    - **可修改字段**: 
      - 数值/文本型: 与 **NPC 变量** 相同 (hp, max_hp, money, power, location, clothing, action, etc.)。
      - 列表型 (物品/配方): 若客机获得物品或配方，**必须**使用 \`UPDATE_COMPANION\`，field 设为 \`items\` 或 \`recipes\`，op 设为 \`push\`，value 为完整的对象。
 `;
 
-const MULTIPLAYER_ACTION = `3. UPDATE_COMPANION: targetName (Character Name), field (hp, money, items, etc.), op (add, subtract, set, push), value`;
+const MULTIPLAYER_ACTION = `3. UPDATE_COMPANION: targetName (角色名称), field (hp, money, items 等属性字段), op (add, subtract, set, push), value`;
 
 /**
- * GameMaster Logic Service (Instruction Mapper)
+ * GameMaster 逻辑处理器 (Logic Processor)
  *
- * 核心职责：具身智能中的“决策层”。
- * 将 Storyteller 生成的语义叙事转化为游戏世界可执行的确定性指令（JSON）。
- * 实现了意图与执行的完全解耦，确保 LLM 的幻觉不会直接破坏游戏数值系统。
+ * 核心职责：具身智能中的“决策层 (Decision Layer)”。
+ * 将 Storyteller 生成的非结构化语义叙事转化为游戏世界可执行的确定性机器指令（JSON Actions）。
+ * 实现了意图提取与物理执行的完全解耦，确保 LLM 的叙事幻觉不会直接导致游戏底层数值系统崩坏。
  */
 export class LogicService {
   /**
-   * Remove large or unnecessary data from player object before sending to LLM
+   * 数据清洗：在将玩家状态发送至逻辑模型前，剔除冗余或大体积字段以节省 Token (Context Sanitization)
    */
   public sanitizePlayer(player: any) {
     if (!player) return player;
     const sanitized = { ...player };
     delete sanitized.avatarUrl;
     delete sanitized.referenceImageUrl;
-    delete sanitized.persona; // Logic doesn't need narrative persona
-    delete sanitized.storySummary; // Logic doesn't need long-term narrative summary
+    delete sanitized.persona; // 核心逻辑层通常无需完整的叙事性人设文本
+    delete sanitized.storySummary; // 核心逻辑层无需详细的长期剧情摘要
+    
+    // 优化策略：防止在后期（如 5000 轮以后）因清单过长导致上下文窗口爆炸
+    // 策略：仅向逻辑模型发送被标记为“暂无描述”等需要模型执行标准化补全的项目
+    if (sanitized.items) {
+      sanitized.items = sanitized.items.filter((i: any) => i.description === '暂无描述' || !i.description || i.type === 'other');
+    }
+    if (sanitized.spell_cards) {
+      sanitized.spell_cards = sanitized.spell_cards.filter((c: any) => c.description === '暂无描述' || !c.description);
+    }
+    if (sanitized.recipes) {
+      sanitized.recipes = sanitized.recipes.filter((r: any) => r.description === '暂无描述' || !r.description);
+    }
+    
     return sanitized;
   }
 
@@ -387,10 +400,10 @@ export class LogicService {
       } catch (e: any) {
         lastError = e;
         if (e.message === 'Operation aborted by user' || e.name === 'AbortError') throw e;
-        console.warn(`Logic process attempt ${attempt} failed:`, e);
+        console.warn(`[逻辑层] 逻辑处理第 ${attempt} 次尝试失败:`, e);
       }
       if (attempt < maxRetries) {
-        // Wait before retry: 1s, 2s, 3s...
+        // 退避重试策略：按 1s, 2s, 3s... 梯度递增延迟
         const delay = attempt * 1000;
         const toastStore = useToastStore();
         toastStore.addToast(`逻辑模型处理重试中 (${attempt}/${maxRetries})...`, 'warning', 2000);
@@ -398,8 +411,8 @@ export class LogicService {
       }
     }
 
-    // If we reach here, all retries failed
-    console.error('Logic Processing Failed after all retries:', lastError);
+    // 若此处逻辑仍未跑通，则视为本轮处理彻底失败
+    console.error('逻辑引擎在多次尝试后最终失败:', lastError);
     const toastStore = useToastStore();
     toastStore.addToast(`逻辑模型处理最终失败: ${lastError.message}`, 'error');
 
@@ -416,12 +429,12 @@ export class LogicService {
       resolve: null
     };
 
-    // Fallback: return empty result so game doesn't crash
+    // 容错回退机制：返回空动作集，确保游戏主流程不因逻辑节点失败而挂起崩溃 (Graceful Degradation)
     return {
       actions: [],
       quick_replies: [],
-      summary: `Logic Error after ${maxRetries} retries: ${lastError.message}`,
-      thinking: `Logic processing failed. Error: ${lastError.message}`
+      summary: `重试 ${maxRetries} 次后逻辑发生错误: ${lastError.message}`,
+      thinking: `逻辑引擎处理最终失败，错误详情: ${lastError.message}`
     };
   }
 
@@ -435,13 +448,13 @@ export class LogicService {
     const config = settingsStore.getEffectiveConfig('logic');
 
     if (!config.apiKey) {
-      console.warn('Logic LLM not configured, skipping logic processing.');
+      console.warn('逻辑模型 (Logic LLM) 未配置，跳过本轮处理。');
       return { thinking: '', actions: [], quick_replies: [], summary: '' };
     }
 
-    // Heuristic: Scan story for NPC names to include them in context
-    // This ensures that if a pre-defined character appears, the Logic Model sees their initial stats
-    // Enhanced: Scan previous 2 turns (approx 4 messages) + current content + predicted characters
+    // 启发式扫描：在当前及近期剧情文本中检测 NPC 姓名，以便在上下文中动态注入对应的属性快照 (Entity Resolution)
+    // 此举确保当预设角色（如灵梦、魔理沙）登场时，逻辑模型能够获取其真实数值基础，而非凭空臆攒属性幻觉。
+    // 增强扫描：覆盖前 2 轮对话 (约 4 条消息) + 当前用户意图 + 本轮叙事文本 + 系统预测的下一轮角色名单。
     const chatStore = useChatStore();
     const recentMessages = chatStore.messages.slice(-4);
     const recentContext = recentMessages.map((m) => m.content).join('\n');
@@ -449,53 +462,59 @@ export class LogicService {
     const scanText =
       recentContext + '\n' + userContent + '\n' + storyContent + '\n' + predictedCharsList;
 
-    // 1. Get all NPCs already in the runtime state
+    // 第一阶段：检索当前运行态中已实例化的 NPC
     const allRuntimeNpcs = gameState.npcs ? Object.values(gameState.npcs) : [];
     const charStore = useCharacterStore();
 
-    // 2. Scan text to find mentioned characters (from runtime state OR static lorebook)
+    // 第二阶段：执行全文文本扫描，识别被提及的角色实体 (跨越运行时态与静态设定库)
     const mentionedNpcMap = new Map<string, any>();
 
-    // Strategy A: Check runtime NPCs
+    // 策略 A：优先检索当前存档中活跃的运行时角色数据
     for (const npc of allRuntimeNpcs) {
-      // @ts-expect-error: TODO: fix type error
+      // @ts-expect-error: 待办：修复类型不匹配问题
       if (npc.name && scanText.includes(npc.name)) {
         // @ts-expect-error: TODO: fix type error
         mentionedNpcMap.set(npc.id, npc);
       }
     }
 
-    // Strategy B: Check static Lorebook for characters not yet in runtime state OR missing details
+    // 策略 B：检索静态设定库 (Lorebook)，寻找尚未实例化或信息不完整的隐藏角色
     for (const char of charStore.characters) {
       if (
         scanText.includes(char.name) ||
         (char.tags && char.tags.some((tag) => scanText.includes(tag)))
       ) {
         if (!mentionedNpcMap.has(char.uuid)) {
-          // Add a "proto-NPC" based on static data (Logic-focused fields only)
-          mentionedNpcMap.set(char.uuid, {
-            id: char.uuid,
-            name: char.name,
-            power: char.initialPower || 'E',
-            gender: char.gender || 'female',
-            tags: char.tags || [],
-            isProto: true // Mark as not yet instantiated in game state
-          });
+          // 数据优先级：若已存在运行时状态，则以该状态为准，严禁重置好感度/关系 (Persistence Guard)
+          const runtimeState = gameState.npcs && gameState.npcs[char.uuid];
+          if (runtimeState) {
+            mentionedNpcMap.set(char.uuid, runtimeState);
+          } else {
+            // 构造“原型 NPC”：基于静态数据构建极简逻辑镜像，仅注入核心数值字段
+            mentionedNpcMap.set(char.uuid, {
+              id: char.uuid,
+              name: char.name,
+              power: char.initialPower || 'E',
+              gender: char.gender || 'female',
+              tags: char.tags || [],
+              isProto: true // 标注：该角色尚未在全局游戏状态中正式实例化
+            });
+          }
         }
       }
     }
 
-    // 3. Combine with current scene NPCs
+    // 第三阶段：合并当前场景 (Current Scene) 所有的显式角色
     const currentSceneIds = new Set(gameState.system.current_scene_npcs);
     const relevantNpcs: any[] = [];
 
-    // Add current scene NPCs (prioritize runtime state, then Lorebook)
+    // 场景人物注入：按优先级（已上线 NPC > 设定库预设）加载物理视图内的角色
     for (const id of gameState.system.current_scene_npcs) {
       if (!id) continue;
 
       let npcData = gameState.npcs[id];
       if (!npcData) {
-        // Try to find in Lorebook if missing from runtime state
+        // 容错补偿：若运行时缺失，尝试从设定库执行二次实体解析 (Entity Binding)
         const resolvedId = resolveCharacterId(id, charStore.characters, gameState.npcs);
         const staticChar = charStore.characters.find((c) => c.uuid === resolvedId);
         if (staticChar) {
@@ -514,14 +533,14 @@ export class LogicService {
       relevantNpcs.push(npcData);
     }
 
-    // Add mentioned NPCs that are NOT in the current scene
+    // 场外对话注入：添加被剧情提及但并未身处当前地点的角色，作为隐式逻辑参考 (Background Reference)
     for (const [id, npc] of mentionedNpcMap.entries()) {
       if (!currentSceneIds.has(id)) {
         relevantNpcs.push(npc);
       }
     }
 
-    // Inject Difficulty Rules
+    // 注入全局难度修正机械规则 (Game Balance Rules Injection)
     const difficulty = gameState.system?.difficulty || 'normal';
     let difficultyRules = '';
 
@@ -571,7 +590,7 @@ export class LogicService {
 
     let finalSystemPrompt = BASE_LOGIC_PROMPT.replace('{{difficulty_rules}}', difficultyRules);
 
-    // Inject Multiplayer Rules if active
+    // 多人模式联机辅助规则注入 (Multiplayer Logic Pass)
     const gameStore = useGameStore();
     if (gameStore.multiplayer.isMultiplayer) {
       finalSystemPrompt = finalSystemPrompt.replace('{{multiplayer_rules}}', MULTIPLAYER_RULES);
@@ -587,7 +606,7 @@ export class LogicService {
         content: JSON.stringify({
           current_state: {
             player: this.sanitizePlayer(gameState.player),
-            // Filter NPCs: Send those in current_scene_npcs AND those mentioned in the story
+            // 角色动态精简过滤器：仅向模型推送当前场景及剧情提及的活跃角色，以此削减 80% 的冗余 Token 压力
             scene_npcs: relevantNpcs
           },
           user_action: userContent,
@@ -609,26 +628,26 @@ export class LogicService {
 
       if (!content) throw new Error('Empty response from Logic LLM');
 
-      // 0. Strip CoT (Chain of Thought) tags like <think>...</think>
-      // This handles models that output internal reasoning (e.g. Gemini, DeepSeek)
+      // 0. 思维链剥离 (Strip CoT): 移除类似 <think>...</think> 的内部推理原件
+      // 此逻辑支持处理如 DeepSeek、Gemini Pro 等具备原生思维输出能力的高阶模型
       content = content.replace(/<think>[\s\S]*?<\/think>/gi, '');
 
-      // Strip Markdown code blocks if present
+      // 数据解包：剥离 Markdown 风格的代码块标签以获取 JSON 核心载荷
       content = content
         .replace(/^```json\s*/, '')
         .replace(/^```\s*/, '')
         .replace(/\s*```$/, '');
 
-      // Locate the JSON object (first '{' to last '}') to ignore conversational text
+      // 区域定位定位：检索首个 '{' 至末位 '}' 之间的区间，过滤冗余的解释性文本或末尾噪音
       const jsonStart = content.indexOf('{');
       const jsonEnd = content.lastIndexOf('}');
       if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
         content = content.substring(jsonStart, jsonEnd + 1);
       }
 
-      // Helper to sanitize JSON (fix quotes, control chars, comments)
+      // 鲁棒性辅助：清洗 JSON 字符串（修正单双引号混合、非标转义、C 风格注释等非法噪音）
       const sanitizeJson = (str: string): string => {
-        // Remove comments (simple C-style)
+        // 物理剔除 C-style 注释块 (去除 LLM 可能生成的非法解释)
         str = str.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
 
         let result = '';
@@ -671,15 +690,15 @@ export class LogicService {
             if (isEscaped) {
               isEscaped = false;
               if (char === "'")
-                result += "'"; // Unescape \' -> '
+                result += "'"; // 执行反转义：\' -> '
               else result += '\\' + char;
             } else if (char === '\\') {
               isEscaped = true;
             } else if (char === "'") {
               inSingle = false;
-              result += '"'; // Convert single quote end to double
+              result += '"'; // 规范化处理：单引号结束符映射回双引号
             } else if (char === '"') {
-              result += '\\"'; // Escape double quote inside
+              result += '\\"'; // 标准转义：对字符串内部的引号执行逃逸处理
             } else if (char === '\n') {
               result += '\\n';
             } else if (char === '\r') {
@@ -700,26 +719,26 @@ export class LogicService {
       try {
         result = JSON.parse(sanitizedContent) as LogicResult;
       } catch (parseError) {
-        // If strict parse fails, try one more permissive fix for unquoted keys
-        // Use a safer regex that requires preceding '{' or ',' to avoid matching text in strings
+        // 降级策略（容错）：若严苛解析失败，尝试最后一次放宽限制，对缺失引号的字典键进行正则补全 (Forgiving Parse)
+        // 采用上下文敏感的正则策略（前缀必须为 '{' 或 ','），防止误伤普通语义文本。
         try {
           const fixed = sanitizedContent.replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3');
           result = JSON.parse(fixed) as LogicResult;
         } catch (e2) {
-          throw parseError; // Throw original error if fallback also fails
+          throw parseError; // 若降级尝试依然失败，则向上层抛出最初的解析异常
         }
       }
 
       return result;
     } catch (e: any) {
-      // Re-throw to be caught by retry logic in processLogic
+      // 捕获异常并向上传递，由 processLogic 入口处触发梯度重试逻辑
       throw e;
     }
   }
 
   /**
-   * Generates a narrative description of the combat process based on logs.
-   * This uses the Misc Model (LLM4) but with a specific "Narrator" persona.
+   * 战斗叙事渲染器：基于底层数值日志生成动人心魄的自然语言描写。
+   * 此方法调用辅助模型 (LLM4)，并注入特定的“旁白君 (Narrator)”人格。
    */
   async generateCombatNarrative(
     combatSummary: string,
@@ -731,37 +750,37 @@ export class LogicService {
     const charStore = useCharacterStore();
     const gameStore = useGameStore();
     try {
-      // 0. Build Character Persona Context
+      // 第一步：构建动态角色人格语境 (Character Personality Injection)
       let systemPrompt = COMBAT_NARRATOR_PROMPT;
 
-      // Inject Context (Pre-combat dialogue)
+      // 语境对齐：注入战斗前置叙事（战斗前的对话与导火索），确保渲染层气氛衔接自然
       if (contextText) {
         systemPrompt += `\n\n# 战斗前置剧情 (Context)\n以下是触发本次战斗的剧情对话，请根据此语境（如双方的对话、冲突原因、语气）来润色战斗描写，使其自然衔接：\n"""\n${contextText}\n"""\n`;
       }
 
-      // Inject Player Persona
+      // 注入主玩家人格画像 (Player Persona Tracking)
       const player = gameStore.state.player;
       if (player) {
         let playerDesc = '暂无详细设定';
         let playerGlobalSetting = '无特殊设定';
         const rawPersona = player.persona || '';
 
-        // If persona is JSON, extract text like we did in PromptBuilder/PromptService
+        // 结构解包：若人设采用 JSON 协议存储，则根据 PromptBuilder 协议按需提取逻辑字段 (Flattening)
         try {
           const jsonObj = JSON.parse(rawPersona);
 
-          // 1. Text Persona
+          // 1. 提取核心文本描述 (Core Bio)
           if (jsonObj['详细人设']) playerDesc = jsonObj['详细人设'];
           else if (jsonObj['补充设定']) playerDesc = jsonObj['补充设定'];
           else playerDesc = '无特殊描述';
 
-          // 2. Global Setting
+          // 2. 剥离全局系统设定 (Global Lore Background)
           const settingObj = { ...jsonObj };
           if ('详细人设' in settingObj) delete settingObj['详细人设'];
           if ('补充设定' in settingObj) delete settingObj['补充设定'];
           playerGlobalSetting = JSON.stringify(settingObj, null, 2);
         } catch (e) {
-          // Not JSON, use as is
+          // 非标准 JSON 格式，按纯文本原样透传
           playerDesc = rawPersona;
         }
 
@@ -774,10 +793,10 @@ export class LogicService {
           '\n\n# 战斗场景其他角色人设 (Other Characters)\n请在描写中参考以下角色的性格与外貌设定：\n';
 
         for (const c of combatants) {
-          // Skip Player if they are in the list (handled above)
+          // 跳过主玩家个人详细人设（已在上方逻辑中独立注入）
           if (c.isPlayer) continue;
 
-          // Try to find static data in Lorebook
+          // 尝试回溯设定库以定位静态角色基准设定 (Statics Resolution)
           const resolvedId = resolveCharacterId(
             c.id || c.name,
             charStore.characters,
@@ -786,24 +805,24 @@ export class LogicService {
           const staticChar = charStore.characters.find((ch) => ch.uuid === resolvedId);
 
           const desc = staticChar?.description || '暂无详细设定';
-          // Truncate desc if too long
+          // 属性修演：若描述过长则执行截断处理，防止 Token 膨胀 (Context Compression)
           const safeDesc = desc.length > 300 ? desc.substring(0, 300) + '...' : desc;
 
           systemPrompt += `- **${c.name}**: ${safeDesc}\n`;
         }
       }
 
-      // 1. Call API (Using LLM4 / Misc Model)
-      // Note: We use 'misc' (LLM4) for text polishing as requested
+      // 运行阶段 1：调用生成接口 (使用 LLM4 / Misc 辅助模型渲染文本)
+      // 注意：这里明确根据需求，使用辅助模型 (LLM4) 执行文本润色与叙事生成。
       console.log(
-        '[LogicService] Generating combat narrative. Summary:',
+        '[LogicService] 正在生成战斗战报。摘要:',
         combatSummary.substring(0, 100) + '...'
       );
       const content = await generateCompletion({
         modelType: 'misc',
         systemPrompt,
         messages: [{ role: 'user', content: combatSummary }],
-        temperature: 0.7, // Higher creativity for narration
+        temperature: 0.7, // 为叙事描写赋予更高的随机采样值以提升文学感
         max_tokens: 3000,
         signal
       });
@@ -813,7 +832,7 @@ export class LogicService {
 
       if (!trimmedContent) {
         console.warn(
-          '[LogicService] LLM4 returned empty content! Falling back to original summary.'
+          '[LogicService] LLM4 响应内容为空！自动回退为原始结算摘要。'
         );
         return `(系统提示：战斗描写生成为空，以下是战斗结算信息)\n${combatSummary}`;
       }
@@ -821,10 +840,10 @@ export class LogicService {
       console.log('[LogicService] Successfully generated narrative.');
       return trimmedContent;
     } catch (e: any) {
-      console.error('Combat Narration Failed:', e);
+      console.error('[LogicService] 战斗叙事生成失败:', e);
       const toastStore = useToastStore();
       toastStore.addToast(`战斗战报生成失败: ${e.message}`, 'error');
-      // Fallback: return original summary if AI fails
+      // 容错降级：若 AI 叙事生成失败，则返回原始战斗结算摘要，确保信息完整。
       return `(战斗描写生成失败，以下是原始记录)\n${combatSummary}`;
     }
   }

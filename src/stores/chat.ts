@@ -27,19 +27,19 @@ export const useChatStore = defineStore('chat', () => {
 
     if (!loadMore) {
       // 初始加载：只加载最后一页（最晚的消息）
-      // Dexie: sortBy('timestamp') implies ASC. slice(-pageSize) takes last 30.
-      // SQL equivalent: SELECT * FROM (SELECT * FROM chats WHERE saveSlotId=? ORDER BY timestamp DESC LIMIT ?) ORDER BY timestamp ASC
-      const limit = pageSize + 1; // Fetch one extra to check if there are more
+      // 分页策略：按时间戳升序排序，截取最后 pageSize 条数据作为当前视窗 (Tail Window Strategy)
+      // SQL 逻辑：子查询按降序取记录后，在外层重新按升序校准。
+      const limit = pageSize + 1; // 多抓取一条记录以判定“更早”分支是否存在更多分页 (Look-ahead Fetch)
       const rows = await dbService.exec(
         `SELECT * FROM chats WHERE saveSlotId = ? ORDER BY timestamp DESC LIMIT ?`,
         [saveStore.currentSaveId, limit]
       );
 
-      const rowsAsc = rows.reverse(); // Now they are ASC
+      const rowsAsc = rows.reverse(); // 执行数组反转，使其符合 UI 渲染的升序时间轴
 
       if (rowsAsc.length > pageSize) {
-        messages.value = rowsAsc.slice(rowsAsc.length - pageSize); // Take last pageSize
-        hasMore.value = true; // We fetched more than pageSize, so there are older messages
+        messages.value = rowsAsc.slice(rowsAsc.length - pageSize); // 若存在溢出，则仅保留标准的 pageSize 数量
+        hasMore.value = true; // 属性判定：检测到溢出意味着磁盘中仍存有更早的历史记录 (Has History)
       } else {
         messages.value = rowsAsc;
         hasMore.value = false;
@@ -51,8 +51,8 @@ export const useChatStore = defineStore('chat', () => {
         const firstMsg = messages.value[0];
         if (!firstMsg) return;
 
-        // Dexie: timestamp < firstMsg.timestamp, reverse(), limit(pageSize)
-        // SQL: SELECT * FROM chats WHERE saveSlotId=? AND timestamp < ? ORDER BY timestamp DESC LIMIT ?
+        // 关联 ID 同步：获取时间戳早于当前首条消息的旧记录分片 (Backward Paging)
+        // SQL 指令：按降序查找历史分片，随后翻转回 UI 适用的升序。
         const olderMsgs = await dbService.exec(
           'SELECT * FROM chats WHERE saveSlotId = ? AND timestamp < ? ORDER BY timestamp DESC LIMIT ?',
           [saveStore.currentSaveId, firstMsg.timestamp, pageSize]
@@ -77,8 +77,8 @@ export const useChatStore = defineStore('chat', () => {
         const lastMsg = messages.value[messages.value.length - 1];
         if (!lastMsg) return;
 
-        // Dexie: timestamp > lastMsg.timestamp, limit(pageSize)
-        // SQL: SELECT * FROM chats WHERE saveSlotId=? AND timestamp > ? ORDER BY timestamp ASC LIMIT ?
+        // 关联 ID 同步：获取时间戳晚于当前末条消息的新记录分片 (Forward Paging)
+        // SQL 指令：按升序顺序步进加载。
         const newerMsgs = await dbService.exec(
           'SELECT * FROM chats WHERE saveSlotId = ? AND timestamp > ? ORDER BY timestamp ASC LIMIT ?',
           [saveStore.currentSaveId, lastMsg.timestamp, pageSize]
@@ -102,8 +102,8 @@ export const useChatStore = defineStore('chat', () => {
       return;
     }
 
-    // Load the latest state if exists (only on initial load)
-    // We need the very last message to check for snapshot
+    // 状态热恢复 (Hot Recovery)：若存在有效存档点，则在初始加载阶段同步恢复游戏全局上下文。
+    // 逻辑判定：需要锁定磁盘最后一条消息以定位最新的全局快照 (Snapshot Recovery Point)。
     const lastMsgRes = await dbService.exec(
       'SELECT * FROM chats WHERE saveSlotId = ? ORDER BY timestamp DESC LIMIT 1',
       [saveStore.currentSaveId]
@@ -130,8 +130,8 @@ export const useChatStore = defineStore('chat', () => {
           console.warn('[ChatStore] Snapshot not found for ID:', lastMsg.snapshotId);
         }
       } else {
-        // If last message has no snapshot, find last available snapshot
-        console.log('[ChatStore] Last message has no snapshot. Searching backwards...');
+        // 容错逻辑：若末位消息未绑定快照（可能由于并发事务崩坏），则开启回溯查找模式。
+        console.log('[ChatStore] 末条消息未关联快照，正在执行反向全表扫描...');
         const lastSnapshot = await dbService.getLatestSnapshot(saveStore.currentSaveId);
 
         if (lastSnapshot) {
@@ -140,7 +140,7 @@ export const useChatStore = defineStore('chat', () => {
         }
       }
     } else {
-      // New save or empty history
+      // 边界处理：检测到纯净新存档或空历史，尝试执行默认的初始化状态恢复。
       const lastSnapshot = await dbService.getLatestSnapshot(saveStore.currentSaveId);
 
       if (lastSnapshot) {
@@ -152,14 +152,14 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  // Create a snapshot without a chat message (for initial save state)
+  // 初始快照声明：在未产生任何对话前，手动记录一份纯净的初始游戏状态坐标点。
   async function createInitialSnapshot() {
     const saveStore = useSaveStore();
     if (!saveStore.currentSaveId) return;
 
     await dbService.createSnapshot(saveStore.currentSaveId, 0, gameStore.state);
 
-    // Sync Save Metadata
+    // 同步更新存档槽位的元数据 (Persistent Metadata Sync)
     await dbService.updateSaveSlot(saveStore.currentSaveId, {
       location: gameStore.state.player.location || '未知',
       lastPlayed: Date.now()
@@ -184,7 +184,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!snapshotId && role === 'assistant') {
       snapshotId = await dbService.createSnapshot(saveStore.currentSaveId, 0, gameStore.state);
 
-      // Sync Save Metadata (Location & Time)
+      // 定期同步更新存档槽位的地理位置与游玩时码流水 (Save State Update)
       await dbService.updateSaveSlot(saveStore.currentSaveId, {
         location: gameStore.state.player.location || '未知',
         lastPlayed: timestamp
@@ -200,7 +200,7 @@ export const useChatStore = defineStore('chat', () => {
       debugLog
     });
 
-    // Update snapshot with correct chatId
+    // 引用补丁：将刚刚生成的对话 ID 反向注入快照索引中，建立持久化逻辑链接 (Message Linking)
     if (snapshotId && !forcedSnapshotId) {
       await dbService.exec('UPDATE snapshots SET chatId = ? WHERE id = ?', [messageId, snapshotId]);
     }
@@ -244,11 +244,11 @@ export const useChatStore = defineStore('chat', () => {
       idsToDelete.length
     );
 
-    // Delete from DB
+    // 物理清理：执行 SQL DELETE 命令同步擦除磁盘记录 (Database Execution)
     const placeholders = idsToDelete.map(() => '?').join(',');
     await dbService.exec(`DELETE FROM chats WHERE id IN (${placeholders})`, idsToDelete);
 
-    // Delete associated snapshots
+    // 级联清理：同步销毁所有已废弃的对应游戏状态快照，释放存储资源 (Asset Recovery)
     const snapshotIds = messagesToDelete
       .map((m) => m.snapshotId)
       .filter((id): id is number => !!id);
@@ -258,13 +258,13 @@ export const useChatStore = defineStore('chat', () => {
       await dbService.exec(`DELETE FROM snapshots WHERE id IN (${snapPlaceholders})`, snapshotIds);
     }
 
-    // Delete snapshots linked via chatId
+    // 深度链接清理：基于 chatId 映射关系执行次级快照表清理
     await dbService.exec(`DELETE FROM snapshots WHERE chatId IN (${placeholders})`, idsToDelete);
 
-    // Update local state
+    // 重塑 Vue 响应式数据视窗 (State Sync)
     messages.value = messages.value.slice(0, startIndex);
 
-    // Restore state
+    // 状态机重置：执行状态回滚，确保游戏全局上下文重定向至删除点前的有效存档位。
     if (messages.value.length > 0) {
       let restored = false;
       for (let i = messages.value.length - 1; i >= 0; i--) {
@@ -318,7 +318,7 @@ export const useChatStore = defineStore('chat', () => {
       }
     }
 
-    // Sync Memory Rollback
+    // 关联记忆层同步：触发记忆管理系统的逻辑回滚，确保 LLM 的对话上下文深度一致。
     const saveStore = useSaveStore();
     if (saveStore.currentSaveId) {
       const currentTurn = gameStore.state.system.turn_count || 0;
@@ -383,9 +383,8 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function updateMessage(id: number, updates: Partial<ChatMessage>) {
-    // updates keys might not map 1:1 to DB columns if they are extra props, but ChatMessage is mostly flat
-    // We should filter keys that exist in DB or just try.
-    // For now assume updates match DB columns.
+    // 兼容性提醒：ChatMessage 更新载荷通常与数据库字段严格映射。
+    // 目前采用直接透传机制，输入负载需与数据库 Schema 保持高度一致。
     const fields = Object.keys(updates)
       .map((k) => `${k} = ?`)
       .join(', ');
@@ -434,10 +433,10 @@ export const useChatStore = defineStore('chat', () => {
     const isLoaded = messages.value.some((m) => m.id === targetChatId);
 
     if (!isLoaded) {
-      console.log('[ChatStore] Loading history window for jump...');
+      console.log('[ChatStore] 对话视窗不在显存中，正在执行历史窗口跳转加载...');
 
       const windowSize = 40;
-      // SQL: SELECT * FROM chats WHERE saveSlotId=? AND id >= ? ORDER BY timestamp ASC LIMIT ?
+      // UI 跳转逻辑：以目标 ID 为基准点，向后扩充拉取 40 条对话记录以填补前端视窗。
       const msgs = await dbService.exec(
         'SELECT * FROM chats WHERE saveSlotId = ? AND id >= ? ORDER BY timestamp ASC LIMIT ?',
         [saveStore.currentSaveId, targetChatId, windowSize]

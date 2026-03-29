@@ -761,7 +761,7 @@ export class ZonePopulator {
           this.setTile(c.x, c.y, '.');
         }
       });
-      // Filter out walls AND reserved cells
+      // 筛选并排除掉阻挡在前的墙壁部分与已标记好的专属保留方格
       const freeCells = new Set(
         zone.cells
           .filter((c) => this.getTile(c.x, c.y) !== '#' && !this.reservedCells.has(`${c.x},${c.y}`))
@@ -1041,7 +1041,7 @@ export class ZonePopulator {
           this.setTile(c.x, c.y, '.');
         }
       });
-      // Filter out walls AND reserved cells
+      // 筛选并排除掉墙壁与保留下来的特殊单元格
       const freeCells = new Set(
         zone.cells
           .filter((c) => this.getTile(c.x, c.y) !== '#' && !this.reservedCells.has(`${c.x},${c.y}`))

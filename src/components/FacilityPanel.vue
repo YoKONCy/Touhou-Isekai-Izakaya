@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue';
 import { dbService } from '@/services/DatabaseService';
 import { useSaveStore } from '@/stores/save';
-import { X, MapPin, Users, Activity, Home } from 'lucide-vue-next';
+import { X, MapPin, Users, Activity, Home, Trash2 } from 'lucide-vue-next';
 import { audioManager } from '@/services/audio';
 
 const props = defineProps<{
@@ -136,6 +136,14 @@ function close() {
   emit('close');
   audioManager.playSoftClick();
 }
+
+async function removeFacility(id: string) {
+  if (confirm('确定要清除这处设施的档案吗？(操作无法撤销)')) {
+    await dbService.deleteFacility(id);
+    audioManager.playSoftClick();
+    loadFacilities();
+  }
+}
 </script>
 
 <template>
@@ -211,15 +219,24 @@ function close() {
                     </div>
                   </div>
                 </div>
-                <div
-                  class="px-3 py-1 rounded-full text-xs font-bold"
-                  :class="
-                    fac.status.includes('正常') || fac.status.includes('经营')
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-amber-100 text-amber-700'
-                  "
-                >
-                  {{ fac.status }}
+                <div class="flex items-center gap-2">
+                  <div
+                    class="px-3 py-1 rounded-full text-xs font-bold"
+                    :class="
+                      fac.status.includes('正常') || fac.status.includes('经营')
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-amber-100 text-amber-700'
+                    "
+                  >
+                    {{ fac.status }}
+                  </div>
+                  <button
+                    @click="removeFacility(fac.id)"
+                    class="p-1.5 bg-white/50 text-red-500 hover:text-white hover:bg-red-500 rounded-full transition-colors shadow-sm"
+                    title="清除该条目"
+                  >
+                    <Trash2 class="w-4 h-4" />
+                  </button>
                 </div>
               </div>
 

@@ -16,7 +16,7 @@ const emit = defineEmits<{
 const gameStore = useGameStore();
 const player = computed(() => gameStore.state.player);
 
-// Form State
+// 表单响应式状态 (Form Reactive State)
 const formData = ref({
   name: '',
   persona: '',
@@ -25,14 +25,14 @@ const formData = ref({
 
 const summaryTurnCount = ref(20);
 
-// Initialize form data when modal opens
+// 弹窗打开时初始化表单数据 (Lifecycle Initialization)
 watch(
   () => props.isOpen,
   (newVal) => {
     if (newVal) {
       formData.value.name = player.value.name;
 
-      // Smart Persona Loading
+      // 智能人设解析加载逻辑 (Smart Persona Loading)
       const rawPersona = player.value.persona;
       try {
         const jsonObj = JSON.parse(rawPersona);
@@ -41,11 +41,11 @@ watch(
         } else if (jsonObj['补充设定']) {
           formData.value.persona = jsonObj['补充设定'];
         } else {
-          // Fallback if no known keys
-          formData.value.persona = rawPersona; // Or empty?
+          // 键值未匹配下的兜底加载策略
+          formData.value.persona = rawPersona;
         }
       } catch (e) {
-        // Not JSON, use raw text
+      // 非 JSON 原始文本处理
         formData.value.persona = rawPersona;
       }
 
@@ -54,7 +54,7 @@ watch(
   }
 );
 
-// Watch for store changes to storySummary (for auto-populate)
+// 监听 Store 中故事总结的变化（用于自动填充 AI 生成的摘要数据）
 watch(
   () => player.value.storySummary,
   (newVal) => {
@@ -65,54 +65,51 @@ watch(
 );
 
 async function handleSave() {
-  // Smart Persona Saving
+  // 智能人设保存策略 (Smart Persona Persistence)
   let finalPersona = formData.value.persona;
   const rawPersona = player.value.persona;
 
   try {
     const jsonObj = JSON.parse(rawPersona);
-    // Update existing JSON structure
+    // 更新已有的 JSON 结构字段 (Structural Integrity Update)
     if (jsonObj['详细人设']) {
       jsonObj['详细人设'] = formData.value.persona;
     } else if (jsonObj['补充设定']) {
       jsonObj['补充设定'] = formData.value.persona;
     } else {
-      // If it was JSON but didn't have these keys, maybe add one?
-      // Or just treat it as a custom JSON object the user manually made?
-      // Let's default to creating "详细人设" if we are in JSON mode but missing keys
+      // 若是有效 JSON 但缺少预设键，则默认补齐“详细人设”字段以便后续识别
       jsonObj['详细人设'] = formData.value.persona;
     }
     finalPersona = JSON.stringify(jsonObj, null, 2);
   } catch (e) {
-    // Not JSON, save as plain text
+    // 识别为非 JSON 格式，按纯文本形式执行覆盖保存
     finalPersona = formData.value.persona;
   }
 
-  // Update GameStore
+  // 同步至状态机并立即执行数据库持久化，以防刷新后数据丢失 (Persistence Guard)
   gameStore.state.player.name = formData.value.name;
   gameStore.state.player.persona = finalPersona;
   gameStore.state.player.storySummary = formData.value.storySummary;
 
-  // Persist to IndexedDB immediately so it's not lost on refresh
   await gameStore.saveCurrentStateToLastSnapshot();
 
-  audioManager.playLevelUp(); // Success sound
+  audioManager.playLevelUp(); // 播放保存成功提示音 (Feedback Sound)
   emit('close');
 }
 
 function handleStartSummary() {
   audioManager.playClick();
   emit('open-summary', summaryTurnCount.value);
-  // We don't close the modal here because we want to see the summary being populated
+  // 此处不立即关闭弹窗，以便用户实时核对 AI 自动填充的摘要内容 (Experience Polish)
 }
 
-// Avatar Upload & Crop Logic
+// 头像上传与裁剪核心逻辑 (Avatar Assets Flow)
 const fileInput = ref<HTMLInputElement | null>(null);
 const showCropperModal = ref(false);
 const rawImage = ref<string | null>(null);
 const cropperImage = ref<HTMLImageElement | null>(null);
 
-// Cropper State
+// 裁剪器内部状态位寄存 (Cropper Coordinate State)
 const cropperState = ref({
   scale: 1,
   x: 0,
@@ -131,13 +128,13 @@ function handleAvatarFile(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0];
   if (!file) return;
 
-  // Compress Image before setting to rawImage
+  // 在渲染到预览器前执行位图物理压缩，防范超大文件导致 Worker OOM 崩溃 (Pre-compression)
   const reader = new FileReader();
   reader.onload = (event) => {
     const img = new Image();
     img.onload = () => {
-      // Compress logic
-      const MAX_SIZE = 1024; // Max width or height
+      // 尺寸缩放逻辑：设定最大长边阈值为 1024px
+      const MAX_SIZE = 1024;
       let width = img.width;
       let height = img.height;
 
@@ -159,25 +156,18 @@ function handleAvatarFile(e: Event) {
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(img, 0, 0, width, height);
-        // Use JPEG for better compression of photos, 0.8 quality
-        // If original was PNG with transparency, this might add black background,
-        // but for avatar raw source usually fine. If we want to keep transparency we should check file type.
-        // However, large PNGs are the main issue. Let's stick to JPEG for raw source storage reduction unless strictly needed.
-        // Actually, let's keep format dynamic but limit size.
+        // 策略选择：大体积位图统一转存为 JPEG 0.85 以削减高达 90% 的内存/存储占用 (Storage Optimization)
+        // 注意：这会牺牲源图的透明通道，但对于玩家头像（通常为照片或完整艺术图）通常利大于弊。
         let mimeType = file.type;
         if (mimeType === 'image/svg+xml') mimeType = 'image/png'; // Convert SVG to raster
 
-        // Force JPEG if file is large (>1MB) to save space, otherwise keep original format?
-        // Safer to just compress to JPEG if it's not transparent, or PNG if it is.
-        // For simplicity and space: verify if transparency is needed?
-        // Player avatars usually don't need transparency for the raw upload (usually photos/art).
-        // Let's use JPEG 0.85 for significant size reduction.
+        // 存储性能平衡：若源图体积或格式可能导致 OOM，则统一执行 JPEG 0.85 强力压缩以获得最佳加载性能。
         const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
 
         rawImage.value = compressedDataUrl;
         showCropperModal.value = true;
 
-        // Reset state
+        // 重置裁剪状态缓存 (State Reset)
         cropperState.value = {
           scale: 1,
           x: 0,
@@ -196,7 +186,7 @@ function handleAvatarFile(e: Event) {
   if (fileInput.value) fileInput.value.value = '';
 }
 
-// Cropper Interaction
+// 裁剪器交互事件处理器 (Input Event Listeners)
 function handleMouseDown(e: MouseEvent) {
   cropperState.value.dragging = true;
   cropperState.value.startX = e.clientX - cropperState.value.x;
@@ -208,24 +198,21 @@ function clampState() {
   const img = cropperImage.value;
   const targetSize = 200; // The size of our circular crop area
 
-  // 1. Ensure scale is not too small (must cover the 200px crop area)
+  // 1. 安全比例校验：确保图像始终能覆盖 200px 裁剪圆形区，不露出背景白边。
   const minScale = Math.max(targetSize / img.naturalWidth, targetSize / img.naturalHeight);
   if (cropperState.value.scale < minScale) {
     cropperState.value.scale = minScale;
   }
 
-  // 2. Clamp x and y to keep the image covering the 200px crop area
-  // The image is centered at (0,0) in our coordinate system initially.
-  // Its scaled dimensions are:
+  // 2. 坐标钳向 (Clamping)：强制重置 X/Y 偏移以确保图像纹理填满裁剪区域
+  // 核心逻辑：计算缩放后的实际物理边界偏移量
   const sw = img.naturalWidth * cropperState.value.scale;
   const sh = img.naturalHeight * cropperState.value.scale;
 
-  // The crop area is from -100 to +100 in our coordinate system.
-  // The image boundaries are:
-  // left: x - sw/2, right: x + sw/2
-  // top: y - sh/2, bottom: y + sh/2
+  // 物理映射判定：目标裁剪圆横跨 [-100, 100] 区间
+  // 须满足：左边界 <= -100 且 右边界 >= 100 以此类推。
 
-  // We need:
+  // 边界约束逻辑：
   // x - sw/2 <= -100  =>  x <= sw/2 - 100
   // x + sw/2 >= 100   =>  x >= 100 - sw/2
   // y - sh/2 <= -100  =>  y <= sh/2 - 100
@@ -265,17 +252,15 @@ function onImageLoad(e: Event) {
   const img = e.target as HTMLImageElement;
   if (!img.naturalWidth || !img.naturalHeight) return;
 
-  // The crop circle is 200px
+  // 裁剪圆直径常量 (Crop Diameter)
   const targetSize = 200;
 
-  // Calculate scale to fit the image reasonably
-  // We want the image to initially cover the crop area
+  // 初始适配策略：计算出一组能将图像恰好覆盖 200px 核心圆的“最优缩放比”
   const scaleX = targetSize / img.naturalWidth;
   const scaleY = targetSize / img.naturalHeight;
 
-  // Start with a scale that fits the image nicely in the 400px view area
-  // but ensures it's at least as big as the 200px crop circle
-  const fitScale = Math.max(scaleX, scaleY) * 1.2; // 1.2x margin
+  // 以 1.2 倍安全余量作为起步渲染比例，确保视觉过渡顺滑
+  const fitScale = Math.max(scaleX, scaleY) * 1.2;
 
   cropperState.value.scale = fitScale;
   cropperState.value.x = 0;
@@ -285,40 +270,29 @@ function onImageLoad(e: Event) {
 async function handleCropConfirm() {
   if (!cropperImage.value) return;
 
-  // Create an offscreen canvas for the final crop
+  // 创建离屏像素空间执行最终采样 (Offscreen Snapshot)
   const canvas = document.createElement('canvas');
-  const size = 256; // Final avatar size
+  const size = 256; // 最终产出的头像尺寸 (Target Storage Size)
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  // Fill background
+  // 渲染底色填充 (防穿透背景渲染)
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, size, size);
 
-  // Calculate draw parameters
-  // The viewer is 300x300 (viewport). The mask is a circle in the center.
-  // We want to capture what's inside the circle.
-  // Current implementation in StatusCard was a bit simplified.
-  // Let's make a robust one here.
-
-  // Save reference image (Original)
-  const referenceUrl = rawImage.value;
-
-  // Generate Avatar (Cropped)
-  // Manual calculation is better for performance and correctness.
+  // 获取渲染变换矩阵参数 (Transformation Matrix Params)
+  // 核心目标：精准捕获预览圆内的像素负载部分，相较于 CSS 方案，离屏手动渲染能提供更高质量的抗锯齿与像素纠偏。
   const img = cropperImage.value;
   const scale = cropperState.value.scale;
   const x = cropperState.value.x;
   const y = cropperState.value.y;
 
-  // The crop window in UI is centered.
-  // Image is drawn at (center + x, center + y) with scale.
+  // 物理映射逻辑：Canvas 中心点 (128, 128) 对应 UI 视窗绝对中心。
+  // 执行基于交互偏移量 (x, y) 与缩放比 (scale) 的平移变换。
 
-  // To draw on 256x256 canvas:
-  // The center of the canvas (128, 128) corresponds to the center of the UI crop window.
-  // The image should be drawn relative to that center.
+  // 矩阵变换与原点平移 (Inverse Matrix Map)
 
   ctx.translate(size / 2, size / 2);
   ctx.translate(x, y);
@@ -327,7 +301,7 @@ async function handleCropConfirm() {
 
   const avatarUrl = canvas.toDataURL('image/png');
 
-  // Save to store
+  // 同步至全局状态机并重置临时显存 (State Commit)
   if (referenceUrl) {
     gameStore.setPlayerAvatar(avatarUrl, referenceUrl);
   }
@@ -347,7 +321,7 @@ async function handleCropConfirm() {
       <div
         class="w-full max-w-2xl bg-[#fdf6e3] dark:bg-stone-900 rounded-xl shadow-2xl border-2 border-izakaya-wood overflow-hidden flex flex-col max-h-[90vh]"
       >
-        <!-- Header -->
+        <!-- 弹窗页眉 -->
         <div
           class="flex items-center justify-between p-4 border-b border-izakaya-wood/20 bg-izakaya-wood/5 dark:bg-stone-800"
         >
@@ -365,12 +339,12 @@ async function handleCropConfirm() {
           </button>
         </div>
 
-        <!-- Content -->
+        <!-- 核心配置内容区 -->
         <div
           class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 custom-scrollbar overscroll-contain"
           style="-webkit-overflow-scrolling: touch"
         >
-          <!-- Avatar Section -->
+          <!-- 头像上传与基本属性 -->
           <div class="flex flex-col sm:flex-row gap-6 items-start">
             <div class="flex-shrink-0 flex flex-col items-center gap-3">
               <div
@@ -389,7 +363,7 @@ async function handleCropConfirm() {
                   <User class="w-12 h-12" />
                 </div>
 
-                <!-- Overlay -->
+                <!-- 悬浮交互遮罩 (Layer Overlay) -->
                 <div
                   class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                 >
@@ -448,7 +422,7 @@ async function handleCropConfirm() {
             </div>
           </div>
 
-          <!-- Persona Section -->
+          <!-- 核心人设设定区 (System Meta) -->
           <div class="space-y-2">
             <div class="flex items-center justify-between">
               <label
@@ -472,7 +446,7 @@ async function handleCropConfirm() {
             ></textarea>
           </div>
 
-          <!-- Story Summary Section -->
+          <!-- 故事大总结区块 (Long-term Story Summary) -->
           <div class="space-y-4 pt-4 border-t border-izakaya-wood/10">
             <div class="flex items-center justify-between">
               <div class="space-y-1">
@@ -519,7 +493,7 @@ async function handleCropConfirm() {
           </div>
         </div>
 
-        <!-- Footer -->
+        <!-- 操作底栏 -->
         <div
           class="p-4 border-t border-izakaya-wood/10 bg-white/50 dark:bg-stone-800/50 flex justify-end gap-3"
         >
@@ -540,7 +514,7 @@ async function handleCropConfirm() {
       </div>
     </div>
 
-    <!-- Cropper Modal (Nested) -->
+    <!-- 头像二次裁剪组件 (Layered Cropper) -->
     <div
       v-if="showCropperModal"
       class="fixed inset-0 z-[110] bg-black/90 flex flex-col items-center justify-center p-4"
@@ -561,7 +535,7 @@ async function handleCropConfirm() {
           @mouseleave="handleMouseUp"
           @wheel="handleWheel"
         >
-          <!-- Image Layer -->
+          <!-- 位图渲染层 (Image Render Pipe) -->
           <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
             <img
               ref="cropperImage"
@@ -575,9 +549,9 @@ async function handleCropConfirm() {
             />
           </div>
 
-          <!-- Overlay Mask -->
+          <!-- 定位遮罩掩模 (Optical Mask Layer) -->
           <div class="absolute inset-0 pointer-events-none">
-            <!-- Dark overlay outside the circle -->
+            <!-- 圆外半透明区域蒙板设计 -->
             <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
               <defs>
                 <mask id="hole">
@@ -596,7 +570,7 @@ async function handleCropConfirm() {
             </div>
           </div>
 
-          <!-- Instructions -->
+          <!-- 操作指引说明 (Guidance Overlay) -->
           <div
             class="absolute bottom-4 left-0 right-0 text-center text-white/50 text-xs pointer-events-none"
           >
