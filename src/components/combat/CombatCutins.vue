@@ -110,60 +110,72 @@
 
   <!-- 战斗心流动效层 (Combat Flow Animation Overlay) -->
   <Teleport to="body">
-    <div
-      v-if="showCombatFlow"
-      class="fixed inset-0 z-[200] flex items-center justify-center overflow-hidden pointer-events-none font-display"
-    >
-      <!-- 背景：深邃虚空 -->
-      <div class="absolute inset-0 bg-black animate-fade-in duration-500"></div>
-
-      <!-- Moving Purple Fog/Nebula -->
+    <transition name="intro-fade">
       <div
-        class="absolute inset-0 bg-gradient-to-br from-purple-900/60 via-transparent to-black mix-blend-screen animate-pulse-slow"
-      ></div>
-
-      <!-- 角色居中发光切入 (Character Cut-in) -->
-      <div
-        class="absolute inset-0 flex items-center justify-center z-10 transition-all duration-1000"
-        :class="
-          combatFlowPhase === 'start'
-            ? 'opacity-0 scale-150 blur-sm'
-            : 'opacity-100 scale-100 blur-0'
-        "
+        v-if="showCombatFlow"
+        class="fixed inset-0 z-[200] flex items-center justify-center overflow-hidden pointer-events-none font-display"
       >
-        <img
-          :src="playerSpriteUrl"
-          class="h-[80vh] object-contain drop-shadow-[0_0_50px_rgba(168,85,247,0.8)] filter brightness-125 contrast-125 animate-float-slow"
-        />
-      </div>
+        <!-- 背景：深邃虚空 -->
+        <div class="absolute inset-0 bg-black animate-fade-in duration-500"></div>
 
-      <!-- Text Layer -->
-      <div
-        class="absolute z-20 flex flex-col items-center justify-center gap-4 mix-blend-hard-light"
-        v-if="combatFlowPhase === 'impact' || combatFlowPhase === 'end'"
-      >
-        <h1
-          class="text-8xl md:text-9xl font-black italic text-transparent bg-clip-text bg-gradient-to-t from-white to-purple-300 font-display animate-glitch-slam tracking-tighter drop-shadow-[0_0_20px_rgba(255,255,255,0.8)]"
-        >
-          COMBAT FLOW
-        </h1>
-        <div class="h-1 w-0 bg-white animate-expand-width shadow-[0_0_10px_white]"></div>
-        <p
-          class="text-2xl md:text-3xl text-purple-200 font-mono tracking-[1em] animate-fade-in-up uppercase"
-        >
-          Zone Activated
-        </p>
-      </div>
+        <!-- Moving Purple Fog/Nebula -->
+        <div
+          class="absolute inset-0 bg-gradient-to-br from-purple-900/60 via-transparent to-black mix-blend-screen animate-pulse-slow"
+        ></div>
 
-      <!-- Vignette & Speed lines -->
-      <div
-        class="absolute inset-0 bg-[radial-gradient(circle,transparent_40%,#000_100%)] z-30"
-      ></div>
-      <div
-        class="absolute inset-0 z-10 opacity-30 animate-pulse-fast bg-[repeating-linear-gradient(90deg,transparent,transparent_50px,rgba(168,85,247,0.1)_50px,rgba(168,85,247,0.1)_51px)]"
-        v-if="combatFlowPhase === 'impact'"
-      ></div>
-    </div>
+        <!-- 角色居中发光切入 (Character Cut-in) -->
+        <div
+          class="absolute inset-0 flex items-center justify-center z-10 transition-all"
+          :class="
+            combatFlowPhase === 'start'
+              ? 'duration-1000 opacity-0 scale-150 blur-sm'
+              : combatFlowPhase === 'end'
+                ? 'animate-warp-out'
+                : 'duration-1000 opacity-100 scale-100 blur-0'
+          "
+        >
+          <img
+            :src="playerSpriteUrl"
+            class="h-[80vh] object-contain drop-shadow-[0_0_50px_rgba(168,85,247,0.8)] filter brightness-125 contrast-125 animate-float-slow"
+          />
+        </div>
+
+        <!-- Text Layer -->
+        <div
+          class="absolute z-20 flex flex-col items-center justify-center gap-4 mix-blend-hard-light"
+          v-if="combatFlowPhase === 'impact' || combatFlowPhase === 'end'"
+          :class="combatFlowPhase === 'end' ? 'animate-text-glitch-out' : ''"
+        >
+          <h1
+            class="text-8xl md:text-9xl font-black italic text-transparent bg-clip-text bg-gradient-to-t from-white to-purple-300 font-display animate-glitch-slam tracking-tighter drop-shadow-[0_0_20px_rgba(255,255,255,0.8)]"
+          >
+            COMBAT FLOW
+          </h1>
+          <div class="h-1 w-0 bg-white animate-expand-width shadow-[0_0_10px_white]"></div>
+          <p
+            class="text-2xl md:text-3xl text-purple-200 font-mono tracking-[1em] animate-fade-in-up uppercase"
+          >
+            Zone Activated
+          </p>
+        </div>
+
+        <!-- Vignette & Speed lines -->
+        <div
+          class="absolute inset-0 bg-[radial-gradient(circle,transparent_40%,#000_100%)] z-30 transition-opacity duration-1000"
+          :class="combatFlowPhase === 'end' ? 'opacity-0' : 'opacity-100'"
+        ></div>
+        <div
+          class="absolute inset-0 z-10 opacity-30 animate-pulse-fast bg-[repeating-linear-gradient(90deg,transparent,transparent_50px,rgba(168,85,247,0.1)_50px,rgba(168,85,247,0.1)_51px)]"
+          v-if="combatFlowPhase === 'impact'"
+        ></div>
+
+        <!-- 终极白屏闪耀退出 (White Flash Out) -->
+        <div
+          class="absolute inset-0 z-[100] pointer-events-none"
+          :class="combatFlowPhase === 'end' ? 'animate-flash-out' : 'opacity-0'"
+        ></div>
+      </div>
+    </transition>
   </Teleport>
 </template>
 
@@ -285,6 +297,33 @@ defineProps<{
   50% {
     transform: translateY(-20px);
   }
+}
+
+@keyframes warp-out {
+  0% { transform: scale(1) translateY(0) scaleY(1); filter: blur(0px) brightness(1); opacity: 1; }
+  30% { transform: scale(0.95) translateY(10px) scaleY(0.95); filter: blur(2px) brightness(1.5); opacity: 1; }
+  100% { transform: scale(1.5) translateY(-50px) scaleY(2) scaleX(1.2); filter: blur(20px) brightness(3); opacity: 0; }
+}
+.animate-warp-out {
+  animation: warp-out 0.6s cubic-bezier(0.5, 0, 0.2, 1) forwards;
+}
+
+@keyframes text-glitch-out {
+  0% { transform: scale(1); filter: drop-shadow(0 0 20px rgba(255,255,255,0.8)); opacity: 1; }
+  20% { transform: scale(1.05) skewX(10deg); filter: drop-shadow(0 0 40px rgba(168,85,247,1)); opacity: 1; }
+  100% { transform: scale(1.2) scaleX(1.8) skewX(-20deg); filter: blur(10px); opacity: 0; }
+}
+.animate-text-glitch-out {
+  animation: text-glitch-out 0.5s cubic-bezier(0.5, 0, 0.2, 1) forwards;
+}
+
+@keyframes flash-out {
+  0% { background-color: rgba(255,255,255,0); backdrop-filter: brightness(1) invert(0); }
+  20% { background-color: rgba(255,255,255,0.8); backdrop-filter: brightness(2) invert(1); }
+  100% { background-color: rgba(255,255,255,0); backdrop-filter: brightness(1) invert(0); }
+}
+.animate-flash-out {
+  animation: flash-out 0.8s ease-out forwards;
 }
 
 .animate-flash-fade { animation: flashFade 0.3s ease-out forwards; }

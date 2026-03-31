@@ -293,7 +293,7 @@ export const useGameStore = defineStore('game', () => {
       buffs: [],
       shield: 0,
       dodgeRate: 0.15,
-      pPoints: 0,
+      pPoints: 70,
       maxPPoints: 100,
       actionPoints: 2,
       maxActionPoints: 2,

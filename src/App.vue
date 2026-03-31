@@ -705,6 +705,13 @@ function handleHelpAction(action: string) {
   }
 }
 
+function handleCombatRetry() {
+  userOpenCombat.value = false; // 先强制闭库进行状态机清理喵
+  setTimeout(() => {
+    handleHelpAction('startCombatTutorial');
+  }, 450);
+}
+
 // 移动端分屏面板切换中心
 function handleMobilePanelSwitch(panel: 'chat' | 'status' | 'map' | 'characters' | 'quests') {
   mobileActivePanel.value = panel;
@@ -942,7 +949,12 @@ const mpAllReady = computed(() => {
     <PromptBuilder :is-open="isPromptBuilderOpen" @close="isPromptBuilderOpen = false" />
     <MapPanel :is-open="isMapOpen" @close="isMapOpen = false" />
     <ConfirmDialog />
-    <CombatOverlay :visible="userOpenCombat" @close="userOpenCombat = false" />
+    <!-- 战斗系统叠加层 -->
+    <CombatOverlay 
+      :visible="userOpenCombat" 
+      @close="userOpenCombat = false" 
+      @retry="handleCombatRetry"
+    />
     <IzakayaGame
       v-if="gameStore.state.system.management?.isActive"
       @close="handleManagementClose"

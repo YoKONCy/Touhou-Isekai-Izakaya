@@ -242,7 +242,7 @@ export const GUIDE_CONTENT: GuideSection[] = [
 ### 🎓 战斗教程示例
 想要亲自体验一下战斗系统的魅力吗？我们为您准备了一个完全隔离的“教程沙箱”。在这里，您可以尝试使用预设的符卡和道具，与一名练习妖精进行实战演练。
 
-**[🚀 开始战斗教程示例 (action:startCombatTutorial)]**
+**[🚀 开始战斗教程示例](action:startCombatTutorial)**
 *(提示：此教程中的数值与您的实际剧情存档完全独立，请放心尝试喵！)*
 `
   },
@@ -468,7 +468,7 @@ export const GUIDE_CONTENT: GuideSection[] = [
     id: 'multiplayer',
     title: '全能联机中心',
     content: `
-# 全能联机中心 (Multiplayer Hub)
+# 全能联机中心
 
 通过“全能联机中心”，您可以跨越时空的限制，与现实中的伙伴在幻想乡并肩作战或共同经营。
 
@@ -540,7 +540,7 @@ export const GUIDE_CONTENT: GuideSection[] = [
 2. **生成质量**: 质量很大程度上取决于您所使用的 API 供应商和模型版本。推荐使用 NovelAI V4 以获得更强的自然语言理解能力。
 3. **网络环境**: 由于图片数据较大，请确保您的网络环境稳定。
 
-### 常见问题排查 (Troubleshooting)
+### 常见问题排查
 
 **Q: 提示 CORS 跨域错误或请求失败怎么办？**
 - **原因**：NovelAI 官方接口 (\`image.novelai.net\`) 不允许浏览器直接调用。

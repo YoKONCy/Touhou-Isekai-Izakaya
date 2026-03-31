@@ -110,7 +110,7 @@
           :isLogExpanded="isLogExpanded"
           :streamingNarrative="streamingNarrative"
           :combatLogs="combatLogs"
-          :isGameOver="isGameOver"
+          :isGameOver="false"
           @toggle-log="isLogExpanded = !isLogExpanded"
           @close-combat="closeCombat"
         />
@@ -143,20 +143,80 @@
         <!-- 游戏结束结算大幕 -->
         <div
           v-if="isGameOver"
-          class="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm z-30 animate-fade-in pointer-events-auto"
+          class="absolute inset-0 flex items-center justify-center z-50 pointer-events-auto transition-all duration-1000 overflow-hidden"
+          :class="
+            gameResult === 'win'
+              ? 'bg-black/60 backdrop-blur-sm'
+              : 'bg-black/90 backdrop-blur-md'
+          "
         >
+          <!-- 背景特效层 (Background Effects) -->
           <div
-            class="text-8xl font-black italic font-display mb-4 animate-slam tracking-tighter"
-            :class="
-              gameResult === 'win'
-                ? 'text-yellow-400 drop-shadow-[0_0_30px_rgba(234,179,8,0.8)]'
-                : 'text-red-600 drop-shadow-[0_0_30px_rgba(220,38,38,0.8)]'
-            "
-          >
-            {{ gameResult === 'win' ? '胜利' : '战败' }}
-          </div>
-          <div class="text-xl text-white/80 font-serif tracking-widest animate-fade-in-up">
-            {{ gameResult === 'win' ? '战斗胜利' : '战斗失败' }}
+            v-if="gameResult === 'loss'"
+            class="absolute inset-0 z-0 opacity-20 bg-[repeating-linear-gradient(transparent,transparent_2px,rgba(255,0,0,0.1)_2px,rgba(255,0,0,0.1)_4px)] mix-blend-color-burn"
+          ></div>
+          <div
+            v-if="gameResult === 'loss'"
+            class="absolute inset-0 z-0 bg-[radial-gradient(circle,transparent_30%,#300_100%)] opacity-80"
+          ></div>
+
+          <div
+            v-if="gameResult === 'win'"
+            class="absolute inset-0 z-0 bg-[radial-gradient(circle,rgba(250,204,21,0.2)_0%,transparent_60%)] animate-pulse-slow"
+          ></div>
+
+          <!-- 前景交互层 (Foreground Interaction) -->
+          <div class="relative z-10 w-full max-w-6xl mx-auto flex items-center justify-center h-full">
+            
+            <!-- 核心大字组 (Title Group) -->
+            <div 
+              class="absolute flex flex-col items-center animate-title-sequence"
+            >
+              <div
+                class="text-7xl md:text-9xl font-black italic font-display tracking-tighter"
+                :class="
+                  gameResult === 'win'
+                    ? 'text-yellow-400 drop-shadow-[0_0_30px_rgba(234,179,8,0.8)]'
+                    : 'text-red-700 drop-shadow-[0_0_30px_rgba(220,38,38,1)] pb-2 text-transparent bg-clip-text bg-gradient-to-b from-red-600 to-red-900 border-b-2 border-red-900/50'
+                "
+              >
+                {{ gameResult === 'win' ? '战斗胜利' : '满身疮痍' }}
+              </div>
+              <div
+                class="mt-2 text-xl md:text-3xl font-serif font-bold tracking-[1em] uppercase"
+                :class="gameResult === 'win' ? 'text-yellow-200/80' : 'text-red-500/80'"
+              >
+                {{ gameResult === 'win' ? 'STAGE CLEAR' : 'GAME OVER' }}
+              </div>
+            </div>
+
+            <!-- 按钮动作组 (Action Buttons Group) -->
+            <div 
+              class="absolute flex flex-col md:flex-row gap-4 md:gap-6 animate-buttons-sequence right-8 md:right-[20%]"
+            >
+              <!-- 战败独有：再次挑战按钮 -->
+              <button
+                v-if="gameResult === 'loss'"
+                @click="handleRetry"
+                class="px-8 md:px-12 py-3 rounded-full font-bold tracking-widest transition-all bg-red-950/50 text-red-500 border border-red-900/50 hover:bg-red-900 hover:text-white hover:shadow-[0_0_20px_rgba(185,28,28,0.8)]"
+              >
+                再次挑战
+              </button>
+
+              <!-- 通用：回到故事按钮 -->
+              <button
+                @click="closeCombat()"
+                class="px-8 md:px-12 py-3 rounded-full font-bold tracking-widest transition-all"
+                :class="
+                  gameResult === 'win'
+                    ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/50 hover:bg-yellow-500 hover:text-white hover:shadow-[0_0_20px_rgba(234,179,8,0.6)]'
+                    : 'bg-izakaya-wood/20 text-izakaya-wood/80 border border-izakaya-wood/40 hover:bg-izakaya-wood hover:text-white'
+                "
+              >
+                回到故事
+              </button>
+            </div>
+
           </div>
         </div>
       </div>
@@ -196,6 +256,15 @@ import CombatEnemyCard from '@/components/combat/CombatEnemyCard.vue';
 
 const gameStore = useGameStore();
 
+function handleRetry() {
+  const isTutorial = (gameStore.state.system.combat as any)?.tutorialMode;
+  if (isTutorial) {
+    emit('retry'); // 交给父级 App 统一调度重置喵
+  } else {
+    useToastStore().addToast({ message: '此战斗非沙箱模式，请读取存档以再次挑战喵', type: 'info' });
+  }
+}
+
 // 监听战斗激活状态以同步（仅限主机段）
 watch(
   () => gameStore.state.system.combat,
@@ -231,7 +300,7 @@ watch(
 const props = defineProps<{
   visible?: boolean;
 }>();
-const emit = defineEmits(['close', 'combat-end']);
+const emit = defineEmits(['close', 'combat-end', 'retry']);
 
 // --- BGM 背景音乐管理模块 ---
 const bgmFiles = import.meta.glob(
@@ -3726,5 +3795,27 @@ function closeCombat() {
 
 .list-complete-leave-active {
   position: absolute;
+}
+
+/* 5. 结算画面 (Game Over / Stage Clear) 分段式出场特效 */
+@keyframes title-slide-left {
+  0% { transform: translateX(0) scale(1.4); opacity: 0; filter: blur(10px); }
+  10% { transform: translateX(0) scale(1); opacity: 1; filter: drop-shadow(0 0 50px rgba(255,255,255,0.8)); }
+  45% { transform: translateX(0) scale(1); opacity: 1; filter: blur(0); }
+  60% { transform: translateX(-15vw) scale(0.9); opacity: 1; filter: blur(1px); }
+  100% { transform: translateX(-15vw) scale(0.9); opacity: 1; filter: blur(0); }
+}
+.animate-title-sequence {
+  animation: title-slide-left 4.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes buttons-appear {
+  0% { opacity: 0; transform: translateX(40px); pointer-events: none; filter: blur(10px); }
+  55% { opacity: 0; transform: translateX(40px); pointer-events: none; filter: blur(5px); }
+  70% { opacity: 1; transform: translateX(0); pointer-events: auto; filter: blur(0); }
+  100% { opacity: 1; transform: translateX(0); pointer-events: auto; filter: blur(0); }
+}
+.animate-buttons-sequence {
+  animation: buttons-appear 4.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 </style>
