@@ -731,8 +731,13 @@ function handleCombatRetry() {
     // 逻辑：如果存在保存的初始快照，则直接根据快照回滚状态并重新开启喵
     if (combat && combat.initialSnapshot) {
       console.log('[App] 检测到初始快照，执行战斗状态原地回滚喵...');
-      // 深度克隆快照以防止后续污染，同时标记其转入待定状态喵
-      gameStore.state.system.combat = JSON.parse(JSON.stringify(combat.initialSnapshot));
+      
+      const snapshotClone = JSON.parse(JSON.stringify(combat.initialSnapshot));
+      // 核心修复：把快照本身再次作为备份挂载回克隆出的状态对象中，
+      // 否则玩家如果在同一场战斗里第二次战败，就会因为丢失它而掉进沙盒里喵！
+      snapshotClone.initialSnapshot = JSON.parse(JSON.stringify(combat.initialSnapshot));
+      
+      gameStore.state.system.combat = snapshotClone;
       userOpenCombat.value = true;
       audioManager.playPageFlip();
     } else {
