@@ -348,6 +348,9 @@ export const useGameStore = defineStore('game', () => {
       ],
       bgm_suggestion: '常规'
     };
+    
+    // 保存初始快照以便重开喵
+    combatState.initialSnapshot = JSON.parse(JSON.stringify(combatState));
 
     state.value.system.combat = combatState;
   }

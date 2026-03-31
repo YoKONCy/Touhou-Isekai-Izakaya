@@ -26,16 +26,19 @@
         ></div>
       </div>
 
-      <!-- 斩击连段特效 (Combo Slash) -->
-      <div v-if="activeEffect.type === 'slash'" class="relative w-[300px] h-[300px]">
+      <!-- 斩击连段特效 (Combo Slash - 疾速轻盈且锐利) -->
+      <div v-if="activeEffect.type === 'slash'" class="relative w-[400px] h-[400px] -translate-x-1/2 -translate-y-1/2">
+        <!-- 基础剑芒爆发原点 (Star Burst) -->
         <div
-          class="absolute inset-0 bg-white clip-shard-diag-1 animate-slash-combo-1 mix-blend-overlay"
+          class="absolute inset-0 bg-white clip-slash-burst animate-slash-combo-3 mix-blend-screen"
         ></div>
+        <!-- 主斩击：极速斜切的锐利白光 -->
         <div
-          class="absolute inset-0 bg-blue-100 clip-shard-diag-2 animate-slash-combo-2 mix-blend-screen"
+          class="absolute inset-[10%] bg-white clip-slash-primary animate-slash-combo-1 mix-blend-overlay"
         ></div>
+        <!-- 副斩击：带蓝色残影的十字反切 -->
         <div
-          class="absolute inset-0 bg-white clip-rect-left animate-slash-combo-3 mix-blend-overlay"
+          class="absolute inset-[10%] bg-cyan-300 clip-slash-secondary animate-slash-combo-2 mix-blend-screen"
         ></div>
       </div>
 
@@ -256,14 +259,14 @@ defineProps<{
 </script>
 
 <style scoped>
-.clip-shard-diag-1 {
-  clip-path: polygon(100% 0, 0 0, 0 100%);
+.clip-slash-primary {
+  clip-path: polygon(0% 50%, 40% 48%, 100% 50%, 40% 52%);
 }
-.clip-shard-diag-2 {
-  clip-path: polygon(100% 0, 0 0, 100% 100%);
+.clip-slash-secondary {
+  clip-path: polygon(0% 50%, 60% 48%, 100% 50%, 60% 52%);
 }
-.clip-rect-left { 
-  clip-path: polygon(10% 0, 100% 0, 100% 100%, 0% 100%); 
+.clip-slash-burst {
+  clip-path: polygon(50% 0%, 52% 48%, 100% 50%, 52% 52%, 50% 100%, 48% 52%, 0% 50%, 48% 48%);
 }
 .clip-triangle {
   clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
@@ -396,19 +399,22 @@ defineProps<{
 }
 
 @keyframes slashCombo1 {
-  0% { transform: scale(0) rotate(20deg) translate(-50px, -50px); opacity: 0; }
-  30% { transform: scale(1.5) rotate(20deg) translate(0, 0); opacity: 1; }
-  100% { transform: scale(1.2) rotate(20deg) translate(20px, 20px); opacity: 0; }
+  0% { transform: scale(0, 0) rotate(15deg); opacity: 1; }
+  15% { transform: scale(1.5, 0.4) rotate(15deg); opacity: 1; filter: drop-shadow(0 0 15px rgba(255,255,255,0.9)); }
+  40% { transform: scale(2.2, 0) rotate(15deg); opacity: 0; filter: drop-shadow(0 0 20px rgba(255,255,255,0.5)); }
+  100% { transform: scale(2.2, 0) rotate(15deg); opacity: 0; }
 }
 @keyframes slashCombo2 {
-  0% { transform: scale(0) rotate(-20deg) translate(50px, -50px); opacity: 0; }
-  30% { transform: scale(1.5) rotate(-20deg) translate(0, 0); opacity: 1; }
-  100% { transform: scale(1.2) rotate(-20deg) translate(-20px, 20px); opacity: 0; }
+  0% { transform: scale(0, 0) rotate(-35deg); opacity: 1; }
+  20% { transform: scale(1.6, 0.5) rotate(-35deg); opacity: 1; filter: drop-shadow(0 0 15px rgba(103,232,249,0.9)); }
+  45% { transform: scale(2.5, 0) rotate(-35deg); opacity: 0; filter: drop-shadow(0 0 20px rgba(103,232,249,0.5)); }
+  100% { transform: scale(2.5, 0) rotate(-35deg); opacity: 0; }
 }
 @keyframes slashCombo3 {
-  0% { transform: scale(0) rotate(0deg); opacity: 0; }
-  40% { transform: scale(1.5) rotate(180deg); opacity: 1; }
-  100% { transform: scale(2) rotate(180deg); opacity: 0; }
+  0% { transform: scale(0); opacity: 1; }
+  15% { transform: scale(1.2) rotate(45deg); opacity: 1; filter: drop-shadow(0 0 20px rgba(255,255,255,1)); }
+  40% { transform: scale(0) rotate(90deg); opacity: 0; }
+  100% { transform: scale(0) rotate(90deg); opacity: 0; }
 }
 
 @keyframes wordProjectile {

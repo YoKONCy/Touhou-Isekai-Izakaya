@@ -131,4 +131,5 @@ export interface CombatState {
   result?: 'win' | 'loss' | 'escape';
   bgm_suggestion?: string;
   tutorialMode?: boolean; // 新增：是否为教学模式
+  initialSnapshot?: CombatState; // 新增：初始快照用于重开战斗喵
 }

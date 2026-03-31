@@ -1432,6 +1432,9 @@ class GameLoopService {
       bgm_suggestion: triggerData.bgm_suggestion || '常规'
     };
 
+    // 保存战斗开始时的初始快照，用于支持后续的重开功能喵
+    combatState.initialSnapshot = JSON.parse(JSON.stringify(combatState));
+
     gameStore.setCombatState(combatState);
 
     // 房主端：向客机广播战斗初始化

@@ -48,8 +48,12 @@
         :playerSpriteUrl="getSpriteUrl('主角')"
       />
 
-      <!-- 第0层：底层背景 -->
-      <div class="absolute inset-0 bg-gradient-to-br from-red-900/20 via-black to-blue-900/20 z-0">
+      <!-- 第0层：底层背景 (新增空处点击取消预选动作之锚点功能喵) -->
+      <div 
+        class="absolute inset-0 bg-gradient-to-br from-red-900/20 via-black to-blue-900/20 z-[5]"
+        :class="selectionMode && !isActing ? 'cursor-pointer' : ''"
+        @click="cancelSelection"
+      >
         <div class="absolute inset-0 bg-texture-stardust opacity-10 mix-blend-overlay"></div>
         <div class="absolute inset-0 overflow-hidden">
           <div
@@ -142,7 +146,7 @@
 
         <!-- 游戏结束结算大幕 -->
         <div
-          v-if="isGameOver"
+          v-if="showResultScreen"
           class="absolute inset-0 flex items-center justify-center z-50 pointer-events-auto transition-all duration-1000 overflow-hidden"
           :class="
             gameResult === 'win'
@@ -192,7 +196,7 @@
 
             <!-- 按钮动作组 (Action Buttons Group) -->
             <div 
-              class="absolute flex flex-col md:flex-row gap-4 md:gap-6 animate-buttons-sequence right-8 md:right-[20%]"
+              class="absolute flex flex-col md:flex-row gap-4 md:gap-6 animate-buttons-sequence right-8 md:right-[15%]"
             >
               <!-- 战败独有：再次挑战按钮 -->
               <button
@@ -257,12 +261,7 @@ import CombatEnemyCard from '@/components/combat/CombatEnemyCard.vue';
 const gameStore = useGameStore();
 
 function handleRetry() {
-  const isTutorial = (gameStore.state.system.combat as any)?.tutorialMode;
-  if (isTutorial) {
-    emit('retry'); // 交给父级 App 统一调度重置喵
-  } else {
-    useToastStore().addToast({ message: '此战斗非沙箱模式，请读取存档以再次挑战喵', type: 'info' });
-  }
+  emit('retry'); // 统一交给父级执行环境进行状态回滚或沙箱重启喵
 }
 
 // 监听战斗激活状态以同步（仅限主机段）
@@ -580,15 +579,21 @@ async function executeCombatLogic(
 
       if (isSupport) {
         const targets = [actor, ...allies.value].filter((t) => t.hp > 0);
+        let hasHealed = false;
         for (const t of targets) {
+          // Buff 附着
           if (spell.buffDetails) applyBuff(t, spell.buffDetails, 'buff');
-          else if (typeStr === 'heal' && spell.damage > 0) {
+          
+          // 如果该群体技能是纯治疗且带固定回复量，则执行群体拉血喵
+          if (typeStr === 'heal' && spell.damage && spell.damage > 0) {
             const newHp = Math.min(t.maxHp, t.hp + spell.damage);
             t.hp = newHp;
             updateCombatantState(t.id, { hp: newHp });
             addPopup(t, spell.damage, 'heal');
+            hasHealed = true;
           }
         }
+        if (hasHealed) audioManager.playHeal();
         addLog(`${actor.name} 释放了 ${spell.name}，温暖的光芒包围了大家喵！`);
       } else {
         for (const enemy of enemies.value) {
@@ -637,9 +642,15 @@ async function executeCombatLogic(
       }
 
       if (spell.type === 'shield' || spell.type === 'heal' || spell.type === 'buff') {
-        if (spell.buffDetails) applyBuff(finalTarget, spell.buffDetails, 'buff');
-        addLog(`${actor.name} 释放了 ${spell.name}，感觉力量涌上来了喵！`);
+        // 完全委托给底层的 executeAction，以实现精准的平白加血与 Buff 触发生效喵！
+        await executeAction(actor, finalTarget, 'spell', spell);
       } else {
+        if (!spell.isUltimate) {
+          triggerShake();
+          audioManager.playHeavyHit();
+          triggerEffect('hit', rect.width * 0.75, rect.height * 0.4);
+          await sleep(150); // 留出一丝受击停顿感喵
+        }
         // 逻辑降级回退方案：执行常规定向打击结算模块 喵
         await executeAction(actor, finalTarget, 'spell', spell);
       }
@@ -1013,6 +1024,7 @@ const phase = ref<'player' | 'ally' | 'enemy'>('player');
 const hoveredEnemyId = ref<string | null>(null);
 
 const isGameOver = ref(false);
+const showResultScreen = ref(false); // 控制最终结算画面淡入时机的视觉状态位喵
 const gameResult = ref<'win' | 'loss' | 'escape' | null>(null);
 const combatLogs = ref<CombatLog[]>([]);
 const isLogExpanded = ref(false);
@@ -1073,6 +1085,7 @@ watch(isActive, (val) => {
   if (val) {
     // 战斗开启时重置上下文状态分量
     isGameOver.value = false;
+    showResultScreen.value = false;
     gameResult.value = null;
     phase.value = 'player';
     isActing.value = false;
@@ -1687,8 +1700,9 @@ async function executeAction(
       defender.hp = newHp;
       updateCombatantState(defender.id, { hp: newHp });
 
+      audioManager.playHeal();
       addPopup(defender, result.heal, 'heal');
-      addLog(`${attacker.name} ${actionName}，恢复了 ${result.heal} 点HP！`);
+      addLog(result.description || `${attacker.name} 恢复了 ${result.heal} 点HP！`);
     } else if (result.damage <= 0) {
       // 处理闪避 (Miss) 或 0 点伤害的边缘情况 (仅在无伤害且无治疗时触发)喵
       if (result.isHit && spell && spell.buffDetails) {
@@ -2341,6 +2355,17 @@ async function handleTalk() {
   }
 }
 
+// 点击战场空白处、安全取消并抛弃任何正在手边的动作锚点 喵
+function cancelSelection() {
+  if (selectionMode.value && !isActing.value) {
+    audioManager.playSoftClick(); // 播放一声柔和的回退提示音
+    selectionMode.value = false;
+    pendingAction.value = null;
+    currentMenu.value = 'main'; // 降级退回至战斗决策主菜单
+    addLog('[系统] 取消了动作预选。');
+  }
+}
+
 // 目标选取完成后的执行回调 (目标选取与执行)
 async function selectTarget(target: UICombatant) {
   if (!selectionMode.value || !pendingAction.value || isActing.value || phase.value !== 'player')
@@ -2640,6 +2665,16 @@ async function processAllyTurn() {
             triggerEffect('hit_aoe', rect.width * 0.5, rect.height * 0.5);
           } else {
             audioManager.playHeavyHit();
+            // 在目标坐标处播放爆炸受击特效点缀
+            const t = targets[0];
+            let hitTx = rect.width * 0.5;
+            let hitTy = rect.height * 0.5;
+            if (t) {
+              const isTargetEnemy = !t.isPlayer && t.team === 'enemy';
+              hitTx = isTargetEnemy ? rect.width * 0.75 : rect.width * 0.25;
+              hitTy = rect.height * 0.6;
+            }
+            triggerEffect('hit', hitTx, hitTy);
           }
         }
 
@@ -2782,6 +2817,16 @@ async function processEnemyTurn() {
           const isSupport = ['heal', 'buff', 'shield'].includes(selectedSpell.type || '');
           const rect = document.body.getBoundingClientRect();
 
+          // 精准计算并缓存敌方目标的受击坐标喵
+          let hitTx = rect.width * 0.25;
+          let hitTy = rect.height * 0.5;
+          const hitTarget = targets[0];
+          if (hitTarget) {
+            const isTargetPlayer = hitTarget.isPlayer || hitTarget.team === 'player';
+            hitTx = isTargetPlayer ? rect.width * 0.25 : rect.width * 0.75;
+            hitTy = isTargetPlayer ? rect.height * 0.6 : rect.height * 0.7;
+          }
+
           if (isUltimateTrigger) {
             if (isSupport) {
               // 作用在敌方自己半场 (右侧)
@@ -2790,12 +2835,18 @@ async function processEnemyTurn() {
               // 作用在玩家正义半场 (左侧)
               triggerEffect('spell', rect.width * 0.25, rect.height * 0.5);
             }
+          } else {
+            // 普通技能补全单体弹道追踪视效喵
+            triggerEffect('spell_single', hitTx, hitTy);
           }
 
-          await sleep(isUltimateTrigger ? 1500 : 300);
+          await sleep(isUltimateTrigger ? 1500 : 800);
           if (!isSupport) {
             triggerShake();
             audioManager.playHeavyHit();
+            if (!isUltimateTrigger) {
+              triggerEffect('hit', hitTx, hitTy);
+            }
           }
 
           // 针对判定的所有受影响目标进行数值摊派执行
@@ -2845,6 +2896,8 @@ async function processEnemyTurn() {
 }
 
 function checkWinLoss() {
+  if (isGameOver.value) return; // 防止因 DoT 或多次追击导致重复结算喵
+
   if (enemies.value.every((e) => e.hp <= 0)) {
     isGameOver.value = true;
     gameResult.value = 'win';
@@ -2858,9 +2911,24 @@ function checkWinLoss() {
         onPopup: (target, val, type) => addPopup(target as UICombatant, val, type)
       });
     }
+
+    // 延迟拉起最终大幕，留出 2.5 秒供敌人破碎、化作光粒退场喵
+    setTimeout(() => {
+      if (isGameOver.value && gameResult.value === 'win') {
+        showResultScreen.value = true;
+      }
+    }, 2500);
+
   } else if (player.value && player.value.hp <= 0) {
     isGameOver.value = true;
     gameResult.value = 'loss';
+
+    // 战败可以快一点，但也要给个 1.5 秒的震惊/倒下缓冲期喵
+    setTimeout(() => {
+      if (isGameOver.value && gameResult.value === 'loss') {
+        showResultScreen.value = true;
+      }
+    }, 1500);
   }
 }
 
@@ -3802,8 +3870,8 @@ function closeCombat() {
   0% { transform: translateX(0) scale(1.4); opacity: 0; filter: blur(10px); }
   10% { transform: translateX(0) scale(1); opacity: 1; filter: drop-shadow(0 0 50px rgba(255,255,255,0.8)); }
   45% { transform: translateX(0) scale(1); opacity: 1; filter: blur(0); }
-  60% { transform: translateX(-15vw) scale(0.9); opacity: 1; filter: blur(1px); }
-  100% { transform: translateX(-15vw) scale(0.9); opacity: 1; filter: blur(0); }
+  60% { transform: translateX(-25vw) scale(0.85); opacity: 1; filter: blur(1px); }
+  100% { transform: translateX(-25vw) scale(0.85); opacity: 1; filter: blur(0); }
 }
 .animate-title-sequence {
   animation: title-slide-left 4.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;

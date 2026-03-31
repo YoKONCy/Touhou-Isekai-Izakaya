@@ -706,9 +706,22 @@ function handleHelpAction(action: string) {
 }
 
 function handleCombatRetry() {
+  const combat = gameStore.state.system.combat;
+  
   userOpenCombat.value = false; // 先强制闭库进行状态机清理喵
+  
   setTimeout(() => {
-    handleHelpAction('startCombatTutorial');
+    // 逻辑：如果存在保存的初始快照，则直接根据快照回滚状态并重新开启喵
+    if (combat && combat.initialSnapshot) {
+      console.log('[App] 检测到初始快照，执行战斗状态原地回滚喵...');
+      // 深度克隆快照以防止后续污染，同时标记其转入待定状态喵
+      gameStore.state.system.combat = JSON.parse(JSON.stringify(combat.initialSnapshot));
+      userOpenCombat.value = true;
+      audioManager.playPageFlip();
+    } else {
+      // 回退逻辑：尝试调用标准的教学入口（适配旧有逻辑）
+      handleHelpAction('startCombatTutorial');
+    }
   }, 450);
 }
 
