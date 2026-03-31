@@ -181,7 +181,7 @@
                 :class="
                   gameResult === 'win'
                     ? 'text-yellow-400 drop-shadow-[0_0_30px_rgba(234,179,8,0.8)]'
-                    : 'text-red-700 drop-shadow-[0_0_30px_rgba(220,38,38,1)] pb-2 text-transparent bg-clip-text bg-gradient-to-b from-red-600 to-red-900 border-b-2 border-red-900/50'
+                    : 'text-red-700 drop-shadow-[0_0_30px_rgba(220,38,38,1)] pb-2 pr-4 text-transparent bg-clip-text bg-gradient-to-b from-red-600 to-red-900 border-b-2 border-red-900/50'
                 "
               >
                 {{ gameResult === 'win' ? '战斗胜利' : '满身疮痍' }}
@@ -300,6 +300,24 @@ const props = defineProps<{
   visible?: boolean;
 }>();
 const emit = defineEmits(['close', 'combat-end', 'retry']);
+
+// 监听外层控制组件开启的生命周期：在此强制剥离上一场残留的结算与日志状态喵！
+watch(
+  () => props.visible,
+  (newVal, oldVal) => {
+    if (newVal && !oldVal) {
+      console.log('[CombatOverlay] 监听到面板重新拉起，清理战斗幽灵缓存喵');
+      isGameOver.value = false;
+      showResultScreen.value = false;
+      gameResult.value = null;
+      exitedEnemyIds.value = [];
+      combatLogs.value = [];
+      phase.value = 'player';
+      selectionMode.value = false;
+      pendingAction.value = null;
+    }
+  }
+);
 
 // --- BGM 背景音乐管理模块 ---
 const bgmFiles = import.meta.glob(
@@ -1463,6 +1481,11 @@ async function triggerEffect(
 
 function startCombat() {
   if (combatState.value) {
+    // 作为主动发起战斗的双重保险，抹除结算幽灵状态喵
+    isGameOver.value = false;
+    showResultScreen.value = false;
+    gameResult.value = null;
+    exitedEnemyIds.value = [];
     // 首先启动全屏战斗开场演出序列 (Intro Animation Sequence)喵
     showIntro.value = true;
     playIntroSequence();

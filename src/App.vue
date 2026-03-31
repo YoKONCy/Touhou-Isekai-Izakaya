@@ -18,6 +18,7 @@ import SummaryModal from '@/components/SummaryModal.vue';
 import HelpModal from '@/components/HelpModal.vue';
 import ToastContainer from '@/components/ToastContainer.vue';
 import NewPlayerGuide from '@/components/NewPlayerGuide.vue';
+import CombatDemoGuide from '@/components/CombatDemoGuide.vue';
 import MultiplayerHub from '@/components/MultiplayerHub.vue';
 import DecisionOverlay from '@/components/DecisionOverlay.vue';
 import {
@@ -103,6 +104,16 @@ const isHelpOpen = ref(false);
 const isMultiplayerHubOpen = ref(false);
 const isDecisionOverlayOpen = ref(false);
 const helpInitialSectionId = ref<string | undefined>(undefined);
+const isGuideVisible = ref(true);
+
+const isGuideActive = computed(() => {
+  return (
+    isGuideVisible.value &&
+    saveStore.isDefaultSave &&
+    chatStore.messages.length < 20 &&
+    !gameStore.multiplayer.isMultiplayer
+  );
+});
 
 // 移动端导航状态管理
 const mobileActivePanel = ref<'chat' | 'status' | 'map' | 'characters' | 'quests'>('chat');
@@ -703,6 +714,12 @@ function handleHelpAction(action: string) {
       audioManager.playPageFlip();
       break;
   }
+}
+
+function handleCombatTutorial() {
+  gameStore.startCombatTutorial();
+  userOpenCombat.value = true;
+  audioManager.playPageFlip();
 }
 
 function handleCombatRetry() {
@@ -1342,8 +1359,14 @@ const mpAllReady = computed(() => {
         <div ref="chatContainer" class="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth">
           <!-- New Player Guide -->
           <NewPlayerGuide
+            v-model:is-visible="isGuideVisible"
             @open-save-manager="isSaveManagerOpen = true"
             @open-help="isHelpOpen = true"
+          />
+
+          <!-- 战斗教学沙盒快捷入口喵 -->
+          <CombatDemoGuide
+            @start-demo="handleCombatTutorial"
           />
 
           <!-- Load More Button -->
@@ -1532,7 +1555,8 @@ const mpAllReady = computed(() => {
               v-if="
                 gameStore.quickReplies.length > 0 &&
                 !gameLoop.isProcessing.value &&
-                !gameLoop.isBackgroundProcessing.value
+                !gameLoop.isBackgroundProcessing.value &&
+                !isGuideActive
               "
               class="flex flex-wrap gap-2 animate-fade-in-up"
             >
@@ -1573,12 +1597,16 @@ const mpAllReady = computed(() => {
                       @blur="isInputFocused = false"
                       @keydown="handleInputKeydown"
                       :disabled="
-                        gameLoop.isProcessing.value || gameLoop.isBackgroundProcessing.value
+                        gameLoop.isProcessing.value ||
+                        gameLoop.isBackgroundProcessing.value ||
+                        isGuideActive
                       "
                       :placeholder="
-                        gameLoop.isBackgroundProcessing.value
-                          ? '正在后台处理，请稍等...'
-                          : '在此书写你的行动...'
+                        isGuideActive
+                          ? '请先完成新玩家引导并创建存档喵~'
+                          : gameLoop.isBackgroundProcessing.value
+                            ? '正在后台处理，请稍等...'
+                            : '在此书写你的行动...'
                       "
                       class="absolute bottom-0 left-0 w-full rounded-none px-2 py-3 focus:outline-none resize-none transition-all duration-300 ease-out origin-bottom font-serif-display text-xl text-ink placeholder:text-ink-light/40 leading-relaxed"
                       :class="[
@@ -1612,7 +1640,7 @@ const mpAllReady = computed(() => {
                     v-if="!gameLoop.isProcessing.value && !gameLoop.isBackgroundProcessing.value"
                     @click="handleSend"
                     class="p-3 bg-touhou-red hover:bg-touhou-red-dark text-white rounded-full transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 border-4 border-white/20 group/send"
-                    :disabled="!userInput.trim()"
+                    :disabled="!userInput.trim() || isGuideActive"
                     title="发送 (Enter)"
                   >
                     <Send

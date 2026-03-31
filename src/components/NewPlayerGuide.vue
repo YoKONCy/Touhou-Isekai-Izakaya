@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+
 import { useSaveStore } from '@/stores/save';
 import { useChatStore } from '@/stores/chat';
 import { Sparkles, X, ArrowRight, Save, HelpCircle } from 'lucide-vue-next';
@@ -7,7 +7,7 @@ import { audioManager } from '@/services/audio';
 
 const saveStore = useSaveStore();
 const chatStore = useChatStore();
-const isVisible = ref(true);
+const isVisible = defineModel<boolean>('isVisible', { default: true });
 
 const emit = defineEmits<{
   (e: 'openSaveManager'): void;
