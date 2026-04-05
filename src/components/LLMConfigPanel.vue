@@ -100,6 +100,25 @@
     <!-- 全局服务商设置显示区 (Global Provider Settings) 喵 -->
     <div v-else class="relative z-10 space-y-3">
       <div>
+        <label class="block text-xs font-bold text-izakaya-wood/60 mb-1 font-display"
+          >使用全局服务商</label
+        >
+        <select
+          v-model="config.globalProviderId"
+          @change="debouncedSave"
+          class="w-full mb-3 text-sm bg-white/60 border border-izakaya-wood/20 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:border-touhou-red/50 focus:ring-1 focus:ring-touhou-red/20 transition-all font-mono text-izakaya-wood"
+        >
+          <option value="">默认服务商</option>
+          <option
+            v-for="provider in settingsStore.globalProviders"
+            :key="provider.id"
+            :value="provider.id"
+          >
+            {{ provider.name }}
+          </option>
+        </select>
+      </div>
+      <div>
         <label class="block text-xs font-bold text-izakaya-wood/60 mb-1 font-display">模型</label>
         <div class="flex gap-2">
           <select
@@ -323,7 +342,15 @@ const props = defineProps<{
 
 const settingsStore = useSettingsStore();
 const config = computed(() => settingsStore.llmConfigs[props.configKey]!);
-const globalProvider = computed(() => settingsStore.globalProvider);
+const globalProvider = computed(() => {
+  if (config.value.globalProviderId) {
+    const provider = settingsStore.globalProviders.find(
+      (p) => p.id === config.value.globalProviderId
+    );
+    if (provider) return provider;
+  }
+  return settingsStore.globalProviders[0] || { baseUrl: '', apiKey: '' };
+});
 
 const models = ref<ModelInfo[]>([]);
 const isLoadingModels = ref(false);

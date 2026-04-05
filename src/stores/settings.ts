@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { dbService } from '@/services/DatabaseService';
 import _ from 'lodash';
 import {
@@ -8,18 +8,26 @@ import {
   DEFAULT_NOVELAI_V4_PROMPT_SYSTEM
 } from '@/services/drawing';
 
+export interface GlobalProvider {
+  id: string;
+  name: string;
+  baseUrl: string;
+  apiKey: string;
+}
+
 export interface LLMConfig {
   id: string;
   name: string;
   enabled: boolean;
   useGlobal: boolean; // 是否继承全局 API 配置
+  globalProviderId?: string; // 指定使用的全局服务商 ID，如果不指定则使用默认（第一个）
   provider: {
     baseUrl: string;
     apiKey: string;
   };
   model: string;
   maxContextTokens?: number; // 可选的上下文窗口限制 (Tokens 数)
-  
+
   // 进阶设置 (Advanced Settings)
   stream?: boolean; // 默认为 true
   timeout?: number; // 默认 300000ms (5分钟)
@@ -118,10 +126,38 @@ const DEFAULT_LLM_CONFIGS: Record<string, LLMConfig> = {
 };
 
 export const useSettingsStore = defineStore('settings', () => {
-  // 全局 API 供应方配置（缺省）
-  const globalProvider = ref({
-    baseUrl: '',
-    apiKey: ''
+  // 全局 API 供应方配置列表
+  const globalProviders = ref<GlobalProvider[]>([
+    {
+      id: 'default',
+      name: '默认服务商',
+      baseUrl: '',
+      apiKey: ''
+    }
+  ]);
+
+  // 全局 API 供应方配置（缺省） - 保留以兼容旧接口
+  const globalProvider = computed({
+    get: () => {
+      const first = globalProviders.value[0];
+      return first ? { baseUrl: first.baseUrl, apiKey: first.apiKey } : { baseUrl: '', apiKey: '' };
+    },
+    set: (val: { baseUrl: string; apiKey: string }) => {
+      if (globalProviders.value.length > 0) {
+        const first = globalProviders.value[0];
+        if (first) {
+          first.baseUrl = val.baseUrl;
+          first.apiKey = val.apiKey;
+        }
+      } else {
+        globalProviders.value.push({
+          id: 'default',
+          name: '默认服务商',
+          baseUrl: val.baseUrl,
+          apiKey: val.apiKey
+        });
+      }
+    }
   });
 
   const llmConfigs = ref<Record<string, LLMConfig>>(_.cloneDeep(DEFAULT_LLM_CONFIGS));
@@ -172,7 +208,20 @@ export const useSettingsStore = defineStore('settings', () => {
   async function loadSettings() {
     const settings = await dbService.getSettings();
     if (settings) {
-      if (settings.globalProvider) globalProvider.value = settings.globalProvider;
+      if (settings.globalProviders && Array.isArray(settings.globalProviders)) {
+        globalProviders.value = settings.globalProviders;
+      } else if (settings.globalProvider) {
+        // 兼容旧存档
+        globalProviders.value = [
+          {
+            id: 'default',
+            name: '默认服务商',
+            baseUrl: settings.globalProvider.baseUrl || '',
+            apiKey: settings.globalProvider.apiKey || ''
+          }
+        ];
+      }
+
       if (settings.llmConfigs) {
         // 元数据同步 (Metadata Sync)：将持久化配置与默认模板执行合并，确保新字段 (如 maxContextTokens) 合法存在
         const savedConfigs = settings.llmConfigs;
@@ -251,7 +300,8 @@ export const useSettingsStore = defineStore('settings', () => {
     // 执行内存深拷贝，规避 Vue Proxy 代理对象在 IndexedDB 存储时的序列化异常
     const settingsToSave = {
       id: 1,
-      globalProvider: JSON.parse(JSON.stringify(globalProvider.value)),
+      globalProviders: JSON.parse(JSON.stringify(globalProviders.value)),
+      globalProvider: JSON.parse(JSON.stringify(globalProvider.value)), // 保留以兼容旧接口
       llmConfigs: JSON.parse(JSON.stringify(llmConfigs.value)),
       enableMemoryRefinement: enableMemoryRefinement.value,
       enableManagementSystem: enableManagementSystem.value,
@@ -279,6 +329,7 @@ export const useSettingsStore = defineStore('settings', () => {
     const config: any = {
       version: 2, // Upgraded version to include game data
       timestamp: Date.now(),
+      globalProviders: globalProviders.value,
       globalProvider: globalProvider.value,
       llmConfigs: llmConfigs.value,
       audio: {
@@ -315,12 +366,27 @@ export const useSettingsStore = defineStore('settings', () => {
       const config = JSON.parse(jsonStr);
 
       // 合规性校验 (Sanity Check)：在执行前确保文件包含有效的版本标识或核心数据分片
-      if (!config.version || (!config.globalProvider && !config.gameData)) {
+      if (
+        !config.version ||
+        (!config.globalProvider && !config.globalProviders && !config.gameData)
+      ) {
         throw new Error('无效的备份文件：缺少版本号或必要数据');
       }
 
       // 1. 引导导入全局配置分片
-      if (config.globalProvider) globalProvider.value = config.globalProvider;
+      if (config.globalProviders && Array.isArray(config.globalProviders)) {
+        globalProviders.value = config.globalProviders;
+      } else if (config.globalProvider) {
+        globalProviders.value = [
+          {
+            id: 'default',
+            name: '默认服务商',
+            baseUrl: config.globalProvider.baseUrl || '',
+            apiKey: config.globalProvider.apiKey || ''
+          }
+        ];
+      }
+
       if (config.llmConfigs) {
         const mergedConfigs = _.cloneDeep(DEFAULT_LLM_CONFIGS);
         for (const key in config.llmConfigs) {
@@ -365,9 +431,17 @@ export const useSettingsStore = defineStore('settings', () => {
     const mergedConfig = { ...defaultConfig, ...config };
 
     if (mergedConfig.useGlobal) {
+      let activeProvider = globalProviders.value.find(
+        (p: GlobalProvider) => p.id === mergedConfig.globalProviderId
+      );
+      if (!activeProvider) {
+        activeProvider =
+          globalProviders.value[0] || ({ baseUrl: '', apiKey: '' } as GlobalProvider);
+      }
+
       return {
-        baseUrl: globalProvider.value.baseUrl,
-        apiKey: globalProvider.value.apiKey,
+        baseUrl: activeProvider.baseUrl,
+        apiKey: activeProvider.apiKey,
         model: mergedConfig.model,
         maxContextTokens: mergedConfig.maxContextTokens,
         // 包含所有带默认值的进阶设置 (Include advanced settings)
@@ -423,6 +497,7 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   return {
+    globalProviders,
     globalProvider,
     llmConfigs,
     enableMemoryRefinement,

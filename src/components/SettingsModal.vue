@@ -405,6 +405,34 @@ function handleVolumeChangeTest() {
     audioManager.playSoftClick();
   }
 }
+
+function addGlobalProvider() {
+  const store = settingsStore as any;
+  if (store.globalProviders) {
+    store.globalProviders.push({
+      id: `provider_${Date.now()}`,
+      name: '新服务商',
+      baseUrl: '',
+      apiKey: ''
+    });
+  }
+}
+
+function removeGlobalProvider(index: number) {
+  const store = settingsStore as any;
+  if (store.globalProviders && store.globalProviders.length > 1) {
+    const providerId = store.globalProviders[index].id;
+    store.globalProviders.splice(index, 1);
+
+    // 如果有LLM配置正在使用被删除的服务商，重置为默认
+    for (const key in store.llmConfigs) {
+      const config = store.llmConfigs[key];
+      if (config && config.globalProviderId === providerId && store.globalProviders[0]) {
+        config.globalProviderId = store.globalProviders[0].id;
+      }
+    }
+  }
+}
 </script>
 
 <template>
@@ -475,27 +503,67 @@ function handleVolumeChangeTest() {
                 模块可以选择继承此配置，也可以覆盖使用独立的配置。
               </p>
 
-              <div class="space-y-4">
-                <div>
-                  <label class="block text-sm font-bold text-izakaya-wood mb-1 font-display"
-                    >默认 Base URL</label
-                  >
-                  <input
-                    v-model="settingsStore.globalProvider.baseUrl"
-                    type="text"
-                    class="w-full bg-white/50 border border-izakaya-wood/20 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:border-touhou-red/50 focus:ring-1 focus:ring-touhou-red/20 transition-all font-mono text-sm text-izakaya-wood placeholder:text-izakaya-wood/30"
-                    placeholder="https://api.openai.com/v1"
-                  />
-                </div>
-                <div>
-                  <label class="block text-sm font-bold text-izakaya-wood mb-1 font-display"
-                    >默认 API Key</label
-                  >
-                  <input
-                    v-model="settingsStore.globalProvider.apiKey"
-                    type="password"
-                    class="w-full bg-white/50 border border-izakaya-wood/20 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:border-touhou-red/50 focus:ring-1 focus:ring-touhou-red/20 transition-all font-mono text-sm text-izakaya-wood placeholder:text-izakaya-wood/30"
-                  />
+              <div
+                class="space-y-4"
+                v-if="settingsStore.globalProviders && settingsStore.globalProviders.length > 0"
+              >
+                <!-- 全局服务商列表管理 -->
+                <div class="space-y-4 pt-4 border-t border-izakaya-wood/10">
+                  <div class="flex items-center justify-between">
+                    <h4 class="font-bold text-sm text-izakaya-wood font-display">服务商列表</h4>
+                    <button
+                      @click="addGlobalProvider"
+                      class="flex items-center gap-1 px-2 py-1 bg-touhou-red/10 hover:bg-touhou-red/20 text-touhou-red rounded text-xs transition-colors font-bold"
+                    >
+                      <span class="text-lg leading-none">+</span> 添加服务商
+                    </button>
+                  </div>
+
+                  <div class="space-y-3">
+                    <div
+                      v-for="(provider, index) in settingsStore.globalProviders"
+                      :key="provider.id"
+                      class="p-3 bg-white/40 border border-izakaya-wood/10 rounded-lg relative group transition-all hover:border-touhou-red/30"
+                    >
+                      <div class="flex justify-between items-start mb-2">
+                        <div class="flex-1 mr-4">
+                          <input
+                            v-model="provider.name"
+                            type="text"
+                            class="w-full bg-transparent border-b border-transparent hover:border-izakaya-wood/20 focus:border-touhou-red/50 px-1 py-0.5 text-sm font-bold text-izakaya-wood focus:outline-none transition-colors"
+                            placeholder="服务商名称"
+                          />
+                        </div>
+                        <button
+                          v-if="settingsStore.globalProviders.length > 1"
+                          @click="removeGlobalProvider(index)"
+                          class="p-1 text-izakaya-wood/40 hover:text-touhou-red transition-colors opacity-0 group-hover:opacity-100"
+                          title="删除此服务商"
+                        >
+                          <X class="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div class="space-y-2">
+                        <div>
+                          <input
+                            v-model="provider.baseUrl"
+                            type="text"
+                            class="w-full bg-white/50 border border-izakaya-wood/20 rounded-md shadow-sm px-2 py-1.5 focus:outline-none focus:border-touhou-red/50 focus:ring-1 focus:ring-touhou-red/20 transition-all font-mono text-xs text-izakaya-wood placeholder:text-izakaya-wood/30"
+                            placeholder="https://api.openai.com/v1"
+                          />
+                        </div>
+                        <div>
+                          <input
+                            v-model="provider.apiKey"
+                            type="password"
+                            class="w-full bg-white/50 border border-izakaya-wood/20 rounded-md shadow-sm px-2 py-1.5 focus:outline-none focus:border-touhou-red/50 focus:ring-1 focus:ring-touhou-red/20 transition-all font-mono text-xs text-izakaya-wood placeholder:text-izakaya-wood/30"
+                            placeholder="API Key"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <!-- 全局配置导出与恢复按钮 (Export/Import Buttons) 喵 -->
@@ -1276,21 +1344,27 @@ function handleVolumeChangeTest() {
                 </div>
 
                 <!-- 神秘的特殊数据开关 (NSFW Display Switch - Mysterious Switch) 喵 -->
-                <div class="p-4 border border-izakaya-wood/10 rounded-lg bg-marisa-gold/5 relative overflow-hidden group/switch">
+                <div
+                  class="p-4 border border-izakaya-wood/10 rounded-lg bg-marisa-gold/5 relative overflow-hidden group/switch"
+                >
                   <!-- Decorative sparkle -->
-                  <div class="absolute -right-2 -top-2 opacity-10 group-hover/switch:opacity-30 transition-opacity">
+                  <div
+                    class="absolute -right-2 -top-2 opacity-10 group-hover/switch:opacity-30 transition-opacity"
+                  >
                     <Sparkles class="w-12 h-12 text-marisa-gold" />
                   </div>
 
                   <div class="flex items-center justify-between relative z-10">
                     <div>
-                      <div class="font-bold text-sm text-izakaya-wood font-display flex items-center gap-2">
+                      <div
+                        class="font-bold text-sm text-izakaya-wood font-display flex items-center gap-2"
+                      >
                         神秘的小开关
-                        <span class="text-[8px] px-1 bg-touhou-red text-white rounded">EXPERIMENTAL</span>
+                        <span class="text-[8px] px-1 bg-touhou-red text-white rounded"
+                          >EXPERIMENTAL</span
+                        >
                       </div>
-                      <div class="text-[10px] text-izakaya-wood/60 font-serif mt-1">
-                        ???
-                      </div>
+                      <div class="text-[10px] text-izakaya-wood/60 font-serif mt-1">???</div>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
                       <input
